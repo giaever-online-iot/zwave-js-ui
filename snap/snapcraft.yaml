@@ -1,0 +1,101 @@
+name: zwavejs2mqtt
+base: core20
+version: 'v1.0.5'
+summary: Fully configurable Zwave to MQTT Gateway and Control Panel. 
+description: |
+  - Configurable Zwave to Mqtt Gateway
+  - Home Assistant integration (beta)
+  - Zwave Control Panel:
+    - Nodes management: check all nodes discovered in the z-wave network, send/receive nodes values updates directly from the UI and send action to the nodes and controller for diagnostics and network heal Custom Node naming and Location: Starting from v1.3.0 nodes name and location are stored in a JSON file named nodes.json. This because not all nodes have native support for naming and location features (#45). This change is back compatible with older versions of this package: on startup it will get all nodes names and location from the zwcfg_homeHEX.xml file (if present) and create the new nodes.json file based on that. This file can be imported/exported from the UI control panel with the import/export buttons placed on the top of nodes table, on the right of controller actions select.
+    - Firmware updates: You are able to send firmware updates to your devices using the UI, just select the controller action Begin Firmware Update
+    - Groups associations: create associations between nodes (also supports multi-instance associations, need to use last version of zwave-js)
+    - Custom scenes management
+  - Log debug in UI
+  - Mesh graph showing devices neighbors
+grade: stable # must be 'stable' to release into candidate/stable channels
+confinement: strict # use 'strict' once you have the right plugs and slots
+
+apps:
+  zwavejs2mqtt:
+    daemon: simple
+    restart-condition: always
+    environment:
+      STORE_DIR: $SNAP_DATA
+      DAEMONIZED: 1
+    command: usr/lib/zwavejs2mqtt/bin/www
+    command-chain:
+      - bin/env-wrapper
+    plugs:
+      - network
+      - network-bind
+      - raw-usb
+  exec:
+    environment:
+      STORE_DIR: $SNAP_DATA
+    command: usr/lib/zwavejs2mqtt/bin/www
+    command-chain:
+      - bin/env-wrapper
+    plugs:
+      - network
+      - network-bind
+      - raw-usb
+  help:
+    command: bin/env-wrapper --help
+  enable:
+    command: bin/daemonize
+  disable:
+    command: bin/de-daemonize
+  restart:
+    command: bin/restart
+
+layout:
+  /usr/src/app/store:
+    bind: $SNAP_DATA/zwavejs2mqtt/store
+  #/usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config/devices/index.json:
+  /usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config/devices/index.json:
+    bind-file: $SNAP/usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config/devices/index.json
+
+parts:
+  zwavejs2mqtt:
+    after: [nodejs]
+    plugin: npm
+    source: https://github.com/zwave-js/zwavejs2mqtt.git
+    source-tag: $SNAPCRAFT_PROJECT_VERSION
+    npm-node-version: '12.20.0'
+    build-packages:
+      - gcc
+      - build-essential
+    stage-packages:
+      - git
+    override-build: |
+      set -ex
+      npm config set unsafe-perm true
+      npm install detect-libc
+      npm run build
+      chmod +x $SNAPCRAFT_PART_BUILD/bin/www
+      cp -rf $SNAPCRAFT_PART_BUILD $SNAPCRAFT_PART_INSTALL/usr/lib/zwavejs2mqtt
+    stage:
+      - -usr/lib/zwavejs2mqtt/kubernetes
+      - -usr/lib/zwavejs2mqtt/kustomization.yaml
+      - -usr/lib/zwavejs2mqtt/docker
+      - -usr/lib/zwavejs2mqtt/.dockerignore
+      - -usr/lib/zwavejs2mqtt/.git*
+      - -usr/lib/zwavejs2mqtt/.markdown*
+  nodejs:
+    plugin: dump
+    source:
+      - on amd64: https://nodejs.org/dist/v12.20.0/node-v12.20.0-linux-x64.tar.gz
+      - on arm64: https://nodejs.org/dist/v12.20.0/node-v12.20.0-linux-arm64.tar.gz
+      - on armhf: https://nodejs.org/dist/v12.20.0/node-v12.20.0-linux-armv7l.tar.gz
+    organize:
+      '*.md' : nodejs/
+      LICENSE : nodejs/
+    prime:
+      - -include
+      - -share
+
+  local:
+    plugin: dump
+    source: src/
+    organize:
+      hooks: snap/hooks

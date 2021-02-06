@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"
+
+if [ $? -eq 0 ]; then
+    echo "Service ${SNAP_NAME} disabled."
+    exit 0
+fi
+echo "Failed disabling ${SNAP_NAME} service"
+exit 1

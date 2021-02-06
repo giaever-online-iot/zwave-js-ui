@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+
+set -e
+
+if [ -z ${DAEMONIZED} ]; then
+    DAEMONIZED=0
+fi
+
+function lprint {
+    if [ ${DAEMONIZED} -eq 0 ]; then
+        echo ${1}
+    else
+        logger "${SNAP_NAME}: ${1}"
+    fi
+}
+
+if ! snapctl is-connected raw-usb; then
+    lprint "Please connect raw-usb interface!"
+    lprint "Run: snap connect ${SNAP_NAME}:raw-usb"
+    exit 1
+fi
+
+export USB_PATH=$(snapctl get usb-path)
+export SERVER_SSL=$(snapctl get server.ssl)
+export SERVER_HOST=$(snapctl get server.host)
+export SERVER_PORT=$(snapctl get server.port)
+
+export SERVER_URL=$(snapctl get server.url)
+export SERVER_WS_URL=$(snapctl get server.url)
+
+OPT_HELP=false
+
+if [ $(snapctl services "${SNAP_NAME}" | grep inactive | wc -l) -eq 0 -a ${OPT_HELP} = false ]; then
+    echo ""
+    for ARG in "${ARGV[@]}"; do
+        shift
+        if [ "${ARG}" = "--exec" ]; then
+            lprint "Service already running, showing help text."
+            lprint "Use: 'snap stop ${SNAP_NAME}' to stop the service and'"
+            lprint "to execute the ${SNAP_NAME} manually"
+            OPT_HELP=true
+            continue
+        fi
+        set -- "$@" "${ARG}"
+    done
+fi
+
+
+if [ ${OPT_HELP} = false ]; then
+    if [ ! -c "${USB_PATH}" ]; then 
+        lprint "usb-path (${USB_PATH}) does not exist, or is not a Character Device."
+        lprint "See: snap get ${SNAP_NAME} -d usb-path"
+        exit 1
+    fi
+else
+    echo "Zwavejs2mqtt ($ ($ 1 --version))"
+    echo ""
+    echo "IMPORTANT! The DAEMON/SERVICE is disabled by default after installation." 
+    echo "You have to manually 'daemonize' OpenZWave Daemon with executing the command"
+    echo ""
+    echo "$ ${SNAP_NAME}.enable"
+    echo ""
+    echo "But first set your configuration as descrived below"
+    echo ""
+    echo "Base configuration values:"
+    echo "- usb-path:               $(snapctl get "usb-path")"
+    echo "Server configuration values: $(snapctl get server -d)"
+    echo ""
+    echo "- server.ssl: Use secure communication"
+    echo "- server.host: IP address to bind to, e.g 127.0.0.1"
+    echo "- server.port: Port to reach the web interface"
+    echo "- server.url: Hostname for http/https"
+    echo "- server.ws-url: Hostname for websocket"
+    echo ""
+    echo "Set options with:         $ snap set ${SNAP_NAME} param=key"
+    echo "For example:              $ snap set ${SNAP_NAME} server.host=0.0.0.0"
+    echo ""
+    echo "Also see 'snap info ${SNAP_NAME}' for information about secure devices."
+    echo ""
+    echo "Follow the log with"
+    echo "$ snap logs ${SNAP_NAME} -f"
+    echo ""
+    echo "Other commands"
+    echo "Disable the daemon:       $ ${SNAP_NAME}.disable"
+    echo "Restart the daemon:       $ ${SNAP_NAME}.restart"
+    exit 0
+fi
+
+exec "$@"

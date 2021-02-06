@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+if ! snapctl is-connected raw-usb; then
+    echo "Failed to enable ${SNAP_NAME} service!"
+    echo ""
+    echo "Consult the help command:"
+    echo "${SNAP_NAME}.exec --help"
+    echo ""
+    echo "Ensure ${SNAP_NAME} is booting successfully before daemonize it"
+    echo "by running the app manually (remove the --help flag)."
+    exit 1
+fi
+
+snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
+
+if [ $? -eq 0 ]; then
+    echo "Service enabled! Follow logs with"
+    echo "$ snap logs ${SNAP_NAME}"
+    exit 0
+fi
+
+echo "Failed enabling service"
+exit 1

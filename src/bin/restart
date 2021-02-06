@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -e
+snapctl restart "${SNAP_NAME}.${SNAP_NAME}"

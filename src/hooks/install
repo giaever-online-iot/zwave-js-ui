@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -e
+
+snapctl set usb-path="/dev/ttyACM0"
+snapctl set server.ssl=false
+snapctl set server.host="localhost"
+snapctl set server.port="8091"
+snapctl set server.url=false
+snapctl set server.ws-url=false
+
+snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"

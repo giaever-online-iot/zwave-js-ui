@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -e
+# silence is golden.
+
+RUNNING=$(snapctl services | grep "${SNAP_NAME}" | grep inactive | wc -l)
+if [ ${RUNNING} -eq 0 ]; then
+    snapctl restart "${SNAP_NAME}"
+fi
