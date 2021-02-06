@@ -29,7 +29,7 @@ apps:
       - network
       - network-bind
       - raw-usb
-      - serial-port
+      - hardware-observe
   exec:
     environment:
       STORE_DIR: $SNAP_DATA
@@ -40,7 +40,6 @@ apps:
       - network
       - network-bind
       - raw-usb
-      - serial-port
       - hardware-observe
   help:
     command: bin/env-wrapper --help
