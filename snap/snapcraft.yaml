@@ -15,6 +15,14 @@ description: |
 grade: stable # must be 'stable' to release into candidate/stable channels
 confinement: strict # use 'strict' once you have the right plugs and slots
 
+assumes:
+  - command-chain
+
+architectures:
+  - build-on: amd64
+  - build-on: arm64
+  - build-on: armhf
+
 apps:
   zwavejs2mqtt:
     daemon: simple
@@ -24,7 +32,7 @@ apps:
       DAEMONIZED: 1
     command: usr/lib/zwavejs2mqtt/bin/www
     command-chain:
-      - bin/env-wrapper
+      - helper/env-wrapper
     plugs:
       - network
       - network-bind
@@ -35,14 +43,14 @@ apps:
       STORE_DIR: $SNAP_DATA
     command: usr/lib/zwavejs2mqtt/bin/www
     command-chain:
-      - bin/env-wrapper
+      - helper/env-wrapper
     plugs:
       - network
       - network-bind
       - raw-usb
       - hardware-observe
   help:
-    command: bin/env-wrapper --help
+    command: helper/env-wrapper --help
   enable:
     command: bin/daemonize
   disable:

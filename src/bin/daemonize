@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-if [ $(id -u) -ne 0 ]; then
-    echo "Run as root" >&2
-    exit 1
-fi
+source $SNAP/helper/functions
 
-if ! snapctl is-connected raw-usb; then
+require_root
+plugs_connected
+
+if [ $? -ne 0 ]; then
     echo "Failed to enable ${SNAP_NAME} service!" >&2
     echo ""
     echo "Consult the help command:" >&2
