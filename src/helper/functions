@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+function plugs_connected {
+    MISSING=0
+    if ! snapctl is-connected raw-usb; then
+        echo "Missing plug «raw-usb" >&2
+        MISSING=1
+    fi
+
+    if ! snapctl is-connected hardware-observe; then
+        echo "Missing plug «hardware-observe»" >&2
+        MISSING=1
+    fi
+
+    if [ $MISSING -ne 0 ]; then
+        echo "Plug with:" >&2
+        echo "$ sudo snap connect ${SNAP_NAME}:PLUG-NAME" >&2
+        return 1
+    fi
+    return 0
+}
+
+
+function is_root {
+    if [ ${EUID:-$(id -u)} -eq 0 ]; then
+        return 0
+    fi
+    return 1
+}
+
+function require_root {
+    is_root
+    if [ $? -eq 1 ]; then
+        echo "Running as root is required." >&2
+        echo "Re-run with sudo."
+        exit 1
+    fi
+}

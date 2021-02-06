@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+
+set -e
+source $SNAP/helper/functions
+
+if [ -z ${DAEMONIZED} ]; then
+    DAEMONIZED=0
+fi
+
+function lprint {
+    if [ ${DAEMONIZED} -eq 0 ]; then
+        echo ${1}
+    else
+        logger "${SNAP_NAME}: ${1}"
+    fi
+}
+
+export NETWORK_KEY=$(snapctl get network.key)
+
+if [ -f "${SNAP_DATA}/settings.json" ]; then
+    SETTINGS_KEY=$(jq '.zwave.networkKey' -r ${SNAP_DATA}/settings.json)
+    if [ "${SETTINGS_KEY}" != "" ] && [ "${NETWORK_KEY}" != "${SETTINGS_KEY}" ]; then
+        snapctl set network.key="${SETTINGS_KEY}"
+        export NETWORK_KEY="${SETTINGS_KEY}"
+    fi
+fi
+
+OPT_HELP=false
+
+if [ "${1}" = "--help" ]; then
+    OPT_HELP=true
+fi
+
+if [ ${OPT_HELP} = true ]; then
+    plugs_connected
+    if [ $? -ne 0 ]; then
+        echo ""
+        echo "NOTE! NOTE! NOTE!"
+        echo ""
+    fi
+    echo "Zwavejs2mqtt ($ ($ 1 --version))"
+    echo ""
+    echo "IMPORTANT! The DAEMON/SERVICE is disabled by default after installation." 
+    echo "You have to manually 'daemonize' OpenZWave Daemon with executing the command"
+    echo ""
+    echo "$ ${SNAP_NAME}.enable"
+    echo ""
+    echo "But first set your configuration as descrived below"
+    echo ""
+    echo "Base configuration values:"
+    echo "- network.key:               $(snapctl get network.key)"
+    echo "Server configuration values: $(snapctl get server -d)"
+    echo ""
+    echo "- server.ssl: Use secure communication"
+    echo "- server.host: IP address to bind to, e.g 127.0.0.1"
+    echo "- server.port: Port to reach the web interface"
+    echo "- server.url: Hostname for http/https"
+    echo "- server.ws-url: Hostname for websocket"
+    echo ""
+    echo "Set options with:         $ snap set ${SNAP_NAME} param=key"
+    echo "For example:              $ snap set ${SNAP_NAME} server.host=0.0.0.0"
+    echo ""
+    echo "Also see 'snap info ${SNAP_NAME}'."
+    echo ""
+    echo "Follow the log with"
+    echo "$ snap logs ${SNAP_NAME} -f"
+    echo ""
+    echo "Other commands"
+    echo "Disable the daemon:       $ ${SNAP_NAME}.disable"
+    echo "Restart the daemon:       $ ${SNAP_NAME}.restart"
+    exit 0
+fi
+
+require_root
+
+plugs_connected
+if [ $? -ne 0 ]; then
+    exit 1
+fi
+
+export SERVER_SSL=$(snapctl get server.ssl)
+export SERVER_HOST=$(snapctl get server.host)
+export SERVER_PORT=$(snapctl get server.port)
+export SERVER_URL=$(snapctl get server.url)
+export SERVER_WS_URL=$(snapctl get server.ws-url)
+export GIT_DIR="${SNAP}/usr/lib/zwavejs2mqtt/.git"
+
+exec "$@"
