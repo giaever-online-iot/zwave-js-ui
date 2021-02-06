@@ -29,6 +29,7 @@ apps:
       - network
       - network-bind
       - raw-usb
+      - serial-port
   exec:
     environment:
       STORE_DIR: $SNAP_DATA
@@ -39,6 +40,8 @@ apps:
       - network
       - network-bind
       - raw-usb
+      - serial-port
+      - hardware-observe
   help:
     command: bin/env-wrapper --help
   enable:
@@ -51,9 +54,8 @@ apps:
 layout:
   /usr/src/app/store:
     bind: $SNAP_DATA/zwavejs2mqtt/store
-  #/usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config/devices/index.json:
-  /usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config/devices/index.json:
-    bind-file: $SNAP/usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config/devices/index.json
+  /usr/config/devices/index.json:
+    bind-file: $SNAP_DATA/config/devices/index.json
 
 parts:
   zwavejs2mqtt:
@@ -69,12 +71,14 @@ parts:
       - jq
     stage-packages:
       - git
+      - udev
     override-build: |
       set -ex
       npm config set unsafe-perm true
       npm install detect-libc
       npm run build
       chmod +x $SNAPCRAFT_PART_BUILD/bin/www
+      ln -s /usr/config/devices/index.json $SNAPCRAFT_PART_BUILD/node_modules/\@zwave-js/config/config/devices/index.json
       cp -rf $SNAPCRAFT_PART_BUILD $SNAPCRAFT_PART_INSTALL/usr/lib/zwavejs2mqtt
     stage:
       - -usr/lib/zwavejs2mqtt/kubernetes

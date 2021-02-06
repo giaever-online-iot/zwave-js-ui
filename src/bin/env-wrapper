@@ -42,6 +42,8 @@ if [ "${1}" = "--help" ]; then
     OPT_HELP=true
 fi
 
+export GIT_DIR="${SNAP}/usr/lib/zwavejs2mqtt/.git"
+
 if [ ${OPT_HELP} = true ]; then
     echo "Zwavejs2mqtt ($ ($ 1 --version))"
     echo ""
