@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 
+if [ $(id -u) -ne 0 ]; then
+    echo "Run as root" >&2
+    exit 1
+fi
+
 if ! snapctl is-connected raw-usb; then
-    echo "Failed to enable ${SNAP_NAME} service!"
+    echo "Failed to enable ${SNAP_NAME} service!" >&2
     echo ""
-    echo "Consult the help command:"
-    echo "${SNAP_NAME}.exec --help"
+    echo "Consult the help command:" >&2
+    echo "${SNAP_NAME}.help" >&2
     echo ""
-    echo "Ensure ${SNAP_NAME} is booting successfully before daemonize it"
-    echo "by running the app manually (remove the --help flag)."
+    echo "Ensure ${SNAP_NAME} is booting successfully before daemonize it" >&2
+    echo "by running the app manually (${SNAP_NAME}.exec)." >&2
     exit 1
 fi
 
@@ -19,5 +24,5 @@ if [ $? -eq 0 ]; then
     exit 0
 fi
 
-echo "Failed enabling service"
+echo "Failed enabling service" >&2
 exit 1

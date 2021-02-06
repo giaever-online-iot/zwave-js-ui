@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
+
+if [ $(id -u) -ne 0 ]; then
+    echo "Run as root" >&2
+    exit 1
+fi
+
 snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"
 
 if [ $? -eq 0 ]; then
     echo "Service ${SNAP_NAME} disabled."
     exit 0
 fi
-echo "Failed disabling ${SNAP_NAME} service"
+echo "Failed disabling ${SNAP_NAME} service" >&2
 exit 1

@@ -65,6 +65,8 @@ parts:
     build-packages:
       - gcc
       - build-essential
+    stage-snaps:
+      - jq
     stage-packages:
       - git
     override-build: |
@@ -79,7 +81,6 @@ parts:
       - -usr/lib/zwavejs2mqtt/kustomization.yaml
       - -usr/lib/zwavejs2mqtt/docker
       - -usr/lib/zwavejs2mqtt/.dockerignore
-      - -usr/lib/zwavejs2mqtt/.git*
       - -usr/lib/zwavejs2mqtt/.markdown*
   nodejs:
     plugin: dump
