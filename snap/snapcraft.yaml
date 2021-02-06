@@ -53,8 +53,9 @@ apps:
 layout:
   /usr/src/app/store:
     bind: $SNAP_DATA/zwavejs2mqtt/store
-  /usr/config/devices/index.json:
-    bind-file: $SNAP_DATA/config/devices/index.json
+  $SNAP/usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config/devices/index.json:
+    # bind-file: $SNAP_DATA/config/devices/index.json
+    bind-file: $SNAP/usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config/devices/index.json
 
 parts:
   zwavejs2mqtt:
@@ -77,7 +78,6 @@ parts:
       npm install detect-libc
       npm run build
       chmod +x $SNAPCRAFT_PART_BUILD/bin/www
-      ln -s /usr/config/devices/index.json $SNAPCRAFT_PART_BUILD/node_modules/\@zwave-js/config/config/devices/index.json
       cp -rf $SNAPCRAFT_PART_BUILD $SNAPCRAFT_PART_INSTALL/usr/lib/zwavejs2mqtt
     stage:
       - -usr/lib/zwavejs2mqtt/kubernetes
