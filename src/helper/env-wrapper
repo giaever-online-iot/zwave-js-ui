@@ -88,7 +88,7 @@ export GIT_DIR="${SNAP}/usr/lib/zwavejs2mqtt/.git"
 
 export HTTPS="${SERVER_SSL}"
 
-if [ "${HTTPS}" != "true" ]; then
+if [ "${HTTPS}" != true ]; then
     unset HTTPS
     unset SERVER_SSL
 fi
