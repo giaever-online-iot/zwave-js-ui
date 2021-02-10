@@ -85,4 +85,7 @@ export SERVER_URL=$(snapctl get server.url)
 export SERVER_WS_URL=$(snapctl get server.ws-url)
 export GIT_DIR="${SNAP}/usr/lib/zwavejs2mqtt/.git"
 
+export HOST="${SERVER_HOST}"
+export PORT="${SERVER_PORT}"
+
 exec "$@"
