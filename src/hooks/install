@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -e
+source $SNAP/helper/functions
 
 snapctl set network.key="$(cat /dev/urandom | LC_ALL=C tr -dc '0-9A-F' | fold -w 32 | head -n 1)"
 snapctl set server.ssl=false
@@ -10,3 +11,5 @@ snapctl set server.url=false
 snapctl set server.ws-url=false
 
 snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"
+
+ensure_zwavejs_config

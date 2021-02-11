@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+set -e
+
+source $SNAP/helper/functions
+
+ensure_zwavejs_config

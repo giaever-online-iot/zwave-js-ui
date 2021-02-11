@@ -61,9 +61,9 @@ apps:
 layout:
   /usr/src/app/store:
     bind: $SNAP_DATA/zwavejs2mqtt/store
-  $SNAP/usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config/devices/index.json:
+  $SNAP/usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config:
     # bind-file: $SNAP_DATA/config/devices/index.json
-    bind-file: $SNAP/usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config/devices/index.json
+    bind: $SNAP/usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config
 
 parts:
   zwavejs2mqtt:
@@ -93,6 +93,8 @@ parts:
       - -usr/lib/zwavejs2mqtt/docker
       - -usr/lib/zwavejs2mqtt/.dockerignore
       - -usr/lib/zwavejs2mqtt/.markdown*
+    organize:
+      usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config: snap/zwave-js/config
   nodejs:
     plugin: dump
     source:
