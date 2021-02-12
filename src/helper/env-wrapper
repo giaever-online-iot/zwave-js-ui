@@ -54,8 +54,6 @@ if [ ${OPT_HELP} = true ]; then
     echo "- server.ssl: Use secure communication"
     echo "- server.host: IP address to bind to, e.g 127.0.0.1"
     echo "- server.port: Port to reach the web interface"
-    echo "- server.url: Hostname for http/https"
-    echo "- server.ws-url: Hostname for websocket"
     echo ""
     echo "Set options with:         $ snap set ${SNAP_NAME} param=key"
     echo "For example:              $ snap set ${SNAP_NAME} server.host=0.0.0.0"
@@ -81,8 +79,6 @@ fi
 export SERVER_SSL=$(snapctl get server.ssl)
 export SERVER_HOST=$(snapctl get server.host)
 export SERVER_PORT=$(snapctl get server.port)
-export SERVER_URL=$(snapctl get server.url)
-export SERVER_WS_URL=$(snapctl get server.ws-url)
 
 export GIT_DIR="${SNAP}/usr/lib/zwavejs2mqtt/.git"
 
