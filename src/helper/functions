@@ -2,30 +2,52 @@
 
 function ensure_zwavejs_config {
     ZWAVE_JS_CONF="${SNAP}/usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config"
-
     if [ "$(find ${ZWAVE_JS_CONF} -maxdepth 0 -empty -exec echo empty \;)" == "empty" ]; then
-        logger "Config directory is empty, copying data"
-        cp -rf $SNAP/snap/zwave-js/config/* "${ZWAVE_JS_CONF}" 
+        logger "Config directory is empty, copying data from ${SNAP}/snap/zwave-js/config"
+        rsync -raz "${SNAP}/snap/zwave-js/config" "${ZWAVE_JS_CONF}/.."
     fi
+    return 0
+}
+
+function same_network_key {
+    if [ -f "${SNAP_DATA}/settings.json" ]; then
+        SETTINGS_KEY=$(jq '.zwave.networkKey' -r ${SNAP_DATA}/settings.json)
+        if [ "${SETTINGS_KEY}" != "" ] && [ "${1}" != "${SETTINGS_KEY}" ]; then
+            echo "${SETTINGS_KEY}"
+            return 1
+        fi
+        return 0
+    fi
+    return 0
+}
+
+function plug_connected {
+    if ! snapctl is-connected "${1}"; then
+        echo "Missing plug: «${1}»" >&2
+        echo "Install with:"
+        echo "$ sudo snap connect ${SNAP_NAME}:${1}"
+        return 1
+    fi
+    return 0
 }
 
 function plugs_connected {
     MISSING=0
-    if ! snapctl is-connected raw-usb; then
-        echo "Missing plug «raw-usb" >&2
+
+    plug_connected "raw-usb"
+    if [ $? -ne 0 ]; then
         MISSING=1
     fi
 
-    if ! snapctl is-connected hardware-observe; then
-        echo "Missing plug «hardware-observe»" >&2
+    plug_connected "hardware-observe"
+    if [ $? -ne 0 ]; then
         MISSING=1
     fi
 
     if [ $MISSING -ne 0 ]; then
-        echo "Plug with:" >&2
-        echo "$ sudo snap connect ${SNAP_NAME}:PLUG-NAME" >&2
         return 1
     fi
+
     return 0
 }
 

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 
-set -e
 source $SNAP/helper/functions
 
-if [ -z ${DAEMONIZED} ]; then
+if [ -z "${DAEMONIZED}" ]; then
     DAEMONIZED=0
 fi
 
@@ -17,12 +16,10 @@ function lprint {
 
 export NETWORK_KEY=$(snapctl get network.key)
 
-if [ -f "${SNAP_DATA}/settings.json" ]; then
-    SETTINGS_KEY=$(jq '.zwave.networkKey' -r ${SNAP_DATA}/settings.json)
-    if [ "${SETTINGS_KEY}" != "" ] && [ "${NETWORK_KEY}" != "${SETTINGS_KEY}" ]; then
-        snapctl set network.key="${SETTINGS_KEY}"
-        export NETWORK_KEY="${SETTINGS_KEY}"
-    fi
+SETTINGS_KEY=$(same_network_key "${NETWORK_KEY}")
+if [ $? -ne 0 ]; then
+    snapctl set network.key="${SETTINGS_KEY}"
+    export NETWORK_KEY="${SETTINGS_KEY}"
 fi
 
 OPT_HELP=false
@@ -38,7 +35,7 @@ if [ ${OPT_HELP} = true ]; then
         echo "NOTE! NOTE! NOTE!"
         echo ""
     fi
-    echo "Zwavejs2mqtt ($ ($ 1 --version))"
+    echo "${SNAP_NAME} ($ ($ 1 --version))"
     echo ""
     echo "IMPORTANT! The DAEMON/SERVICE is disabled by default after installation." 
     echo "You have to manually 'daemonize' it with executing the command"
@@ -75,6 +72,8 @@ plugs_connected
 if [ $? -ne 0 ]; then
     exit 1
 fi
+
+ensure_zwavejs_config
 
 export SERVER_SSL=$(snapctl get server.ssl)
 export SERVER_HOST=$(snapctl get server.host)

@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 
 set -e
-# silence is golden.
+source $SNAP/helper/functions
 
 SERVER_SSL=$(snapctl get server.ssl)
 SERVER_PORT=$(snapctl get server.port)
 
 if [ $(echo "${SERVER_PORT}" | grep -E "^\-?[0-9]+$") = "" ]; then
-    echo "Port must be numeric, got ${SERVER_PORT}" >&2
+    echo "!! server.port must be numeric, got ${SERVER_PORT}" >&2
     exit 1
 fi
 
 if [ ${SERVER_SSL} != true -a ${SERVER_SSL} != false ]; then
-    echo "server.ssl must be boolean value" >&2
+    echo "!! server.ssl must be boolean value" >&2
     exit 1
 fi
 
@@ -31,3 +31,4 @@ if [ ${RUNNING} -eq 0 ]; then
     echo "Restarting ${SNAP_NAME}"
     snapctl restart "${SNAP_NAME}"
 fi
+
