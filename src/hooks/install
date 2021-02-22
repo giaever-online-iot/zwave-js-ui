@@ -4,7 +4,15 @@
 
 set -e 
 
-snapctl set network.key="$(cat /dev/urandom | LC_ALL=C tr -dc '0-9A-F' | fold -w 32 | head -n 1)"
+logger "SNAP_DATA: $(ls -al ${SNAP_DATA})"
+
+SETTINGS_KEY=$(same_network_key "")
+
+if [ $? -eq 0 ]; then
+    snapctl set network.key="$(cat /dev/urandom | LC_ALL=C tr -dc '0-9A-F' | fold -w 32 | head -n 1)"
+else
+    snapctl set network.key="${SETTINGS_KEY}"
+fi
 
 snapctl set server.ssl=false
 snapctl set server.host="localhost"
