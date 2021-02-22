@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-#source $SNAP/helper/functions
+source $SNAP/helper/functions
 
 set -e 
 
