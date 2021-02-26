@@ -83,9 +83,16 @@ export GIT_DIR="${SNAP}/usr/lib/zwavejs2mqtt/.git"
 
 export HTTPS="${SERVER_SSL}"
 
+export SESSION_SECRET=$(snapctl get session.secret)
+export USE_SECURE_COOKIE=$(snapctl get session.cookie-secure)
+
 if [ "${HTTPS}" != true ]; then
     unset HTTPS
     unset SERVER_SSL
+fi
+
+if [ "${USE_SECURE_COOKIE}" != true ]; then
+    unset USE_SECURE_COOKIE
 fi
 
 export HOST="${SERVER_HOST}"

@@ -67,3 +67,29 @@ function require_root {
         exit 1
     fi
 }
+
+function testnset_config {
+    logger "${SNAP_NAME}: Testing ${1}, or setting ${2}"
+    RES=$(snapctl get ${1})
+    if [ $? -ne 0 ] || [ -z "${RES}" ]; then
+        logger "${SNAP_NAME}: Setting ${1}=${2}"
+        RES=$(snapctl set ${1}=${2})
+        if [ $? -ne 0 ]; then
+            logger "${RES}"
+            exit 1
+        fi
+        return 0
+    else
+        logger "${SNAP_NAME}: ${1} has ${RES}, leaving as is"
+    fi
+    return 0
+}
+
+function test_default_config {
+    testnset_config "server.ssl" false
+    testnset_config "server.host" "localhost"
+    testnset_config "server.port" 8091
+
+    testnset_config "session.cookie-secure" false
+    testnset_config "session.secret" $(uuid)
+}

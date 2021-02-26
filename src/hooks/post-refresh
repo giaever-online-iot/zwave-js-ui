@@ -3,3 +3,5 @@
 source $SNAP/helper/functions
 
 ensure_zwavejs_config
+
+test_default_config

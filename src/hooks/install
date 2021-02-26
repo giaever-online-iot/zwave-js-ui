@@ -4,18 +4,13 @@ source $SNAP/helper/functions
 
 set -e 
 
-logger "SNAP_DATA: $(ls -al ${SNAP_DATA})"
-
 SETTINGS_KEY=$(same_network_key "")
 
 if [ $? -eq 0 ]; then
-    snapctl set network.key="$(cat /dev/urandom | LC_ALL=C tr -dc '0-9A-F' | fold -w 32 | head -n 1)"
-else
-    snapctl set network.key="${SETTINGS_KEY}"
+    SETTINGS_KEY=$(cat /dev/urandom | LC_ALL=C tr -dc '0-9A-F' | fold -w 32 | head -n 1)
 fi
 
-snapctl set server.ssl=false
-snapctl set server.host="localhost"
-snapctl set server.port="8091"
+testnset_config "network.key" "${SETTINGS_KEY}"
+test_default_config
 
 snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"
