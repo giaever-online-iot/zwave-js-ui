@@ -99,6 +99,9 @@ parts:
       - on amd64: https://nodejs.org/dist/v12.20.0/node-v12.20.0-linux-x64.tar.gz
       - on arm64: https://nodejs.org/dist/v12.20.0/node-v12.20.0-linux-arm64.tar.gz
       - on armhf: https://nodejs.org/dist/v12.20.0/node-v12.20.0-linux-armv7l.tar.gz
+    stage-packages:
+      - on armhf: 
+        - libatomic1
     organize:
       '*.md' : nodejs/
       LICENSE : nodejs/
