@@ -81,7 +81,7 @@ parts:
     override-build: |
       set -ex
       npm config set unsafe-perm true
-      npm install detect-libc
+      npm install npm@latest detect-libc
       npm run build
       chmod +x $SNAPCRAFT_PART_BUILD/bin/www
       cp -rf $SNAPCRAFT_PART_BUILD $SNAPCRAFT_PART_INSTALL/usr/lib/zwavejs2mqtt
