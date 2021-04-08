@@ -68,7 +68,7 @@ parts:
     plugin: npm
     source: https://github.com/zwave-js/zwavejs2mqtt.git
     source-tag: $SNAPCRAFT_PROJECT_VERSION
-    npm-node-version: '12.20.0'
+    npm-node-version: '15.14.0'
     build-packages:
       - gcc
       - build-essential
@@ -96,9 +96,9 @@ parts:
   nodejs:
     plugin: dump
     source:
-      - on amd64: https://nodejs.org/dist/v12.20.0/node-v12.20.0-linux-x64.tar.gz
-      - on arm64: https://nodejs.org/dist/v12.20.0/node-v12.20.0-linux-arm64.tar.gz
-      - on armhf: https://nodejs.org/dist/v12.20.0/node-v12.20.0-linux-armv7l.tar.gz
+      - on amd64: https://nodejs.org/dist/v15.14.0/node-v15.14.0-linux-x64.tar.gz
+      - on arm64: https://nodejs.org/dist/v15.14.0/node-v15.14.0-linux-arm64.tar.gz
+      - on armhf: https://nodejs.org/dist/v15.14.0/node-v15.14.0-linux-armv7l.tar.gz
     stage-packages:
       - on armhf: 
         - libatomic1
