@@ -1,6 +1,6 @@
 name: zwavejs2mqtt
 base: core20
-version: 'v3.2.1'
+version: 'v3.3.0'
 summary: Fully configurable Zwave to MQTT Gateway and Control Panel. 
 description: |
   - Configurable Zwave to Mqtt Gateway
