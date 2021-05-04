@@ -1,6 +1,6 @@
 name: zwavejs2mqtt
 base: core20
-version: 'v3.5.0'
+version: 'v4.0.1'
 summary: Fully configurable Zwave to MQTT Gateway and Control Panel. 
 description: |
   - Configurable Zwave to Mqtt Gateway
@@ -38,6 +38,7 @@ apps:
       - network
       - network-bind
       - raw-usb
+      - serial-port
       - hardware-observe
   exec:
     environment:
@@ -49,6 +50,7 @@ apps:
       - network
       - network-bind
       - raw-usb
+      - serial-port
       - hardware-observe
   help:
     command: helper/env-wrapper --help

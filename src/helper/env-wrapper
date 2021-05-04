@@ -52,6 +52,8 @@ if [ ${OPT_HELP} = true ]; then
     echo "- server.host: IP address to bind to, e.g 127.0.0.1"
     echo "- server.port: Port to reach the web interface"
     echo ""
+    echo "Session configuration values: $(snapctl get session -d)"
+    echo ""
     echo "Set options with:         $ snap set ${SNAP_NAME} param=key"
     echo "For example:              $ snap set ${SNAP_NAME} server.host=0.0.0.0"
     echo ""

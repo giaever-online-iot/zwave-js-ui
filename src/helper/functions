@@ -24,7 +24,7 @@ function same_network_key {
 function plug_connected {
     if ! snapctl is-connected "${1}"; then
         echo "Missing plug: «${1}»" >&2
-        echo "Install with:"
+        echo "Connect with:"
         echo "$ sudo snap connect ${SNAP_NAME}:${1}"
         return 1
     fi
@@ -34,9 +34,23 @@ function plug_connected {
 function plugs_connected {
     MISSING=0
 
-    plug_connected "raw-usb"
-    if [ $? -ne 0 ]; then
+    RAW_OUT=$(plug_connected "raw-usb")
+    RAW_RES=$?
+
+    SERIAL_OUT=$(plug_connected "serial-port")
+    SERIAL_RES=$?
+
+    if [ $RAW_RES -ne 0 -a $SERIAL_RES -ne 0 ]; then
+        echo $RAW_OUT
+        echo "----- OR -----"
+        echo $SERIAL_OUT
         MISSING=1
+    elif [ $RAW_RES -ne 0 ]; then
+        echo "OPTIONAL plug:"
+        echo $RAW_OUT
+    elif [ $SERIAL_RES -ne 0 ]; then
+        echo "OPTIONAL plug"
+        echo $SERIAL_OUT
     fi
 
     plug_connected "hardware-observe"
