@@ -1,6 +1,6 @@
 name: zwavejs2mqtt
 base: core20
-version: 'v4.2.1'
+version: 'v4.3.0'
 summary: Fully configurable Zwave to MQTT Gateway and Control Panel. 
 description: |
   - Configurable Zwave to Mqtt Gateway
@@ -83,11 +83,11 @@ parts:
       - udev
       - rsync
     override-build: |
-      if [ -n "$http_proxy" ]; then
+      set -ex
+      if [ -n "${http_proxy-}" ]; then
         export GLOBAL_AGENT_HTTP_PROXY="${http_proxy}"
         export GLOBAL_AGENT_HTTPS_PROXY="${http_proxy}"
       fi
-      set -ex
       npm config set unsafe-perm true
       npm install npm@latest detect-libc
       npm run build
