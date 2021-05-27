@@ -70,8 +70,8 @@ parts:
     after: [nodejs]
     plugin: npm
     source: https://github.com/zwave-js/zwavejs2mqtt.git
-    source-branch: "fix#1274"
-    #source-tag: $SNAPCRAFT_PROJECT_VERSION
+    #source-branch: "fix#1274"
+    source-tag: $SNAPCRAFT_PROJECT_VERSION
     npm-node-version: '15.14.0'
     build-packages:
       - gcc
