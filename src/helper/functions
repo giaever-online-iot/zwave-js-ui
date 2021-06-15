@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 function ensure_zwavejs_config {
-    ZWAVE_JS_CONF="${SNAP}/usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config"
+    ZWAVE_JS_CONF="${SNAP}/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config/config"
     if [ "$(find ${ZWAVE_JS_CONF} -maxdepth 0 -empty -exec echo empty \;)" == "empty" ]; then
         logger "Config directory is empty, copying data from ${SNAP}/snap/zwave-js/config"
         rsync -raz "${SNAP}/snap/zwave-js/config" "${ZWAVE_JS_CONF}/.."

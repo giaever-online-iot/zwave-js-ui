@@ -1,6 +1,6 @@
 name: zwavejs2mqtt
 base: core20
-version: 'v5.0.1'
+version: 'v5.0.2'
 summary: Fully configurable Zwave to MQTT Gateway and Control Panel. 
 description: |
   - Configurable Zwave to Mqtt Gateway
@@ -30,8 +30,9 @@ apps:
     restart-condition: always
     environment:
       STORE_DIR: $SNAP_DATA
+      ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
       DAEMONIZED: 1
-    command: usr/lib/zwavejs2mqtt/bin/www
+    command: lib/node_modules/yarn/bin/yarn run
     command-chain:
       - helper/env-wrapper
     plugs:
@@ -43,7 +44,9 @@ apps:
   exec:
     environment:
       STORE_DIR: $SNAP_DATA
-    command: usr/lib/zwavejs2mqtt/bin/www
+      ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
+      #command: lib/node_modules/zwavejs2mqtt/bin/www.ts
+    command: lib/node_modules/yarn/bin/yarn --cwd $SNAP/lib/node_modules/zwavejs2mqtt --global-folder $SNAP/lib/node_modules/npm/node_modules start
     command-chain:
       - helper/env-wrapper
     plugs:
@@ -62,45 +65,54 @@ apps:
     command: bin/restart
 
 layout:
-  $SNAP/usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config:
-    bind: $SNAP/usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config
+  $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config/config:
+    bind: $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config/config
 
 parts:
   zwavejs2mqtt:
     after: [nodejs]
-    plugin: npm
+    plugin: dump
     source: https://github.com/zwave-js/zwavejs2mqtt.git
     #source-branch: "fix#1274"
     source-tag: $SNAPCRAFT_PROJECT_VERSION
-    npm-node-version: '15.14.0'
     build-packages:
       - gcc
       - build-essential
+    override-build: |
+      set -x
+      if [ -n "${http_proxy-}" ]; then
+        export GLOBAL_AGENT_HTTP_PROXY="${http_proxy}"
+        export GLOBAL_AGENT_HTTPS_PROXY="${http_proxy}"
+      fi
+      yarn install
+      yarn run build \
+        && mkdir -p $SNAPCRAFT_PART_INSTALL/lib/node_modules \
+        && cp --archive --link --no-dereference $SNAPCRAFT_PART_BUILD \
+          $SNAPCRAFT_PART_INSTALL/lib/node_modules/zwavejs2mqtt \
+    organize:
+      lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config/config: snap/zwave-js/config
+      lib/node_modules/zwavejs2mqtt/dist: lib/node_modules/zwavejs2mqtt/server/dist
+      lib/node_modules/zwavejs2mqtt/views: lib/node_modules/zwavejs2mqtt/server/views
+    filesets:
+      zwavejs2mqtt-include:
+        - lib/node_modules/zwavejs2mqtt/.git
+        - lib/node_modules/zwavejs2mqtt/LICENSE
+        - lib/node_modules/zwavejs2mqtt/*.md
+        - lib/node_modules/zwavejs2mqtt/node_modules
+        - lib/node_modules/zwavejs2mqtt/server
+        - lib/node_modules/zwavejs2mqtt/package.json
+        - lib/node_modules/zwavejs2mqtt/yarn.lock
+    stage:
+      - snap
+      - $zwavejs2mqtt-include
+  dependencies:
+    plugin: nil
     stage-snaps:
       - jq
     stage-packages:
       - git
       - udev
       - rsync
-    override-build: |
-      set -ex
-      if [ -n "${http_proxy-}" ]; then
-        export GLOBAL_AGENT_HTTP_PROXY="${http_proxy}"
-        export GLOBAL_AGENT_HTTPS_PROXY="${http_proxy}"
-      fi
-      npm config set unsafe-perm true
-      npm install npm@latest detect-libc
-      npm run build
-      chmod +x $SNAPCRAFT_PART_BUILD/bin/www
-      cp -rf $SNAPCRAFT_PART_BUILD $SNAPCRAFT_PART_INSTALL/usr/lib/zwavejs2mqtt
-    stage:
-      - -usr/lib/zwavejs2mqtt/kubernetes
-      - -usr/lib/zwavejs2mqtt/kustomization.yaml
-      - -usr/lib/zwavejs2mqtt/docker
-      - -usr/lib/zwavejs2mqtt/.dockerignore
-      - -usr/lib/zwavejs2mqtt/.markdown*
-    organize:
-      usr/lib/zwavejs2mqtt/node_modules/@zwave-js/config/config: snap/zwave-js/config
   nodejs:
     plugin: dump
     source:
@@ -110,6 +122,9 @@ parts:
     stage-packages:
       - on armhf: 
         - libatomic1
+    override-stage: |
+      npm install --global yarn
+      snapcraftctl stage
     organize:
       '*.md' : nodejs/
       LICENSE : nodejs/
