@@ -32,7 +32,7 @@ apps:
       STORE_DIR: $SNAP_DATA
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
       DAEMONIZED: 1
-    command: lib/node_modules/yarn/bin/yarn run
+    command: lib/node_modules/yarn/bin/yarn --cwd $SNAP/lib/node_modules/zwavejs2mqtt --global-folder $SNAP/lib/node_modules/npm/node_modules start
     command-chain:
       - helper/env-wrapper
     plugs:
