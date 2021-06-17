@@ -109,6 +109,7 @@ parts:
     plugin: nil
     stage-snaps:
       - jq
+      - yq
     stage-packages:
       - git
       - udev

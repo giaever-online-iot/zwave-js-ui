@@ -35,7 +35,7 @@ if [ ${OPT_HELP} = true ]; then
         echo "NOTE! NOTE! NOTE!"
         echo ""
     fi
-    echo "${SNAP_NAME} ($ ($ 1 --version))"
+    echo "${SNAP_NAME} - $(yq eval '.version' "${SNAP}/meta/snap.yaml")"
     echo ""
     echo "IMPORTANT! The DAEMON/SERVICE is disabled by default after installation." 
     echo "You have to manually 'daemonize' it with executing the command"
