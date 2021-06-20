@@ -30,7 +30,7 @@ apps:
     restart-condition: always
     environment:
       STORE_DIR: $SNAP_DATA
-      ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
+      # ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
       DAEMONIZED: 1
     command: lib/node_modules/yarn/bin/yarn --cwd $SNAP/lib/node_modules/zwavejs2mqtt --global-folder $SNAP/lib/node_modules/npm/node_modules start
     command-chain:
@@ -44,7 +44,7 @@ apps:
   exec:
     environment:
       STORE_DIR: $SNAP_DATA
-      ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
+      # ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
       #command: lib/node_modules/zwavejs2mqtt/bin/www.ts
     command: lib/node_modules/yarn/bin/yarn --cwd $SNAP/lib/node_modules/zwavejs2mqtt --global-folder $SNAP/lib/node_modules/npm/node_modules start
     command-chain:
