@@ -67,6 +67,7 @@ apps:
 layout:
   $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config/config:
     bind: $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config/config
+  #$SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-jspackages/zwave-js/src/lib/driver/
 
 parts:
   zwavejs2mqtt:
