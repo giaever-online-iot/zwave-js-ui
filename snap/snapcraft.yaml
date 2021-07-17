@@ -46,7 +46,7 @@ apps:
       STORE_DIR: $SNAP_DATA
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
       #command: lib/node_modules/zwavejs2mqtt/bin/www.ts
-    command: lib/node_modules/yarn/bin/yarn --cwd $SNAP/lib/node_modules/zwavejs2mqtt --global-folder $SNAP/lib/node_modules/npm/node_modules start
+    command: lib/node_modules/yarn/bin/yarn --cwd $SNAP/lib/node_modules/zwavejs2mqtt start
     command-chain:
       - helper/env-wrapper
     plugs:
@@ -65,8 +65,12 @@ apps:
     command: bin/restart
 
 layout:
-  $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config/config:
-    bind: $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config/config
+  $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config:
+    bind: $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config
+  /usr/local/share/.cache/yarn:
+    bind: $SNAP/.cache/yarn
+  /usr/local/share/.yarn:
+    symlink: $SNAP/lib/node_modules
   #$SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-jspackages/zwave-js/src/lib/driver/
 
 parts:
@@ -91,7 +95,7 @@ parts:
         && cp --archive --link --no-dereference $SNAPCRAFT_PART_BUILD \
           $SNAPCRAFT_PART_INSTALL/lib/node_modules/zwavejs2mqtt \
     organize:
-      lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config/config: snap/zwave-js/config
+      lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config: snap/zwave-js/config
       lib/node_modules/zwavejs2mqtt/dist: lib/node_modules/zwavejs2mqtt/server/dist
       lib/node_modules/zwavejs2mqtt/views: lib/node_modules/zwavejs2mqtt/server/views
     filesets:

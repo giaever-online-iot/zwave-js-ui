@@ -10,6 +10,8 @@ if [ $? -eq 0 ]; then
     SETTINGS_KEY=$(cat /dev/urandom | LC_ALL=C tr -dc '0-9A-F' | fold -w 32 | head -n 1)
 fi
 
+ensure_zwavejs_config
+
 testnset_config "network.key" "${SETTINGS_KEY}"
 test_default_config
 

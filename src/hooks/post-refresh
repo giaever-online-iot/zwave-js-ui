@@ -2,6 +2,11 @@
 
 source $SNAP/helper/functions
 
-ensure_zwavejs_config
+if [ -d "${SNAP_COMMON}/latest-device-config/config" ]; then
+    logger "Restoring latest device config latest-device-config to ${ZWAVE_JS_CONF}"
+    rsync -raz "${SNAP_COMMON}/latest-device-config/config" "${ZWAVE_JS_CONF}/.."
+else
+    ensure_zwavejs_config
+fi
 
 test_default_config

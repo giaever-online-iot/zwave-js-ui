@@ -75,7 +75,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-ensure_zwavejs_config
+# ensure_zwavejs_config
 
 export SERVER_SSL=$(snapctl get server.ssl)
 export SERVER_HOST=$(snapctl get server.host)
