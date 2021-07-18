@@ -92,9 +92,8 @@ export USE_SECURE_COOKIE=$(snapctl get session.cookie-secure)
 if [ "${HTTPS}" != true ]; then
     unset HTTPS
     unset SERVER_SSL
-fi
-
-if [ "${USE_SECURE_COOKIE}" != true ]; then
+    unset USE_SECURE_COOKIE
+elif [ "${USE_SECURE_COOKIE}" != true ]; then
     unset USE_SECURE_COOKIE
 fi
 
