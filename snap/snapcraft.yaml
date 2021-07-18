@@ -22,7 +22,6 @@ architectures:
   - build-on: amd64
   - build-on: arm64
   - build-on: armhf
-    #- build-on: ppc64el
 
 apps:
   zwavejs2mqtt:
@@ -65,14 +64,15 @@ apps:
     command: bin/restart
 
 layout:
-  $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config:
-    bind: $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config
   /usr/local/share/.cache/yarn:
     bind: $SNAP/.cache/yarn
   /usr/local/share/.yarn:
     symlink: $SNAP/lib/node_modules
   $SNAP/lib/node_modules/zwavejs2mqtt/package.json.lock:
-    bind-file: $SNAP/lib/node_modules/zwavejs2mqtt/package.json.lock:
+    bind-file: $SNAP/lib/node_modules/zwavejs2mqtt/package.json.lock
+  # Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG ?
+  # $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config:
+  #   bind: $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config
 
 parts:
   zwavejs2mqtt:
@@ -96,7 +96,8 @@ parts:
         && cp --archive --link --no-dereference $SNAPCRAFT_PART_BUILD \
           $SNAPCRAFT_PART_INSTALL/lib/node_modules/zwavejs2mqtt \
     organize:
-      lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config: snap/zwave-js/config
+      # Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG?
+      # lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config: snap/zwave-js/config
       lib/node_modules/zwavejs2mqtt/dist: lib/node_modules/zwavejs2mqtt/server/dist
       lib/node_modules/zwavejs2mqtt/views: lib/node_modules/zwavejs2mqtt/server/views
     filesets:
@@ -109,7 +110,7 @@ parts:
         - lib/node_modules/zwavejs2mqtt/package.json
         - lib/node_modules/zwavejs2mqtt/yarn.lock
     stage:
-      - snap
+      # - snap
       - $zwavejs2mqtt-include
   dependencies:
     plugin: nil

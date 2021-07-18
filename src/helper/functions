@@ -3,12 +3,13 @@
 export ZWAVE_JS_CONF="${SNAP}/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config"
 
 function ensure_zwavejs_config {
-    if [ "$(find ${ZWAVE_JS_CONF} -maxdepth 0 -empty -exec echo empty \;)" == "empty" ]; then
-        logger "Config directory is empty, copying data from ${SNAP}/snap/zwave-js/config"
-        rsync -raz "${SNAP}/snap/zwave-js/config" "${ZWAVE_JS_CONF}/.."
-    else
-        logger "Config directory ${ZWAVE_JS_CONF} exists"
-    fi
+    # Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG
+    # if [ "$(find ${ZWAVE_JS_CONF} -maxdepth 0 -empty -exec echo empty \;)" == "empty" ]; then
+    #     logger "Config directory is empty, copying data from ${SNAP}/snap/zwave-js/config"
+    #     rsync -raz "${SNAP}/snap/zwave-js/config" "${ZWAVE_JS_CONF}/.."
+    # else
+    #     logger "Config directory ${ZWAVE_JS_CONF} exists"
+    # fi
     return 0
 }
 

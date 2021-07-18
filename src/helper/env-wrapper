@@ -75,6 +75,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG?
 # ensure_zwavejs_config
 
 export SERVER_SSL=$(snapctl get server.ssl)

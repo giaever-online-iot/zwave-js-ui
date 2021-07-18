@@ -2,11 +2,12 @@
 
 source $SNAP/helper/functions
 
-if [ -d "${SNAP_COMMON}/latest-device-config/config" ]; then
-    logger "Restoring latest device config latest-device-config to ${ZWAVE_JS_CONF}"
-    rsync -raz "${SNAP_COMMON}/latest-device-config/config" "${ZWAVE_JS_CONF}/.."
-else
-    ensure_zwavejs_config
-fi
+# Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG?
+# if [ -d "${SNAP_COMMON}/latest-device-config/config" ]; then
+#     logger "Restoring latest device config latest-device-config to ${ZWAVE_JS_CONF}"
+#     rsync -raz "${SNAP_COMMON}/latest-device-config/config" "${ZWAVE_JS_CONF}/.."
+# else
+#     ensure_zwavejs_config
+# fi
 
 test_default_config
