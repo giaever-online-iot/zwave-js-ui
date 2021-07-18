@@ -69,7 +69,7 @@ layout:
   /usr/local/share/.yarn:
     symlink: $SNAP/lib/node_modules
   $SNAP/lib/node_modules/zwavejs2mqtt/package.json.lock:
-    symlink: $SNAP/lib/node_modules/zwavejs2mqtt/package.json.lock
+    bind-file: $SNAP_DATA/.ext-config.lock
   # Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG ?
   # $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config:
   #   bind: $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config
