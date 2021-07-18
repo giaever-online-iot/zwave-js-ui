@@ -71,7 +71,8 @@ layout:
     bind: $SNAP/.cache/yarn
   /usr/local/share/.yarn:
     symlink: $SNAP/lib/node_modules
-  #$SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-jspackages/zwave-js/src/lib/driver/
+  $SNAP/lib/node_modules/zwavejs2mqtt/package.json.lock:
+    bind-file: $SNAP/lib/node_modules/zwavejs2mqtt/package.json.lock:
 
 parts:
   zwavejs2mqtt:
