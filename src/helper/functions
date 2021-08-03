@@ -97,8 +97,6 @@ function testnset_config {
             exit 1
         fi
         return 0
-    else
-        logger "${SNAP_NAME}: ${1} has ${RES}, leaving as is"
     fi
     return 0
 }
@@ -111,4 +109,5 @@ function test_default_config {
     testnset_config "server.host" "localhost"
     testnset_config "server.port" 8091
 
+    testnset_config "mqtt.name" ""
 }

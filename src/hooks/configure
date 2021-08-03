@@ -5,6 +5,7 @@ source $SNAP/helper/functions
 
 SERVER_SSL=$(snapctl get server.ssl)
 SERVER_PORT=$(snapctl get server.port)
+COOKIE_SECURE=$(snapctl get sessio.cookie-secure)
 
 if [ $(echo "${SERVER_PORT}" | grep -E "^\-?[0-9]+$") = "" ]; then
     echo "!! server.port must be numeric, got ${SERVER_PORT}" >&2
@@ -13,6 +14,11 @@ fi
 
 if [ ${SERVER_SSL} != true -a ${SERVER_SSL} != false ]; then
     echo "!! server.ssl must be boolean value" >&2
+    exit 1
+fi
+
+if [ ${COOKIE_SECURE} != true -a ${COOKIE_SECURE} != false ]; then
+    echo "!! session.cookie-secure must be boolean value" >&2
     exit 1
 fi
 
