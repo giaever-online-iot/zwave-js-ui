@@ -1,6 +1,6 @@
 name: zwavejs2mqtt
 base: core20
-version: 'v5.4.5'
+version: 'v5.5.1'
 summary: Fully configurable Zwave to MQTT Gateway and Control Panel. 
 description: |
   - Configurable Zwave to Mqtt Gateway
@@ -68,8 +68,8 @@ layout:
     bind: $SNAP/.cache/yarn
   /usr/local/share/.yarn:
     symlink: $SNAP/lib/node_modules
-  $SNAP/lib/node_modules/zwavejs2mqtt/package.json.lock:
-    bind-file: $SNAP_DATA/.ext-config.lock
+  # $SNAP/lib/node_modules/zwavejs2mqtt/package.json.lock:
+  #   bind-file: $SNAP_DATA/.ext-config.lock
   # Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG ?
   # $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config:
   #   bind: $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config
