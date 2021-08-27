@@ -4,16 +4,17 @@ source $SNAP/helper/functions
 
 set -e 
 
-SETTINGS_KEY=$(same_network_key "")
-
-if [ $? -eq 0 ]; then
-    SETTINGS_KEY=$(cat /dev/urandom | LC_ALL=C tr -dc '0-9A-F' | fold -w 32 | head -n 1)
-fi
-
-# Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG ?
-# ensure_zwavejs_config
-
-testnset_config "network.key" "${SETTINGS_KEY}"
+# AS OF S0+n NETWORK KEY IS NOT USED ANYMORE
+# SETTINGS_KEY=$(same_network_key "")
+#
+# if [ $? -eq 0 ]; then
+#     SETTINGS_KEY=$(cat /dev/urandom | LC_ALL=C tr -dc '0-9A-F' | fold -w 32 | head -n 1)
+# fi
+#
+# # Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG ?
+# # ensure_zwavejs_config
+#
+# testnset_config "network.key" "${SETTINGS_KEY}"
 test_default_config
 
 snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"

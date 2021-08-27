@@ -14,13 +14,13 @@ function lprint {
     fi
 }
 
-export NETWORK_KEY=$(snapctl get network.key)
-
-SETTINGS_KEY=$(same_network_key "${NETWORK_KEY}")
-if [ $? -ne 0 ]; then
-    snapctl set network.key="${SETTINGS_KEY}"
-    export NETWORK_KEY="${SETTINGS_KEY}"
-fi
+# WITH S0+n NETWORK KEY IS NOT USED ANYMORE
+#export NETWORK_KEY=$(snapctl get network.key)
+# SETTINGS_KEY=$(same_network_key "${NETWORK_KEY}")
+# if [ $? -ne 0 ]; then
+#     snapctl set network.key="${SETTINGS_KEY}"
+#     export NETWORK_KEY="${SETTINGS_KEY}"
+# fi
 
 OPT_HELP=false
 
@@ -44,8 +44,8 @@ if [ ${OPT_HELP} = true ]; then
     echo ""
     echo "Set your configuration as descrived below"
     echo ""
-    echo "Base configuration values:"
-    echo "- network.key:               $(snapctl get network.key)"
+    # echo "Base configuration values:"
+    # echo "- network.key:               $(snapctl get network.key)"
     echo "Server configuration values: $(snapctl get server -d)"
     echo ""
     echo "- server.ssl: Use secure communication"

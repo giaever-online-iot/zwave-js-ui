@@ -22,15 +22,16 @@ if [ ${COOKIE_SECURE} != true -a ${COOKIE_SECURE} != false ]; then
     exit 1
 fi
 
-NETWORK_KEY=$(snapctl get network.key)
-
-if [ ! -f "${SNAP_DATA}/settings.json" ]; then
-    echo "{}" > ${SNAP_DATA}/settings.json
-fi
-
-jq --arg networkKey "${NETWORK_KEY}" '.zwave.networkKey = $networkKey' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
-cat ${SNAP_DATA}/tmp.json > ${SNAP_DATA}/settings.json
-rm ${SNAP_DATA}/tmp.json
+# AS WITH S0+n NETWORK_KEY is not used anymore
+# NETWORK_KEY=$(snapctl get network.key)
+#
+# if [ ! -f "${SNAP_DATA}/settings.json" ]; then
+#     echo "{}" > ${SNAP_DATA}/settings.json
+# fi
+#
+# jq --arg networkKey "${NETWORK_KEY}" '.zwave.networkKey = $networkKey' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
+# cat ${SNAP_DATA}/tmp.json > ${SNAP_DATA}/settings.json
+# rm ${SNAP_DATA}/tmp.json
 
 test_default_config
 
