@@ -15,6 +15,11 @@ set -e
 # # ensure_zwavejs_config
 #
 # testnset_config "network.key" "${SETTINGS_KEY}"
+
+settings_key=$(same_network_key "")
+if [ $? -eq 0 ]; then
+    settings_key=$(cat /dev/urandom | lc_all=c tr -dc '0-9a-f' | fold -w 32 | head -n 1)
+fi
 test_default_config
 
 snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"
