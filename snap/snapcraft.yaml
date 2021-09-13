@@ -1,6 +1,6 @@
 name: zwavejs2mqtt
 base: core20
-version: 'v5.5.3'
+version: 'v5.5.4'
 summary: Fully configurable Zwave to MQTT Gateway and Control Panel. 
 description: |
   - Configurable Zwave to Mqtt Gateway
@@ -44,7 +44,6 @@ apps:
     environment:
       STORE_DIR: $SNAP_DATA
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
-      #command: lib/node_modules/zwavejs2mqtt/bin/www.ts
     command: lib/node_modules/yarn/bin/yarn --cwd $SNAP/lib/node_modules/zwavejs2mqtt start
     command-chain:
       - helper/env-wrapper
@@ -79,13 +78,14 @@ parts:
     after: [nodejs]
     plugin: dump
     source: https://github.com/zwave-js/zwavejs2mqtt.git
-    #source-branch: "fix#1274"
+    #source-branch: "softreset"
     source-tag: $SNAPCRAFT_PROJECT_VERSION
     build-packages:
       - gcc
       - build-essential
     override-build: |
       set -x
+      sed -i 's/"zwave-js".*$/"zwave-js"\: "8.2.4-0-pr-3262-aaea250"/g' ${SNAPCRAFT_PART_BUILD}/package.json
       if [ -n "${http_proxy-}" ]; then
         export GLOBAL_AGENT_HTTP_PROXY="${http_proxy}"
         export GLOBAL_AGENT_HTTPS_PROXY="${http_proxy}"
@@ -110,7 +110,6 @@ parts:
         - lib/node_modules/zwavejs2mqtt/package.json
         - lib/node_modules/zwavejs2mqtt/yarn.lock
     stage:
-      # - snap
       - $zwavejs2mqtt-include
   dependencies:
     plugin: nil
