@@ -83,7 +83,6 @@ function plugs_connected {
     return 0
 }
 
-
 function is_root {
     if [ ${EUID:-$(id -u)} -eq 0 ]; then
         return 0
