@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+source $SNAP/helper/functions
+
+# Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG?
+# logger "Storing latest device config..."
+# mkdir -p "${SNAP_COMMON}/latest-device-config"
+# rsync -raz "${ZWAVE_JS_CONF}" "${SNAP_COMMON}/latest-device-config"
+test_default_config
+
+# When user can change store dir....
+# if [ "${STORE_DIR}" == "${SNAP_DATA}" ]; then
+#     snapctl set
+
