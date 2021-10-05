@@ -123,9 +123,10 @@ parts:
       - $zwavejs2mqtt-include
   dependencies:
     plugin: nil
-    override-stage: |
+    override-pull: |
+      set -x
       export SNAPPY_STORE_NO_CDN=1
-      snapcraftctl stage
+      snapcraftctl pull
     stage-snaps:
       - jq
       - yq
