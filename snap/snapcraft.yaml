@@ -84,11 +84,6 @@ layout:
     bind: $SNAP/.cache/yarn
   /usr/local/share/.yarn:
     symlink: $SNAP/lib/node_modules
-  # $SNAP/lib/node_modules/zwavejs2mqtt/package.json.lock:
-  #   bind-file: $SNAP_DATA/.ext-config.lock
-  # Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG ?
-  # $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config:
-  #   bind: $SNAP/lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config
 
 parts:
   zwavejs2mqtt:
@@ -102,14 +97,17 @@ parts:
       - build-essential
     override-build: |
       set -x
+      #sed -i 's/"zwave-js".*$/"zwave-js"\: "8.3.2-0-pr-3262-f5cdbca"/g' ${SNAPCRAFT_PART_BUILD}/package.json
+      # if [ -n "${http_proxy-}" ]; then
+      #   export GLOBAL_AGENT_HTTP_PROXY="${http_proxy}"
+      #   export GLOBAL_AGENT_HTTPS_PROXY="${http_proxy}"
+      # fi
       yarn install
       yarn run build \
         && mkdir -p $SNAPCRAFT_PART_INSTALL/lib/node_modules \
         && cp --archive --link --no-dereference $SNAPCRAFT_PART_BUILD \
           $SNAPCRAFT_PART_INSTALL/lib/node_modules/zwavejs2mqtt \
     organize:
-      # Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG?
-      # lib/node_modules/zwavejs2mqtt/node_modules/@zwave-js/config: snap/zwave-js/config
       lib/node_modules/zwavejs2mqtt/dist: lib/node_modules/zwavejs2mqtt/server/dist
       lib/node_modules/zwavejs2mqtt/views: lib/node_modules/zwavejs2mqtt/server/views
     filesets:
