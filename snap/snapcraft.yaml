@@ -123,10 +123,8 @@ parts:
       - $zwavejs2mqtt-include
   pre-dependencies:
     plugin: nil
-    override-build: |
-      set -x
-      export SNAPPY_STORE_NO_CDN=1
-      snapcraftctl build
+    build-environment:
+      - SNAPPY_STORE_NO_CDN: "1"
   dependencies:
     after: [pre-dependencies]
     plugin: nil
