@@ -121,14 +121,15 @@ parts:
         - lib/node_modules/zwavejs2mqtt/yarn.lock
     stage:
       - $zwavejs2mqtt-include
-  dependencies:
+  pre-dependencies:
     plugin: nil
-    build-environment:
-      - SNAPPY_STORE_NO_CDN: "1"
-    # override-pull: |
-    #   set -x
-    #   export SNAPPY_STORE_NO_CDN=1
-    #   snapcraftctl pull
+    override-build: |
+      set -x
+      export SNAPPY_STORE_NO_CDN=1
+      snapcraftctl build
+  dependencies:
+    after: [pre-dependencies]
+    plugin: nil
     stage-snaps:
       - jq
       - yq
