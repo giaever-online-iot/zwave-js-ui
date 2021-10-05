@@ -124,7 +124,7 @@ parts:
   dependencies:
     plugin: nil
     build-environment:
-      SNAPPY_STORE_NO_CDN: 1
+      - SNAPPY_STORE_NO_CDN: 1
     # override-pull: |
     #   set -x
     #   export SNAPPY_STORE_NO_CDN=1
