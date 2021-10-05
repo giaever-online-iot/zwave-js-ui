@@ -125,6 +125,7 @@ parts:
     plugin: nil
     override-stage: |
       export SNAPPY_STORE_NO_CDN=1
+      snapcraftctl stage
     stage-snaps:
       - jq
       - yq
