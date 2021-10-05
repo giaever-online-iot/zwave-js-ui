@@ -123,6 +123,8 @@ parts:
       - $zwavejs2mqtt-include
   dependencies:
     plugin: nil
+    override-stage: |
+      export SNAPPY_STORE_NO_CDN=1
     stage-snaps:
       - jq
       - yq
