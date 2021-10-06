@@ -129,12 +129,13 @@ parts:
     after: [pre-dependencies]
     plugin: nil
     stage-snaps:
-      - jq
+      #- jq
       - yq
     stage-packages:
       - git
       - udev
       - rsync
+      - jq
   nodejs:
     plugin: dump
     source:
