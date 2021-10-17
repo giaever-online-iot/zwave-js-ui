@@ -149,10 +149,8 @@ parts:
       npm install --global yarn
       if [ -n "${http_proxy-}" ]; then
         echo "${http_proxy}}"
-        # yarn config set httpProxy "${http_proxy}"
-        # yarn config set httpsProxy "${http_proxy}"
-        export GLOBAL_AGENT_HTTP_PROXY="${http_proxy}"
-        export GLOBAL_AGENT_HTTPS_PROXY="${http_proxy}"
+        yarn config set httpProxy "${http_proxy}"
+        yarn config set httpsProxy "${http_proxy}"
       fi
       yarn set version berry
       snapcraftctl stage
