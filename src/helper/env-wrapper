@@ -113,4 +113,6 @@ fi
 export HOST="${SERVER_HOST}"
 export PORT="${SERVER_PORT}"
 
+cd "${SNAP}/lib/node_modules/zwavejs2mqtt"
+
 exec "$@"
