@@ -103,8 +103,6 @@ parts:
         export GLOBAL_AGENT_HTTP_PROXY="${http_proxy}"
         export GLOBAL_AGENT_HTTPS_PROXY="${http_proxy}"
       fi
-      yarn set version berry
-      yarn --version
       yarn install --immutable
       yarn run build \
         && yarn remove $(cat $SNAPCRAFT_PART_INSTALL/package.json | jq -r '.devDependencies | keys | join(" ")') \
