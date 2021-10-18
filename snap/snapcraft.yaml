@@ -98,7 +98,7 @@ parts:
       - jq
     override-build: |
       set -x
-      sed -i 's/"zwave-js".*$/"zwave-js"\: "v8.5.1-beta.1"/g' ${SNAPCRAFT_PART_BUILD}/package.json
+      #sed -i 's/"zwave-js".*$/"zwave-js"\: "v8.5.1-beta.1"/g' ${SNAPCRAFT_PART_BUILD}/package.json
       if [ -n "${http_proxy-}" ]; then
         yarn config set httpProxy "${http_proxy}"
       fi
