@@ -22,4 +22,4 @@ fi
 # Update references to the external config directory
 # sed -iE "s#$(dirname ${SNAP_DATA})/(current|[0-9]+)#${SNAP_DATA}/#g" $ZWAVEJS_EXTERNAL_CONFIG/devices/index.json
 # Discussed with Al Calzone, lead dev of Zwavejs, can just be deleted and re-build
-rm "${ZWAVEJS_EXTERNAL_CONFIG}/devices/index.json"
+rm "${ZWAVEJS_EXTERNAL_CONFIG-${SNAP_DATA}/.ext-config}/devices/index.json"
