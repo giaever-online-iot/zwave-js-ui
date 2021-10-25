@@ -13,13 +13,19 @@ source $SNAP/helper/functions
 test_default_config
 
 # Update deviceConfigPriorityDir to match new revision
-PRIORITY_DIR=$(echo "$(sed -E "s#$(dirname ${SNAP_DATA})/(current|[0-9]+)#${SNAP_DATA}#g" <<< $(cat "${SNAP_DATA}/settings.json" | jq '.zwave.deviceConfigPriorityDir'))" | tr -d '"')
-if [ -d $(dirname "${PRIORITY_DIR}") ]; then
-    jq --arg deviceConfigPriorityDir ${PRIORITY_DIR} '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
-    mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
+if [ -f "${SNAP_DATA}" ]; then
+	PRIORITY_DIR=$(echo "$(sed -E "s#$(dirname ${SNAP_DATA})/(current|[0-9]+)#${SNAP_DATA}#g" <<< $(cat "${SNAP_DATA}/settings.json" | jq '.zwave.deviceConfigPriorityDir'))" | tr -d '"')
+	if [ -d $(dirname "${PRIORITY_DIR}") ]; then
+	    jq --arg deviceConfigPriorityDir ${PRIORITY_DIR} '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
+	    mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
+	fi
 fi
+
+EXT_CONFIG_DIR="${ZWAVEJS_EXTERNAL_CONFIG-${SNAP_DATA}/.ext-config}"
 
 # Update references to the external config directory
 # sed -iE "s#$(dirname ${SNAP_DATA})/(current|[0-9]+)#${SNAP_DATA}/#g" $ZWAVEJS_EXTERNAL_CONFIG/devices/index.json
 # Discussed with Al Calzone, lead dev of Zwavejs, can just be deleted and re-build
-rm "${ZWAVEJS_EXTERNAL_CONFIG-${SNAP_DATA}/.ext-config}/devices/index.json"
+if [ -d "${EXT_CONFIG_DIR}" ]; then 
+	rm -f "${EXT_CONFIG_DIG}/devices/index.json"
+fi
