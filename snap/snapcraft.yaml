@@ -1,6 +1,6 @@
 name: zwavejs2mqtt
 base: core20
-version: 'v5.9.0'
+version: 'v5.10.0'
 summary: Fully configurable Zwave to MQTT Gateway and Control Panel. 
 description: |
   - Configurable Zwave to Mqtt Gateway
@@ -36,9 +36,9 @@ assumes:
   - command-chain
 
 architectures:
-  - build-on: amd64
+  # - build-on: amd64
   - build-on: arm64
-  - build-on: armhf
+  # - build-on: armhf
 
 apps:
   zwavejs2mqtt:
@@ -98,7 +98,8 @@ parts:
       - jq
     override-build: |
       set -x
-      #sed -i 's/"zwave-js".*$/"zwave-js"\: "v8.5.1-beta.1"/g' ${SNAPCRAFT_PART_BUILD}/package.json
+      # Used when testing an unreleased version of Z-wavejs
+      sed -i 's/"zwave-js".*$/"zwave-js"\: "8.5.1-beta.2-pr-3573-ee58966"/g' ${SNAPCRAFT_PART_BUILD}/package.json
       if [ -n "${http_proxy-}" ]; then
         yarn config set httpProxy "${http_proxy}"
       fi
