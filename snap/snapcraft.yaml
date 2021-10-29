@@ -67,7 +67,7 @@ parts:
       - build-essential
       - jq
     override-build: |
-      set -xe
+      set -x
       # Used when testing an unreleased version of Z-wavejs
       #sed -i 's/"zwave-js".*$/"zwave-js"\: "8.5.1-beta.2-pr-3573-ee58966"/g' ${SNAPCRAFT_PART_BUILD}/package.json
       if [ -n "${http_proxy-}" ]; then
@@ -80,12 +80,12 @@ parts:
       yarn install \
         && yarn run build \
         && yarn remove $(cat "${SNAPCRAFT_PART_BUILD}/package.json" | jq -r '.devDependencies | keys | join(" ")') \
+        && mkdir -p "${SNAPCRAFT_PART_INSTALL}/lib/node_modules" \
         && cp --archive --link --no-dereference "${SNAPCRAFT_PART_BUILD}" \
-          "${SNAPCRAFT_PART_INSTALL}/zwavejs2mqtt" \
+          "${SNAPCRAFT_PART_INSTALL}/lib/node_modules/zwavejs2mqtt" \
     organize:
-      dist: zwavejs2mqtt/server/dist
-      views: zwavejs2mqtt/server/views
-      zwavejs2mqtt: lib/node_modules/zwavejs2mqtt
+      lib/node_modules/zwavejs2mqtt/dist: lib/node_modules/zwavejs2mqtt/server/dist
+      lib/node_modules/zwavejs2mqtt/views: lib/node_modules/zwavejs2mqtt/server/views
     filesets:
       zwavejs2mqtt-include:
         - lib/node_modules/zwavejs2mqtt/.git

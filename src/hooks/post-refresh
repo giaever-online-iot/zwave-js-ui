@@ -17,7 +17,9 @@ if [ -f "${SNAP_DATA}" ]; then
 	PRIORITY_DIR=$(echo "$(sed -E "s#$(dirname ${SNAP_DATA})/(current|[0-9]+)#${SNAP_DATA}#g" <<< $(cat "${SNAP_DATA}/settings.json" | jq '.zwave.deviceConfigPriorityDir'))" | tr -d '"')
 	if [ -d $(dirname "${PRIORITY_DIR}") ]; then
 	    jq --arg deviceConfigPriorityDir ${PRIORITY_DIR} '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
-	    mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
+        if [ $? -eq 0 ]; then
+            mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
+        fi
 	fi
 fi
 
