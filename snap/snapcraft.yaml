@@ -1,45 +1,17 @@
 name: zwavejs2mqtt
 base: core20
 version: 'v5.10.1'
-summary: Fully configurable Zwave to MQTT Gateway and Control Panel. 
-description: |
-  - Configurable Zwave to Mqtt Gateway
-  - Home Assistant integration (beta)
-  - Zwave Control Panel:
-    - Nodes management: check all nodes discovered in the z-wave network, 
-      send/receive nodes values updates directly from the UI and send 
-      action to the nodes and controller for diagnostics and network 
-      heal Custom Node naming and Location: Starting from v1.3.0 nodes 
-      name and location are stored in a JSON file named nodes.json. 
-      This because not all nodes have native support for naming and 
-      location features (#45). This change is back compatible with older 
-      versions of this package: on startup it will get all nodes names 
-      and location from the zwcfg_homeHEX.xml file (if present) and 
-      create the new nodes.json file based on that. This file can be 
-      imported/exported from the UI control panel with the import/export 
-      buttons placed on the top of nodes table, on the right of controller 
-      actions select.
-    - Firmware updates: You are able to send firmware updates to your 
-      devices using the UI, just select the controller action Begin 
-      Firmware Update
-    - Groups associations: create associations between nodes (also 
-      supports multi-instance associations, need to use last version of 
-      zwave-js).
-    - Custom scenes management
-  - Log debug in UI
-  - Mesh graph showing devices neighbors
+summary: Fully configurable Zwave to MQTT Gateway and Control Panel.
+description: "** Fully configurable Zwave to MQTT Gateway and Control Panel**\n\n- Zwave to Mqtt Gateway: Configure how nodes and nodes values are \n  mapped between the two protocols\n- Secured: Supports HTTPS and users authentication\n- Control Panel UI: Directly control all your nodes and their \n  values from the UI, some of control panel features:\n    - Nodes management: check all nodes discovered in the z-wave \n      network and manage their values\n    - Firmware updates: update devices firmware, just select the \n      controller action _Begin Firmware Update_ and upload the \n      firmware file\n    - Groups associations: add/edit nodes associations\n    - Full zwave-js APIs support\n- Custom scenes management: create scenes and trigger them by using\n  MQTT apis (also supports timeouts)\n- Log debug in UI: See debug logs directly from the UI\n- Store directory management: all files are stored in store folder, \n  you can download/edit files inside this folder directly from the UI\n- Network graph: see how nodes are communicating with the controller,\n  useful for diagnostics purposes\n- Home Assistant integration: you can use official Zwavejs integration \n  by enabling zwavejs server or use integrated MQTT discovery integration\n\n**Channels in `latest`**\n\nThis is how we use the different of channels in the `latest` track, \nto give the user a chance to choose how often they want updates.\n\n- `latest/stable`: Latest version of the last *major* release. Will\n  only update once per major release and most likely by the end of\n  that release cycle. E.g when there is a new version `b.a.a` then\n  version `a.b.c` will be will be available.\n\n- `latest/candidate`:  Latest minor or patch release of latest major\n  release. E.g when version `a.b.c` changes to `a.b.d` or `a.c.a`, then\n  version `a.b.d` or `a.c.a` will be available. Consider this rolling\n  releases.\n\n- `latest/edge` and `latest/edge/dev`: Every build (including tests) \\n  might be pushed to these channels.\n"
 grade: stable
 confinement: strict
 license: MIT
-
 assumes:
   - command-chain
-
 architectures:
   - build-on: amd64
   - build-on: arm64
   - build-on: armhf
-
 apps:
   zwavejs2mqtt:
     daemon: simple
@@ -48,7 +20,7 @@ apps:
       STORE_DIR: $SNAP_DATA
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
       DAEMONIZED: 1
-    command: lib/node_modules/yarn/bin/yarn start
+    command: bin/yarn start
     command-chain:
       - helper/env-wrapper
     plugs:
@@ -61,7 +33,7 @@ apps:
     environment:
       STORE_DIR: $SNAP_DATA
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
-    command: lib/node_modules/yarn/bin/yarn start
+    command: bin/yarn --cwd $SNAP/lib/node_modules/zwavejs2mqtt start
     command-chain:
       - helper/env-wrapper
     plugs:
@@ -78,26 +50,24 @@ apps:
     command: bin/de-daemonize
   restart:
     command: bin/restart
-
 layout:
   /usr/local/share/.cache/yarn:
     bind: $SNAP/.cache/yarn
   /usr/local/share/.yarn:
     symlink: $SNAP/lib/node_modules
-
 parts:
   zwavejs2mqtt:
-    after: [nodejs]
+    after: [yarn]
     plugin: dump
     source: https://github.com/zwave-js/zwavejs2mqtt.git
-    #source-branch: "fix#1762"
+    #source-branch: "fix#1895"
     source-tag: $SNAPCRAFT_PROJECT_VERSION
     build-packages:
       - gcc
       - build-essential
       - jq
     override-build: |
-      set -x
+      set -xe
       # Used when testing an unreleased version of Z-wavejs
       #sed -i 's/"zwave-js".*$/"zwave-js"\: "8.5.1-beta.2-pr-3573-ee58966"/g' ${SNAPCRAFT_PART_BUILD}/package.json
       if [ -n "${http_proxy-}" ]; then
@@ -106,15 +76,16 @@ parts:
       if [ -n "${https_proxy-}" ]; then
         yarn config set httpsProxy "${https_proxy}"
       fi
-      yarn install
-      yarn run build \
-        && yarn remove $(cat "${SNAPCRAFT_PART_INSTALL}/package.json" | jq -r '.devDependencies | keys | join(" ")') \
-        && mkdir -p "${SNAPCRAFT_PART_INSTALL}/lib/node_modules" \
+      yarn set version berry
+      yarn install \
+        && yarn run build \
+        && yarn remove $(cat "${SNAPCRAFT_PART_BUILD}/package.json" | jq -r '.devDependencies | keys | join(" ")') \
         && cp --archive --link --no-dereference "${SNAPCRAFT_PART_BUILD}" \
-          "${SNAPCRAFT_PART_INSTALL}/lib/node_modules/zwavejs2mqtt" \
+          "${SNAPCRAFT_PART_INSTALL}/zwavejs2mqtt" \
     organize:
-      lib/node_modules/zwavejs2mqtt/dist: lib/node_modules/zwavejs2mqtt/server/dist
-      lib/node_modules/zwavejs2mqtt/views: lib/node_modules/zwavejs2mqtt/server/views
+      dist: zwavejs2mqtt/server/dist
+      views: zwavejs2mqtt/server/views
+      zwavejs2mqtt: lib/node_modules/zwavejs2mqtt
     filesets:
       zwavejs2mqtt-include:
         - lib/node_modules/zwavejs2mqtt/.git
@@ -137,28 +108,48 @@ parts:
       - git
       - udev
       - rsync
-    override-stage:
-      snapcraftctl stage
   nodejs:
     plugin: dump
     source:
-      - on amd64: https://nodejs.org/dist/v15.14.0/node-v15.14.0-linux-x64.tar.gz
-      - on arm64: https://nodejs.org/dist/v15.14.0/node-v15.14.0-linux-arm64.tar.gz
-      - on armhf: https://nodejs.org/dist/v15.14.0/node-v15.14.0-linux-armv7l.tar.gz
+      - on amd64: https://nodejs.org/dist/v16.13.0/node-v16.13.0-linux-x64.tar.gz
+      - on arm64: https://nodejs.org/dist/v16.13.0/node-v16.13.0-linux-arm64.tar.gz
+      - on armhf: https://nodejs.org/dist/v16.13.0/node-v16.13.0-linux-armv7l.tar.gz
     stage-packages:
-      - on armhf: 
-        - libatomic1
-    override-stage: |
-      npm install --global yarn
-      #yarn set version berry
-      snapcraftctl stage
+      - on armhf:
+          - libatomic1
     organize:
-      '*.md' : nodejs/
-      LICENSE : nodejs/
+      '*.md': nodejs/
+      LICENSE: nodejs/
     prime:
       - -include
       - -share
-
+  yarn:
+    after: [nodejs]
+    plugin: nil
+    override-build: |
+      npm install yarn
+      if [ -n "${http_proxy-}" ]; then
+        yarn config set httpProxy "${http_proxy}"
+      fi
+      if [ -n "${https_proxy-}" ]; then
+        yarn config set httpsProxy "${https_proxy}"
+      fi
+      #$SNAPCRAFT_PART_BUILD/node_modules/.bin/yarn set version berry
+      snapcraftctl build
+      cp -r $SNAPCRAFT_PART_BUILD/* $SNAPCRAFT_PART_INSTALL
+    organize:
+      node_modules/yarn: lib/node_modules/yarn
+    stage:
+      - lib/node_modules/yarn
+    override-stage: |
+      snapcraftctl stage 
+      PWD=$(pwd)
+      cd $SNAPCRAFT_STAGE/bin
+      ln -sf ../lib/node_modules/yarn/bin/yarn yarn
+      cd "${PWD}"
+    prime:
+      - lib/node_modules/yarn
+      - bin/yarn
   local:
     plugin: dump
     source: src/
