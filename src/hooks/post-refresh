@@ -24,7 +24,6 @@ if [ -d "${SNAP_DATA}" ]; then
 fi
 
 # Update references to the external config directory
-# sed -iE "s#$(dirname ${SNAP_DATA})/(current|[0-9]+)#${SNAP_DATA}/#g" $ZWAVEJS_EXTERNAL_CONFIG/devices/index.json
 # Discussed with Al Calzone, lead dev of Zwavejs, can just be deleted and re-build
-EXT_CONFIG_DIR="${ZWAVEJS_EXTERNAL_CONFIG-${SNAP_DATA}/.ext-config}"
-rm -f "${EXT_CONFIG_DIG}/devices/index.json"
+EXT_CONFIG_DIR_INDEX="$(find "${SNAP_DATA}" -path *.ext-config/devices/index.json -print0 -quit)"
+rm -f "${EXT_CONFIG_DIR_INDEX}"
