@@ -128,14 +128,6 @@ parts:
     plugin: nil
     override-build: |
       npm install yarn
-      # YARN="${SNAPCRAFT_PART_BUILD}/node_modules/yarn/bin/yarn"
-      # if [ -n "${http_proxy-}" ]; then
-      #   $YARN config set httpProxy "${http_proxy}"
-      # fi
-      # if [ -n "${https_proxy-}" ]; then
-      #   $YARN config set httpsProxy "${https_proxy}"
-      # fi
-      #$SNAPCRAFT_PART_BUILD/node_modules/.bin/yarn set version berry
       snapcraftctl build
       cp -r $SNAPCRAFT_PART_BUILD/* $SNAPCRAFT_PART_INSTALL
     organize:
