@@ -69,7 +69,7 @@ parts:
     override-build: |
       set -x
       # Used when testing an unreleased version of Z-wavejs
-      #sed -i 's/"zwave-js".*$/"zwave-js"\: "8.5.1-beta.2-pr-3573-ee58966"/g' ${SNAPCRAFT_PART_BUILD}/package.json
+      sed -i 's/"zwave-js".*$/"zwave-js"\: "8.8.3-0-pr-3830-852dbcf"/g' ${SNAPCRAFT_PART_BUILD}/package.json
       if [ -n "${http_proxy-}" ]; then
         yarn config set httpProxy "${http_proxy}"
       fi
