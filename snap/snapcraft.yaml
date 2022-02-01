@@ -107,7 +107,8 @@ parts:
     stage-packages:
       - git
       - udev
-      - rsync
+    # stage-snaps:
+    #   - duplicity
   nodejs:
     plugin: dump
     source:
@@ -148,6 +149,5 @@ parts:
     source: src/
     stage-packages:
       - uuid
-      - duplicity
     organize:
       hooks: snap/hooks
