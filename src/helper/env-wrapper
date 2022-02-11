@@ -72,6 +72,20 @@ if [ ${OPT_HELP} = true ]; then
     echo "Other commands"
     echo "Disable the daemon:       $ ${SNAP_NAME}.disable"
     echo "Restart the daemon:       $ ${SNAP_NAME}.restart"
+    echo ""
+    echo "Info on the serial-port plug:"
+    echo " This plug requires the experimental hotplug feature in snapd."
+    echo " Enable it with"
+    echo "  $ sudo snap set system experimental.hotplug=true"
+    echo ""
+    echo " And restart snapd with:"
+    echo "  $ sudo systemctl restart snapd"
+    echo ""
+    echo " Now list available serial slots with:"
+    echo "  $ sudo snap iterface serial-port"
+    echo ""
+    echo " And connect it to ${SNAP_NAME} with:"
+    echo "  $ sudo snap connect ${SNAP_NAME}:serial-port <slot name>"
     exit 0
 fi
 

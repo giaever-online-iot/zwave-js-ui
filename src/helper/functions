@@ -62,13 +62,8 @@ function plugs_connected {
         echo $RAW_OUT
         echo "----- OR -----"
         echo $SERIAL_OUT
+        echo "See ${SNAP_NAME}.help for more info on the serial-port plug"
         MISSING=1
-    elif [ $RAW_RES -ne 0 ]; then
-        echo "OPTIONAL plug:"
-        echo $RAW_OUT
-    elif [ $SERIAL_RES -ne 0 ]; then
-        echo "OPTIONAL plug"
-        echo $SERIAL_OUT
     fi
 
     plug_connected "hardware-observe"
