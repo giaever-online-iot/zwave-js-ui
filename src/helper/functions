@@ -43,7 +43,11 @@ function plug_connected {
     if ! snapctl is-connected "${1}"; then
         echo "Missing plug: «${1}»" >&2
         echo "Connect with:"
-        echo "$ sudo snap connect ${SNAP_NAME}:${1}"
+	if [ "${1}" == "serial-port" ]; then
+		echo "$ sudo snap connect ${SNAP_NAME}:${1} <slot name>"
+	else
+		echo "$ sudo snap connect ${SNAP_NAME}:${1}"
+	fi
         return 1
     fi
     return 0
