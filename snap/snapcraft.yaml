@@ -55,10 +55,6 @@ layout:
     bind: $SNAP/.cache/yarn
   /usr/local/share/.yarn:
     symlink: $SNAP/lib/node_modules
-slots:
-  ttyama0:
-    interface: serial-port
-    path: /dev/ttyAMA0
 parts:
   zwavejs2mqtt:
     after: [yarn]
