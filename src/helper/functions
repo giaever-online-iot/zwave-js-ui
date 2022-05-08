@@ -113,6 +113,29 @@ function testnset_config {
     return 0
 }
 
+function test_priority_dir {
+    Z2M_SETTINGS="${SNAP_DATA}/settings.json"
+
+    if ! [ -w "${Z2M_SETTINGS}" ]; then
+        return 1
+    fi
+
+	PRIORITY_DIR=$(echo "$(sed -E "s#$(dirname ${SNAP_DATA})/(current|[0-9]+)#${SNAP_DATA}#g" <<< $(cat "${Z2M_SETTINGS}" | jq '.zwave.deviceConfigPriorityDir'))" | tr -d '"')
+
+    if [[ -d $(dirname "${PRIORITY_DIR}") && -w "${PRIORITY_DIR}" ]]; then
+            jq --arg deviceConfigPriorityDir ${PRIORITY_DIR} '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' "${Z2M_SETTINGS}" > "${Z2M_SETTINGS}.tmp"
+            if [ $? -eq 0 ]; then
+                mv "${Z2M_SETTINGS}.tmp" "${Z2M_SETTINGS}"
+            fi
+    elif ! [[ "${PRIORITY_DIR}" =~ ^"$(dirname $SNAP_DATA)"* ]]; then 
+            jq --arg deviceConfigPriorityDir "${SNAP_DATA}/devicePriorityConfig" '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' "${Z2M_SETTINGS}" > "${Z2M_SETTINGS}.tmp"
+            if [ $? -eq 0 ]; then
+                mv "${Z2M_SETTINGS}.tmp" "${Z2M_SETTINGS}"
+            fi
+    fi
+    return 0
+}
+
 function test_default_config {
     testnset_config "server.ssl" false
     testnset_config "session.cookie-secure" $(snap get server.ssl)
