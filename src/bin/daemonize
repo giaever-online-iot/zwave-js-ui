@@ -19,8 +19,11 @@ fi
 snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
 
 if [ $? -eq 0 ]; then
-    echo "Service enabled! Follow logs with"
-    echo "$ snap logs ${SNAP_NAME}"
+    echo "Service enabled!"
+    echo "- If you have turned OFF «log to file», follow logs with:"
+    echo "  $ snap logs ${SNAP_NAME} -f"
+    echo "- If you have turned ON «log to file», follow logs with:"
+    echo "  $ tail -f ${SNAP_DATA}/*.log"
     exit 0
 fi
 
