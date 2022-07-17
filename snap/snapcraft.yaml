@@ -68,7 +68,7 @@ parts:
       - jq
     override-build: |
       # Used when testing an unreleased version of Z-wavejs
-      #sed -i 's/"zwave-js".*$/"zwave-js"\: "8.11.4"/g' ${SNAPCRAFT_PART_BUILD}/package.json
+      sed -i 's/"zwave-js".*$/"zwave-js"\: "9.6.0"/g' ${SNAPCRAFT_PART_BUILD}/package.json
       if [ -n "${http_proxy-}" ]; then
         yarn config set httpProxy "${http_proxy}"
       fi
