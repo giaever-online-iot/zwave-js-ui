@@ -102,18 +102,24 @@ fi
 # Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG?
 # ensure_zwavejs_config
 
-export SERVER_SSL=$(snapctl get server.ssl)
 export SERVER_HOST=$(snapctl get server.host)
 export SERVER_PORT=$(snapctl get server.port)
 
-export GIT_DIR="${SNAP}/lib/node_modules/zwavejs2mqtt/.git"
+export HOST="${SERVER_HOST}"
+export PORT="${SERVER_PORT}"
 
+export SERVER_SSL=$(snapctl get server.ssl)
 export HTTPS="${SERVER_SSL}"
 
-export SESSION_SECRET=$(snapctl get session.secret)
+export FORCE_DISABLE_SSL=$(snapctl get server.force-disable-ssl)
+
+if [ "${FORCE_DISABLE_SSL}" != true ]; then
+    unset FORCE_DISABLE_SSL
+fi
+
 export USE_SECURE_COOKIE=$(snapctl get session.cookie-secure)
 
-if [ "${HTTPS}" != true ]; then
+if [ "${HTTPS}" != true ] || [ "${FORCE_DISABLE_SSL}" == true ]; then
     unset HTTPS
     unset SERVER_SSL
     unset USE_SECURE_COOKIE
@@ -121,13 +127,14 @@ elif [ "${USE_SECURE_COOKIE}" != true ]; then
     unset USE_SECURE_COOKIE
 fi
 
+export SESSION_SECRET=$(snapctl get session.secret)
+
 export MQTT_NAME=$(snapctl get mqtt.name)
 
 if [ -z "${MQTT_NAME}" ]; then
     unset MQTT_NAME
 fi
 
-export HOST="${SERVER_HOST}"
-export PORT="${SERVER_PORT}"
+export GIT_DIR="${SNAP}/lib/node_modules/zwavejs2mqtt/.git"
 
 [ "$(basename "${1}")" == "yarn" ] && cd "${SNAP}/lib/node_modules/zwavejs2mqtt" && exec "${@}" || exec "${@}"
