@@ -106,6 +106,7 @@ parts:
     stage-packages:
       - git
       - udev
+      - iproute2
     # stage-snaps:
     #   - duplicity
   nodejs:
