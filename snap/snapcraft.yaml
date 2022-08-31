@@ -60,7 +60,7 @@ parts:
     after: [yarn]
     plugin: dump
     source: https://github.com/zwave-js/zwavejs2mqtt.git
-    source-branch: "zjs-v10"
+    source-branch: "master"
     #source-tag: $SNAPCRAFT_PROJECT_VERSION
     build-packages:
       - gcc
