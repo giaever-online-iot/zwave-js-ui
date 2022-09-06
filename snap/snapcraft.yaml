@@ -86,6 +86,7 @@ parts:
     organize:
       lib/node_modules/zwavejs2mqtt/dist: lib/node_modules/zwavejs2mqtt/server/dist
       lib/node_modules/zwavejs2mqtt/views: lib/node_modules/zwavejs2mqtt/server/views
+      lib/node_modules/zwavejs2mqtt/snippets: lib/node_modules/zwavejs2mqtt/server/snippets
     filesets:
       zwavejs2mqtt-include:
         - lib/node_modules/zwavejs2mqtt/.git
@@ -93,7 +94,7 @@ parts:
         - lib/node_modules/zwavejs2mqtt/hass
         - lib/node_modules/zwavejs2mqtt/node_modules
         - lib/node_modules/zwavejs2mqtt/server
-        - lib/node_modules/zwavejs2mqtt/snippets
+          #- lib/node_modules/zwavejs2mqtt/snippets
         - lib/node_modules/zwavejs2mqtt/package.json
         - lib/node_modules/zwavejs2mqtt/.yarn
         - lib/node_modules/zwavejs2mqtt/yarn.lock
