@@ -90,13 +90,15 @@ parts:
       zwavejs2mqtt-include:
         - lib/node_modules/zwavejs2mqtt/.git
         - lib/node_modules/zwavejs2mqtt/*.md
-        - lib/node_modules/zwavejs2mqtt/LICENSE
+        - lib/node_modules/zwavejs2mqtt/hass
         - lib/node_modules/zwavejs2mqtt/node_modules
         - lib/node_modules/zwavejs2mqtt/server
+        - lib/node_modules/zwavejs2mqtt/snippets
         - lib/node_modules/zwavejs2mqtt/package.json
         - lib/node_modules/zwavejs2mqtt/.yarn
         - lib/node_modules/zwavejs2mqtt/yarn.lock
         - lib/node_modules/zwavejs2mqtt/.yarnrc.yml
+        - lib/node_modules/zwavejs2mqtt/LICENSE
     stage:
       - $zwavejs2mqtt-include
   dependencies:
