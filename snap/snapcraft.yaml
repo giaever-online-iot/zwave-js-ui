@@ -33,7 +33,7 @@ apps:
     environment:
       STORE_DIR: $SNAP_DATA
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
-    command: bin/yarn --cwd $SNAP/lib/node_modules/zwavejs2mqtt start
+    command: bin/yarn start
     command-chain:
       - helper/env-wrapper
     plugs:
@@ -57,7 +57,7 @@ layout:
     symlink: $SNAP/lib/node_modules
 parts:
   zwavejs2mqtt:
-    after: [yarn]
+    after: [nodejs, dependencies]
     plugin: dump
     source: https://github.com/zwave-js/zwavejs2mqtt.git
     #source-branch: "master"
@@ -66,42 +66,64 @@ parts:
     build-packages:
       - gcc
       - build-essential
-      - jq
+
+    build-environment:
+      - LD_LIBRARY_PATH: "${LD_LIBRARY_PATH}:$(dirname $(find ${SNAPCRAFT_STAGE} -name libonig.so.2 -print0))"
+      - PATH: "${PATH}:${SNAPCRAFT_PART_BUILD}/bin"
     override-build: |
       # Used when testing an unreleased version of Z-wavejs
       #sed -i 's/"zwave-js".*$/"zwave-js"\: "10.0.5-0-pr-4836-ed10b36"/g' ${SNAPCRAFT_PART_BUILD}/package.json
+
+      # Link the bundled yarn 
+      cd "${SNAPCRAFT_PART_BUILD}/bin"
+      YARN="$(find ${SNAPCRAFT_PART_BUILD} -name yarn-*.cjs -print0)"
+      ln -s "../${YARN:${#SNAPCRAFT_PART_BUILD}+1}" ./yarn
+      chmod +x ./yarn
+      cd "${SNAPCRAFT_PART_BUILD}"
+
+      # Necessary for the remote build; sometimes.
       if [ -n "${http_proxy-}" ]; then
         yarn config set httpProxy "${http_proxy}"
       fi
       if [ -n "${https_proxy-}" ]; then
         yarn config set httpsProxy "${https_proxy}"
       fi
-      yarn set version berry
-      yarn install \
-        && yarn run build \
-        && yarn remove $(cat "${SNAPCRAFT_PART_BUILD}/package.json" | jq -r '.devDependencies | keys | join(" ")') \
-        && mkdir -p "${SNAPCRAFT_PART_INSTALL}/lib/node_modules" \
+
+      yarn install
+      yarn build:server
+      yarn build:ui
+      yarn remove $(cat "${SNAPCRAFT_PART_BUILD}/package.json" | jq -r '.devDependencies | keys | join(" ")')
+      
+      # Copy built version into install directory
+      mkdir -p "${SNAPCRAFT_PART_INSTALL}/lib/" \
         && cp --archive --link --no-dereference "${SNAPCRAFT_PART_BUILD}" \
-          "${SNAPCRAFT_PART_INSTALL}/lib/node_modules/zwavejs2mqtt" \
-    organize:
-      lib/node_modules/zwavejs2mqtt/dist: lib/node_modules/zwavejs2mqtt/server/dist
-      lib/node_modules/zwavejs2mqtt/views: lib/node_modules/zwavejs2mqtt/server/views
-      lib/node_modules/zwavejs2mqtt/snippets: lib/node_modules/zwavejs2mqtt/server/snippets
+          "${SNAPCRAFT_PART_INSTALL}/lib/zwavejs2mqtt"
+      
+      # Link yarn in install directory
+      mkdir "${SNAPCRAFT_PART_INSTALL}/bin" \
+        && cd "${SNAPCRAFT_PART_INSTALL}/bin" \
+        && ln -s "../lib/zwavejs2mqtt/bin/yarn" "yarn"
+
     filesets:
       zwavejs2mqtt-include:
-        - lib/node_modules/zwavejs2mqtt/.git
-        - lib/node_modules/zwavejs2mqtt/*.md
-        - lib/node_modules/zwavejs2mqtt/hass
-        - lib/node_modules/zwavejs2mqtt/node_modules
-        - lib/node_modules/zwavejs2mqtt/server
-          #- lib/node_modules/zwavejs2mqtt/snippets
-        - lib/node_modules/zwavejs2mqtt/package.json
-        - lib/node_modules/zwavejs2mqtt/.yarn
-        - lib/node_modules/zwavejs2mqtt/yarn.lock
-        - lib/node_modules/zwavejs2mqtt/.yarnrc.yml
-        - lib/node_modules/zwavejs2mqtt/LICENSE
+        - bin
+        - lib/zwavejs2mqtt/.git
+        - lib/zwavejs2mqtt/*.md
+        - lib/zwavejs2mqtt/bin/yarn
+        - lib/zwavejs2mqtt/dist
+        - lib/zwavejs2mqtt/hass
+        - lib/zwavejs2mqtt/node_modules
+        - lib/zwavejs2mqtt/server
+        - lib/zwavejs2mqtt/snippets
+        - lib/zwavejs2mqtt/package.json
+        - lib/zwavejs2mqtt/views
+        - lib/zwavejs2mqtt/.yarn
+        - lib/zwavejs2mqtt/yarn.lock
+        - lib/zwavejs2mqtt/.yarnrc.yml
+        - lib/zwavejs2mqtt/LICENSE
     stage:
       - $zwavejs2mqtt-include
+  
   dependencies:
     plugin: nil
     stage-snaps:
@@ -111,8 +133,7 @@ parts:
       - git
       - udev
       - iproute2
-    # stage-snaps:
-    #   - duplicity
+
   nodejs:
     plugin: dump
     source:
@@ -128,26 +149,14 @@ parts:
     prime:
       - -include
       - -share
-  yarn:
-    after: [nodejs]
-    plugin: nil
-    override-build: |
-      npm install yarn
-      snapcraftctl build
-      cp -r $SNAPCRAFT_PART_BUILD/* $SNAPCRAFT_PART_INSTALL
-    organize:
-      node_modules/yarn: lib/node_modules/yarn
-    stage:
-      - lib/node_modules/yarn
+      - -lib/node_modules
+      - -bin/npm
+      - -bin/npx
+      - -bin/corepack
     override-stage: |
-      snapcraftctl stage 
-      PWD=$(pwd)
-      cd $SNAPCRAFT_STAGE/bin
-      ln -sf ../lib/node_modules/yarn/bin/yarn yarn
-      cd "${PWD}"
-    prime:
-      - lib/node_modules/yarn
-      - bin/yarn
+      corepack disable
+      snapcraftctl stage
+
   local:
     plugin: dump
     source: src/

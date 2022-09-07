@@ -135,6 +135,6 @@ if [ -z "${MQTT_NAME}" ]; then
     unset MQTT_NAME
 fi
 
-export GIT_DIR="${SNAP}/lib/node_modules/zwavejs2mqtt/.git"
+export GIT_DIR="${SNAP}/lib/zwavejs2mqtt/.git"
 
-[ "$(basename "${1}")" == "yarn" ] && cd "${SNAP}/lib/node_modules/zwavejs2mqtt" && exec "${@}" || exec "${@}"
+[ "$(basename "${1}")" == "yarn" ] && cd "${SNAP}/lib/zwavejs2mqtt" && exec "${@}" || exec "${@}"
