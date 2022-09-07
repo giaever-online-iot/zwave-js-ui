@@ -29,6 +29,7 @@ apps:
       - raw-usb
       - serial-port
       - hardware-observe
+      - log-observe
   exec:
     environment:
       STORE_DIR: $SNAP_DATA
@@ -61,8 +62,8 @@ parts:
     plugin: dump
     source: https://github.com/zwave-js/zwavejs2mqtt.git
     #source-branch: "master"
-    #source-tag: "v7.1.0"
-    source-tag: $SNAPCRAFT_PROJECT_VERSION
+    source-tag: "v7.1.0"
+      #source-tag: $SNAPCRAFT_PROJECT_VERSION
     build-packages:
       - gcc
       - build-essential
@@ -72,7 +73,7 @@ parts:
       - PATH: "${PATH}:${SNAPCRAFT_PART_BUILD}/bin"
     override-build: |
       # Used when testing an unreleased version of Z-wavejs
-      sed -i 's/"zwave-js".*$/"zwave-js"\: "10.0.5-0-pr-4836-ed10b36"/g' ${SNAPCRAFT_PART_BUILD}/package.json
+      # sed -i 's/"zwave-js".*$/"zwave-js"\: "10.0.5-0-pr-4836-ed10b36"/g' ${SNAPCRAFT_PART_BUILD}/package.json
 
       # Link the bundled yarn 
       cd "${SNAPCRAFT_PART_BUILD}/bin"
