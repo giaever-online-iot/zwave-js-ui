@@ -1,4 +1,4 @@
-name: zwavejs2mqtt
+name: zwave-js-ui
 base: core20
 version: 'v7.1.0-SEL-CC'
 summary: Fully configurable Zwave to MQTT Gateway and Control Panel.
@@ -45,7 +45,7 @@ architectures:
   - build-on: armhf
 
 apps:
-  zwavejs2mqtt:
+  zwave-js-ui:
     daemon: simple
     restart-condition: always
     environment:
@@ -97,15 +97,8 @@ slots: # ZUI offers new config dir within data
     write:
       - $SNAP_DATA
 
-plugs:
-  store-dir:
-    interface: content
-    content: store-dir 
-    target: $SNAP_COMMON/zui-store
-    default-provider: zwave-js-ui
-
 parts:
-  zwavejs2mqtt:
+  zwave-js-ui:
     after: [nodejs, dependencies]
     plugin: dump
     source: https://github.com/zwave-js/zwavejs2mqtt.git
