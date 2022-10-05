@@ -1,6 +1,6 @@
 name: zwave-js-ui
 base: core20
-version: '8.1.0'
+version: 'v8.1.0'
 summary: Fully configurable Zwave to MQTT Gateway and Control Panel.
 description: |
   ** Fully configurable Zwave to MQTT Gateway and Control Panel**
@@ -139,32 +139,32 @@ parts:
       # Copy built version into install directory
       mkdir -p "${SNAPCRAFT_PART_INSTALL}/lib/" \
         && cp --archive --link --no-dereference "${SNAPCRAFT_PART_BUILD}" \
-          "${SNAPCRAFT_PART_INSTALL}/lib/zwavejs2mqtt"
+          "${SNAPCRAFT_PART_INSTALL}/lib/zwave-js-ui"
       
       # Link yarn in install directory
       mkdir "${SNAPCRAFT_PART_INSTALL}/bin" \
         && cd "${SNAPCRAFT_PART_INSTALL}/bin" \
-        && ln -s "../lib/zwavejs2mqtt/bin/yarn" "yarn"
+        && ln -s "../lib/zwave-js-ui/bin/yarn" "yarn"
 
     filesets:
-      zwavejs2mqtt-include:
+      zwave-js-ui-include:
         - bin
-        - lib/zwavejs2mqtt/.git
-        - lib/zwavejs2mqtt/*.md
-        - lib/zwavejs2mqtt/bin/yarn
-        - lib/zwavejs2mqtt/dist
-        - lib/zwavejs2mqtt/hass
-        - lib/zwavejs2mqtt/node_modules
-        - lib/zwavejs2mqtt/server
-        - lib/zwavejs2mqtt/snippets
-        - lib/zwavejs2mqtt/package.json
-        - lib/zwavejs2mqtt/views
-        - lib/zwavejs2mqtt/.yarn
-        - lib/zwavejs2mqtt/yarn.lock
-        - lib/zwavejs2mqtt/.yarnrc.yml
-        - lib/zwavejs2mqtt/LICENSE
+        - lib/zwave-js-ui/.git
+        - lib/zwave-js-ui/*.md
+        - lib/zwave-js-ui/bin/yarn
+        - lib/zwave-js-ui/dist
+        - lib/zwave-js-ui/hass
+        - lib/zwave-js-ui/node_modules
+        - lib/zwave-js-ui/server
+        - lib/zwave-js-ui/snippets
+        - lib/zwave-js-ui/package.json
+        - lib/zwave-js-ui/views
+        - lib/zwave-js-ui/.yarn
+        - lib/zwave-js-ui/yarn.lock
+        - lib/zwave-js-ui/.yarnrc.yml
+        - lib/zwave-js-ui/LICENSE
     stage:
-      - $zwavejs2mqtt-include
+      - $zwave-js-ui-include
   
   dependencies:
     plugin: nil
