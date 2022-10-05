@@ -1,25 +1,25 @@
 #!/usr/bin/bash
 
 ZJS_LOGGING_TO_FILE="$(jq '.zwave.logToFile' -r ${SNAP_DATA}/settings.json)"
-Z2M_LOGGING_TO_FILE="$(jq '.gateway.logToFile' -r ${SNAP_DATA}/settings.json)"
+ZUI_LOGGING_TO_FILE="$(jq '.gateway.logToFile' -r ${SNAP_DATA}/settings.json)"
 
 echo "${Z2M_LOGGING_TO_FILE}"
 echo "${ZJS_LOGGING_TO_FILE}"
 
-Z2M_LOG=
+ZUI_LOG=
 ZJS_LOG=
 
-if [ "${Z2M_LOGGING_TO_FILE}" != true ]; then
-	Z2M_LOG="tail -f $(ls $SNAP_DATA/logs/zwavejs2mqtt_* | tail -1)"
+if [ "${ZUI_LOGGING_TO_FILE}" != true ]; then
+	ZUI_LOG="tail -f $(ls $SNAP_DATA/logs/zwave-js-ui_* | tail -1)"
 else
-	Z2M_LOG="tail -f /var/log/syslog | grep zwavejs2mqtt | sed -E 's/.*(]|m):/ZWAVE2MQTT/'"
+	ZUI_LOG="tail -f /var/log/syslog | grep zwave-js-ui | sed -E 's/.*(]|m):/ZWAVE2MQTT/'"
 fi
 
 if [ "${ZJS_LOGGING_TO_FILE}" == true ]; then
 	ZJS_LOG="tail -f ${SNAP_DATA}/logs/zwavejs_current.log"
 fi
 
-echo "${Z2M_LOG}"
+echo "${ZUI_LOG}"
 echo "${ZJS_LOG}"
 
 #{ tail -f /var/log/syslog | grep zwavejs2mqtt | sed -E 's/.*(]|m):/ZWAVE2MQTT/' & tail -f $SNAP_DATA/logs/zwavejs_current.log; }

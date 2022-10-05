@@ -1,6 +1,6 @@
 name: zwave-js-ui
 base: core20
-version: 'v7.1.0-SEL-CC'
+version: '8.1.0'
 summary: Fully configurable Zwave to MQTT Gateway and Control Panel.
 description: |
   ** Fully configurable Zwave to MQTT Gateway and Control Panel**
@@ -101,10 +101,10 @@ parts:
   zwave-js-ui:
     after: [nodejs, dependencies]
     plugin: dump
-    source: https://github.com/zwave-js/zwavejs2mqtt.git
+    source: https://github.com/zwave-js/zwave-js-ui.git
     #source-branch: "master"
-    source-tag: "v7.1.0"
-      #source-tag: $SNAPCRAFT_PROJECT_VERSION
+    #source-tag: "v7.1.0"
+    source-tag: $SNAPCRAFT_PROJECT_VERSION
     build-packages:
       - gcc
       - build-essential
