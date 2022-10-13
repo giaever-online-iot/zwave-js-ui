@@ -40,22 +40,27 @@ a little bit of computing power and a serial port.
   cause a network corruption.
 
 ## Additions with the snap
-- Command to read the log from the terminal independent of if you're logging to file or not
-- Plugs for the `code-server` snap, if you want a full-fledge editor experience for the «store-folder»
+- Command to read the log from the terminal independent of if you're logging to file 
+  or not
+- Plugs for the `code-server` snap, if you want a full-fledge editor experience for 
+  the «store-folder»
 
 # Auto-connections
 - `raw-usb`: To access USB devices, such as Z-wave controller dongles
 - `hardware-observe`: To observe your system for devices, to easily find them in the UI
 
-**Note:** None of these connections are necessary to run the app, so you can disconnect them as you like, but please note that it might
-change the experience within the software.
+**Note:** None of these connections are necessary to run the app, so you can disconnect 
+them as you like, but please note that it might change the experience within the software.
 
 # Issues
 If your issue is with 
-- the UI, report them with [Zwave JS UI](https://github.com/zwave-js/zwave-js-ui/issues)
+- the UI/front-end, report them with [Zwave JS UI](https://github.com/zwave-js/zwave-js-ui/issues)
 - the driver, report them with the driver [Zwave JS](https://github.com/zwave-js/node-zwave-js/issues).
 
 Make sure you have set the log level to `DEBUG` for the respective unit and that you are
 logging to file, and attach it with your issue.
+
+If you're not sure, just report it witin any of the above, but attach logs for both 
+packages. It will be transferred if you reported it within the wrong tracker.
 ## Issues with the snap package
 Report it with the [github repository](https://github.com/giaever-online-iot/zwave-js-ui/issues).
