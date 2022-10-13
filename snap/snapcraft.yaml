@@ -1,6 +1,6 @@
 name: zwave-js-ui
 base: core20
-version: 'v8.1.0'
+version: 'v8.2.1'
 summary: Fully configurable Zwave to MQTT Gateway and Control Panel.
 description: |
   ** Fully configurable Zwave to MQTT Gateway and Control Panel**
