@@ -2,11 +2,11 @@
 
 Fully configurable Zwave to MQTT Gateway and Control Panel.
 
-[![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-black.svg)](https://snapcraft.io/home-assistant-snap)
-[![Donate with PayPal](https://giaever.online/paypal-donate-button.png)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=69NA8SXXFBDBN&source=https://git.giaever.org/joachimmg/home-assistant-snap)
+[![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-black.svg)](https://snapcraft.io/zwave-js-ui)
+[![Donate with PayPal](https://giaever.online/paypal-donate-button.png)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=69NA8SXXFBDBN&source=https://snapcraft.io/zwave-js-ui)
 
-**If you're happy with this snap package, please consider contribute with PR's
-  or a donation.**
+**If you're happy with this snap package, please consider to contribute with PR's,
+a donation and/or starring this repository.** 
 
 Full featured Z-Wave Control Panel and MQTT Gateway compatible with all known 500 and 
 700 series Z-Wave controller hardware adapters, Z-Wave JS runs on almost anything with 
@@ -50,3 +50,12 @@ a little bit of computing power and a serial port.
 **Note:** None of these connections are necessary to run the app, so you can disconnect them as you like, but please note that it might
 change the experience within the software.
 
+# Issues
+If your issue is with 
+- the UI, report them with [Zwave JS UI](https://github.com/zwave-js/zwave-js-ui/issues)
+- the driver, report them with the driver [Zwave JS](https://github.com/zwave-js/node-zwave-js/issues).
+
+Make sure you have set the log level to `DEBUG` for the respective unit and that you are
+logging to file, and attach it with your issue.
+## Issues with the snap package
+Report it with the [github repository](https://github.com/giaever-online-iot/zwave-js-ui/issues).
