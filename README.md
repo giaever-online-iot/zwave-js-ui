@@ -16,10 +16,10 @@ a little bit of computing power and a serial port.
 
 # Main features
 - Control Panel UI: Directly control your nodes and their values from the UI, including:
-- Nodes management: Add, remove, and configure all nodes in your Z-Wave network
-- Firmware updates: Update device firmware using manufacturer-supplied firmware files
-- Groups associations: Add, edit, and remove direct node associations
-- Z-Wave JS Exposed: Provides full-access to Z-Wave JS's APIs
+  - Nodes management: Add, remove, and configure all nodes in your Z-Wave network
+  - Firmware updates: Update device firmware using manufacturer-supplied firmware files
+  - Groups associations: Add, edit, and remove direct node associations
+  - Z-Wave JS Exposed: Provides full-access to Z-Wave JS's APIs
 - Full-Featured Z-Wave to MQTT Gateway: Expose Z-Wave devices to an MQTT broker in a 
   fully configurable manner
 - Secured: Supports HTTPS and user authentication
@@ -47,7 +47,7 @@ a little bit of computing power and a serial port.
 - Plugs for the `code-server` snap, if you want a full-fledge editor experience for 
   the «store-folder»
 
-# Auto-connections
+# Auto-connections (only if installed from the Snap store)
 - `raw-usb`: To access USB devices, such as Z-wave controller dongles
 - `hardware-observe`: To observe your system for devices, to easily find them in the UI
 
