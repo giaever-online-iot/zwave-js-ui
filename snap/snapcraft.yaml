@@ -93,7 +93,7 @@ layout:
 slots: # ZUI offers new config dir within data
   store-dir:
     interface: content
-    content: store-dir
+    content: vscs-content
     write:
       - $SNAP_DATA
 
