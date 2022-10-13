@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-export ZWAVE_JS_CONF="${SNAP}/lib/zwavejs2mqtt/node_modules/@zwave-js/config"
+export ZWAVE_JS_CONF="${SNAP}/lib/zwave-js-ui/node_modules/@zwave-js/config"
 
 function ensure_zwavejs_config {
     # Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG

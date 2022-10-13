@@ -10,9 +10,9 @@ ZUI_LOG=
 ZJS_LOG=
 
 if [ "${ZUI_LOGGING_TO_FILE}" != true ]; then
-	ZUI_LOG="tail -f $(ls $SNAP_DATA/logs/zwave-js-ui_* | tail -1)"
+	ZUI_LOG="tail -f $(ls $SNAP_DATA/logs/zwave-js-ui * | tail -1)"
 else
-	ZUI_LOG="tail -f /var/log/syslog | grep zwave-js-ui | sed -E 's/.*(]|m):/ZWAVE2MQTT/'"
+	ZUI_LOG="tail -f /var/log/syslog | grep zwave-js-ui | sed -E 's/.*(]|m):/ZWAVE-JS-UI/'"
 fi
 
 if [ "${ZJS_LOGGING_TO_FILE}" == true ]; then
@@ -22,4 +22,4 @@ fi
 echo "${ZUI_LOG}"
 echo "${ZJS_LOG}"
 
-#{ tail -f /var/log/syslog | grep zwavejs2mqtt | sed -E 's/.*(]|m):/ZWAVE2MQTT/' & tail -f $SNAP_DATA/logs/zwavejs_current.log; }
+#{ tail -f /var/log/syslog | grep zwave-js-ui | sed -E 's/.*(]|m):/ZWAVE-JS-UI/' & tail -f $SNAP_DATA/logs/zwavejs_current.log; }
