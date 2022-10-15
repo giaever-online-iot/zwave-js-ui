@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 logger "Connected wiht z2m!"
 logger "$(ls ${SNAP_DATA})"
+snap start --enable "${SNAP_NAME}"
