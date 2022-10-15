@@ -7,7 +7,10 @@ Fully configurable Zwave to MQTT Gateway and Control Panel.
 
 **If you're happy with this snap package, please consider to**
 - contribute with PR's,
-- make a donation and/or 
+- make a donation (any contribution will help keep these projects alive!) to the
+  * Snap package [maintainer](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=69NA8SXXFBDBN&source=https://snapcraft.io/zwave-js-ui)
+  * ZUI [developer](https://github.com/sponsors/robertsLando)
+  * Zwave JS [developer](https://github.com/sponsors/AlCalzone)
 - starring this repository
 
 Full featured Z-Wave Control Panel and MQTT Gateway compatible with all known 500 and 
