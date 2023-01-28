@@ -14,6 +14,42 @@ function lprint {
     fi
 }
 
+if [ -s "${SNAP_DATA}/.snap.config"]; then
+	if [ -f "${SNAP_DATA}/.z2m-cpy" ]; then
+		rm "${SNAP_DATA}/.z2m-cpy"
+		SNAP_CONFIG="${SNAP_DATA}/snap.config"
+		lprint "Has snap config: $(cat ${SNAP_CONFIG})"
+
+		until [ "$(echo "${SNAP_CONFIG}"*)" = "${SNAP_CONFIG}" ]; do
+			lprint "${SNAP_NAME}: Waiting for Z2M snap.config" && sleep 2
+		done
+
+		mapfile -t OPTS < <(jq -r 'keys[]' "${SNAP_CONFIG}")
+
+		SUCCESS=1
+		for OPT in "${OPTS[@]}"; do
+			lprint "${SNAP_NAME}: import configuration ${OPT}=$(jq -c ".${OPT}" snap.config)"
+			set -t "${OPT}"="$(jq -c ".$OPT" snap.config)"
+			if [ $? -ne 0 ]; then
+				SUCCESS=0
+			fi
+		done
+
+		jq --arg deviceConfigPriorityDir "${SNAP_DATA}/config" '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
+		if [ $? -eq 0 ]; then
+			lprint "Renamed «config-folder» to: ${SNAP_DATA}/config"
+			mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
+		else
+			lprint "Renaming «config-folder» was unsuccessful. You must do this manually after application has booted."
+		fi
+
+		if [ "${SUCCESS}" -eq 1 ]; then
+			lprint "Configuration is imported successfully"
+			rm "${SNAP_CONFIG}"
+		fi
+	fi
+fi
+
 # WITH S0+n NETWORK KEY IS NOT USED ANYMORE
 #export NETWORK_KEY=$(snapctl get network.key)
 # SETTINGS_KEY=$(same_network_key "${NETWORK_KEY}")

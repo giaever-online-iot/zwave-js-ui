@@ -2,36 +2,23 @@
 logger "Connected wiht z2m!"
 logger "$(ls ${SNAP_DATA})"
 
-SNAP_CONFIG="$(snapctl get --plug :store-dir plugattribute)"
+SNAP_CONFIG="$(snapctl get --plug :store-dir z2mconfig)"
 
-echo "Has snap plug config?"
-logger "Has snap plug config?"
 if [ -n "${SNAP_CONFIG}" ]; then
 	echo "${SNAP_CONFIG}"
 	logger "${SNAP_CONFIG}"
 	echo "${SNAP_CONFIG}" > "${SNAP_DATA}/.snap.config"
-	snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
+	if snapctl is-connected serial-port; then
+		echo "Serial-port is enabled, wont enable zui"
+		logger "${SNAP_NAME}: Serial-port is enabled, wont enable zui"
+	else
+		echo "Enabling ZUI"
+		logger "Enabling ZUI"
+		snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
+	fi
 else
 	echo "Do not have snap plug config"
 	logger "Do not have snap plug config"
 fi
 
-# SNAP_CONFIG="${SNAP_DATA}/snap.config"
-
-# until [ "$(echo "${SNAP_CONFIG}"*)" = "${SNAP_CONFIG}" ]; do
-# 	logger "${SNAP_NAME}: Waiting for Z2M snap.config" && sleep 2
-# done
-
-
-# mapfile -t OPTS < <(jq -r 'keys[]' "${SNAP_CONFIG}")
-
-# for OPT in "${OPTS[@]}"; do
-#        logger "${SNAP_NAME}: ${OPT}=$(jq -c ".${OPT}" snap.config)"
-#        snapctl set -t "${OPT}"="$(jq -c ".$OPT" snap.config)"
-# done
-
-# jq --arg deviceConfigPriorityDir "${SNAP_DATA}/config" '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
-# if [ $? -eq 0 ]; then
-#    mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
-# fi
 
