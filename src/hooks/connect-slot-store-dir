@@ -2,24 +2,23 @@
 logger "Connected wiht z2m!"
 logger "$(ls ${SNAP_DATA})"
 
-SNAP_CONFIG="${SNAP_DATA}/snap.config"
+# SNAP_CONFIG="${SNAP_DATA}/snap.config"
 
-until [ "$(echo "${SNAP_CONFIG}"*)" = "${SNAP_CONFIG}" ]; do
-	logger "${SNAP_NAME}: Waiting for Z2M snap.config" && sleep 2
-done
+# until [ "$(echo "${SNAP_CONFIG}"*)" = "${SNAP_CONFIG}" ]; do
+# 	logger "${SNAP_NAME}: Waiting for Z2M snap.config" && sleep 2
+# done
 
 
-mapfile -t OPTS < <(jq -r 'keys[]' "${SNAP_CONFIG}")
+# mapfile -t OPTS < <(jq -r 'keys[]' "${SNAP_CONFIG}")
 
-for OPT in "${OPTS[@]}"; do
-        logger "${SNAP_NAME}: ${OPT}=$(jq -c ".${OPT}" snap.config)"
-        snapctl set -t "${OPT}"="$(jq -c ".$OPT" snap.config)"
-done
-rm 
+# for OPT in "${OPTS[@]}"; do
+#        logger "${SNAP_NAME}: ${OPT}=$(jq -c ".${OPT}" snap.config)"
+#        snapctl set -t "${OPT}"="$(jq -c ".$OPT" snap.config)"
+# done
 
-jq --arg deviceConfigPriorityDir "${SNAP_DATA}/config" '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
-if [ $? -eq 0 ]; then
-    mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
-fi
+# jq --arg deviceConfigPriorityDir "${SNAP_DATA}/config" '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
+# if [ $? -eq 0 ]; then
+#    mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
+# fi
 
-snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
+# snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
