@@ -2,6 +2,20 @@
 logger "Connected wiht z2m!"
 logger "$(ls ${SNAP_DATA})"
 
+SNAP_CONFIG="$(snapctl get --plug :store-dir plugattribute)"
+
+echo "Has snap plug config?"
+logger "Has snap plug config?"
+if [ -n "${SNAP_CONFIG}" ]; then
+	echo "${SNAP_CONFIG}"
+	logger "${SNAP_CONFIG}"
+	echo "${SNAP_CONFIG}" > "${SNAP_DATA}/.snap.config"
+	snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
+else
+	echo "Do not have snap plug config"
+	logger "Do not have snap plug config"
+fi
+
 # SNAP_CONFIG="${SNAP_DATA}/snap.config"
 
 # until [ "$(echo "${SNAP_CONFIG}"*)" = "${SNAP_CONFIG}" ]; do
@@ -21,4 +35,3 @@ logger "$(ls ${SNAP_DATA})"
 #    mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
 # fi
 
-# snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
