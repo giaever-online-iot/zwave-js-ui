@@ -1,4 +1,14 @@
 #!/usr/bin/env bash
 logger "Connected wiht z2m!"
 logger "$(ls ${SNAP_DATA})"
+
+until [ "$(echo "${SNAP_DATA}/settings.json"*)" = "${SNAP_DATA}/settings.json" ]; do
+	logger "${SNAP_NAME}: Waiting for Z2M files" && sleep 2
+done
+
+jq --arg deviceConfigPriorityDir "${SNAP_DATA}/config" '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
+if [ $? -eq 0 ]; then
+    mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
+fi
+
 snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
