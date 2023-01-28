@@ -1,3 +1,0 @@
-!#/usr/bin/env bash
-
-snapctl set :store-dir serial=$(snapctl is-connected serial-port)
