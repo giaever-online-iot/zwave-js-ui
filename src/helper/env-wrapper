@@ -14,8 +14,8 @@ function lprint {
     fi
 }
 
-if [ -s "${SNAP_DATA}/.snap.config"]; then
-	if [ -f "${SNAP_DATA}/.z2m-cpy" ]; then
+if [ -s "${SNAP_DATA}/.snap.config" ]; then
+	if [ -f "${SNAP_DATA}/.z2m-cpy" ]; then
 		rm "${SNAP_DATA}/.z2m-cpy"
 		SNAP_CONFIG="${SNAP_DATA}/snap.config"
 		lprint "Has snap config: $(cat ${SNAP_CONFIG})"
