@@ -8,7 +8,7 @@ if [ -n "${SNAP_CONFIG}" ]; then
 	echo "${SNAP_CONFIG}"
 	logger "${SNAP_CONFIG}"
 	echo "${SNAP_CONFIG}" > "${SNAP_DATA}/.snap.config"
-	if [ "$(snapctl get --plug :storedir z2mserial)" -eq 1 ]; then
+	if [ "$(snapctl get --plug :store-dir z2mserial)" -eq 1 ]; then
 		echo "Serial-port is enabled on Z2M, wont enable ${SNAP_NAME}"
 		logger "${SNAP_NAME}: Serial-port is enabled, wont enable zui"
 	else
