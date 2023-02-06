@@ -52,6 +52,8 @@ if [ -s "${SNAP_CONFIG}" ]; then
 		else
 			lprint "Failed importing Z2M configuration"
 		fi
+	else
+		lprint "${Z2M_CPY} does not exits... $(ls -al ${SNAP_DATA})"
 	fi
 fi
 

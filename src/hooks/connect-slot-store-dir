@@ -14,6 +14,7 @@ if [ -n "${SNAP_CONFIG}" ]; then
 	else
 		echo "Enabling ZUI"
 		logger "Enabling ZUI"
+		#snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
 		snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
 	fi
 else
