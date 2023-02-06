@@ -2,25 +2,12 @@
 
 source $SNAP/helper/functions
 
-if [ -z "${DAEMONIZED}" ]; then
-    DAEMONIZED=0
-fi
-
-function lprint {
-    if [ ${DAEMONIZED} -eq 0 ]; then
-        echo ${1}
-    else
-        logger "${SNAP_NAME}: ${1}"
-    fi
-}
-
 SNAP_CONFIG="${SNAP_DATA}/.snap.config"
 if [ -s "${SNAP_CONFIG}" ]; then
 	Z2M_CPY="${SNAP_DATA}/.z2m-cpy"
 	lprint "${SNAP_CONFIG} exists, looking for ${Z2M_CPY}..."
 	if [ -f "${Z2M_CPY}" ]; then
 		lprint "${Z2M_CPY} exist."
-		#rm "${Z2M_CPY}"
 
 		lprint "Z2M snap-config to restore: $(cat ${SNAP_CONFIG})"
 
@@ -49,6 +36,7 @@ if [ -s "${SNAP_CONFIG}" ]; then
 		if [ "${SUCCESS}" -eq 1 ]; then
 			lprint "Z2M Configuration is imported and updated successfully"
 			rm "${SNAP_CONFIG}"
+			rm "${Z2M_CPY}"
 		else
 			lprint "Failed importing Z2M configuration"
 		fi

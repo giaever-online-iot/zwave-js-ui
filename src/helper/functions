@@ -2,6 +2,18 @@
 
 export ZWAVE_JS_CONF="${SNAP}/lib/zwave-js-ui/node_modules/@zwave-js/config"
 
+if [ -z "${DAEMONIZED}" ]; then
+    DAEMONIZED=0
+fi
+
+function lprint {
+    if [ ${DAEMONIZED} -eq 0 ]; then
+        echo ${1}
+    else
+        logger "${SNAP_NAME}: ${1}"
+    fi
+}
+
 function ensure_zwavejs_config {
     # Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG
     # if [ "$(find ${ZWAVE_JS_CONF} -maxdepth 0 -empty -exec echo empty \;)" == "empty" ]; then
@@ -17,7 +29,7 @@ function get_network_key {
     if [ -f "${SNAP_DATA}/settings.json" ]; then
         SETTINGS_KEY=$(jq '.zwave.networkKey' -r ${SNAP_DATA}/settings.json)
         if [ "${SETTINGS_KEY}" != "" ] && [ "${1}" != "${SETTINGS_KEY}" ]; then
-            echo "${SETTINGS_KEY}"
+            lprint "${SETTINGS_KEY}"
             return 1
         fi
         return 0
@@ -41,12 +53,12 @@ function same_network_key {
 
 function plug_connected {
     if ! snapctl is-connected "${1}"; then
-        echo "Missing plug: «${1}»" >&2
-        echo "Connect with:"
+        lprint "Missing plug: «${1}»" >&2
+	lprint "Connect with:"
 	if [ "${1}" == "serial-port" ]; then
-		echo "$ sudo snap connect ${SNAP_NAME}:${1} <slot name>"
+		lprint "$ sudo snap connect ${SNAP_NAME}:${1} <slot name>"
 	else
-		echo "$ sudo snap connect ${SNAP_NAME}:${1}"
+		lprint "$ sudo snap connect ${SNAP_NAME}:${1}"
 	fi
         return 1
     fi
@@ -63,10 +75,10 @@ function plugs_connected {
     SERIAL_RES=$?
 
     if [ $RAW_RES -ne 0 -a $SERIAL_RES -ne 0 ]; then
-        echo $RAW_OUT
-        echo "----- OR -----"
-        echo $SERIAL_OUT
-        echo "See ${SNAP_NAME}.help for more info on the serial-port plug"
+        lprint $RAW_OUT
+        lprint "----- OR -----"
+        lprint $SERIAL_OUT
+        lprint "See ${SNAP_NAME}.help for more info on the serial-port plug"
         MISSING=1
     fi
 
@@ -92,20 +104,20 @@ function is_root {
 function require_root {
     is_root
     if [ $? -eq 1 ]; then
-        echo "Running as root is required." >&2
-        echo "Re-run with sudo."
+        lprint "Running as root is required." >&2
+        lprint "Re-run with sudo."
         exit 1
     fi
 }
 
 function testnset_config {
-    logger "${SNAP_NAME}: Testing ${1}, or setting ${2}"
+    lprint "${SNAP_NAME}: Testing ${1}, or setting ${2}"
     RES=$(snapctl get ${1})
     if [ $? -ne 0 ] || [ -z "${RES}" ]; then
-        logger "${SNAP_NAME}: Setting ${1}=${2}"
+        lprint "${SNAP_NAME}: Setting ${1}=${2}"
         RES=$(snapctl set ${1}=${2})
         if [ $? -ne 0 ]; then
-            logger "${RES}"
+            lprint "${RES}"
             exit 1
         fi
         return 0
