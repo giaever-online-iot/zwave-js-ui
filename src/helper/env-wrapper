@@ -36,7 +36,7 @@ if [ -s "${SNAP_CONFIG}" ]; then
 		if [ "${SUCCESS}" -eq 1 ]; then
 			lprint "Z2M Configuration is imported and updated successfully"
 			rm "${SNAP_CONFIG}"
-			rm "${Z2M_CPY}"
+			#rm "${Z2M_CPY}"
 		else
 			lprint "Failed importing Z2M configuration"
 		fi
