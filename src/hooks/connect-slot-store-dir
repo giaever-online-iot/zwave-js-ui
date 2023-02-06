@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 logger "Connected wiht z2m!"
 logger "$(ls ${SNAP_DATA})"
 
@@ -16,8 +17,6 @@ if [ -n "${SNAP_CONFIG}" ]; then
 		echo "Tell install-hook to enable ZUI"
 		logger "Tell install-hook to enable ZUI"
 		echo "enable" > "${SNAP_DATA}/.hook.install"
-		#snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
-		#snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
 	fi
 else
 	echo "Do not have snap plug config"
