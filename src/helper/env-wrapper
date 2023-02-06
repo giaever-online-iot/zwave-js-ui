@@ -4,44 +4,37 @@ source $SNAP/helper/functions
 
 SNAP_CONFIG="${SNAP_DATA}/.snap.config"
 if [ -s "${SNAP_CONFIG}" ]; then
-	Z2M_CPY="${SNAP_DATA}/.z2m-cpy"
-	lprint "${SNAP_CONFIG} exists, looking for ${Z2M_CPY}..."
-	if [ -f "${Z2M_CPY}" ]; then
-		lprint "${Z2M_CPY} exist."
+	lprint "${SNAP_CONFIG} exists..."
+	lprint "Z2M snap-config to restore: $(cat ${SNAP_CONFIG})"
 
-		lprint "Z2M snap-config to restore: $(cat ${SNAP_CONFIG})"
+	mapfile -t OPTS < <(jq -r 'keys[]' "${SNAP_CONFIG}")
 
-		mapfile -t OPTS < <(jq -r 'keys[]' "${SNAP_CONFIG}")
-
-		SUCCESS=1
-		for OPT in "${OPTS[@]}"; do
-			OPTVAL="$(jq -c ".$OPT" "${SNAP_CONFIG}")"
-			lprint "${SNAP_NAME}: import configuration ${OPT}=${OPT_VAL}"
-			set -t "${OPT}"="${OPTVAL}"
-			if [ $? -ne 0 ]; then
-				lprint "Failed to set option: ${OPT}=${OPTVAL}"
-				SUCCESS=0
-		
-			fi
-		done
-
-		jq --arg deviceConfigPriorityDir "${SNAP_DATA}/config" '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
-		if [ $? -eq 0 ]; then
-			lprint "Renamed «config-folder» to: ${SNAP_DATA}/config"
-			mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
-		else
-			lprint "Renaming «config-folder» was unsuccessful. You must do this manually after application has booted."
+	SUCCESS=1
+	for OPT in "${OPTS[@]}"; do
+		OPTVAL="$(jq -c ".$OPT" "${SNAP_CONFIG}")"
+		lprint "${SNAP_NAME}: import configuration ${OPT}=${OPT_VAL}"
+		set -t "${OPT}"="${OPTVAL}"
+		if [ $? -ne 0 ]; then
+			lprint "Failed to set option: ${OPT}=${OPTVAL}"
+			SUCCESS=0
+	
 		fi
+	done
 
-		if [ "${SUCCESS}" -eq 1 ]; then
-			lprint "Z2M Configuration is imported and updated successfully"
-			rm "${SNAP_CONFIG}"
-			#rm "${Z2M_CPY}"
-		else
-			lprint "Failed importing Z2M configuration"
-		fi
+	jq --arg deviceConfigPriorityDir "${SNAP_DATA}/config" '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
+	if [ $? -eq 0 ]; then
+		lprint "Renamed «config-folder» to: ${SNAP_DATA}/config"
+		mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
 	else
-		lprint "${Z2M_CPY} does not exits... $(ls -al ${SNAP_DATA})"
+		lprint "Renaming «config-folder» was unsuccessful. You must do this manually after application has booted."
+	fi
+
+	if [ "${SUCCESS}" -eq 1 ]; then
+		lprint "Z2M Configuration is imported and updated successfully"
+		rm "${SNAP_CONFIG}"
+		#rm "${Z2M_CPY}"
+	else
+		lprint "Failed importing Z2M configuration"
 	fi
 fi
 

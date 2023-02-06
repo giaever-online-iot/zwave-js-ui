@@ -30,6 +30,7 @@ if [ -s "${SNAP_DATA}/.hook.install" ]; then
 		logger "Disabling ${SNAP_NAME}: hook.install=$(cat "${SNAP_DATA}/.hook.install")"
 		snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"
 	fi
+	rm "${SNAP_DATA}/.hook.install"
 else
 	logger "Disabling ${SNAP_NAME}: see command «${SNAP_NAME}.help»"
 	snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"
