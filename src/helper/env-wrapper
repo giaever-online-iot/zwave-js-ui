@@ -19,8 +19,8 @@ if [ -s "${SNAP_CONFIG}" ]; then
 	Z2M_CPY="${SNAP_DATA}/.z2m-cpy"
 	lprint "${SNAP_CONFIG} exists, looking for ${Z2M_CPY}..."
 	if [ -f "${Z2M_CPY}" ]; then
-		lprint "${Z2M_CPY} exist, deleting it..."
-		rm "${Z2M_CPY}"
+		lprint "${Z2M_CPY} exist."
+		#rm "${Z2M_CPY}"
 
 		lprint "Z2M snap-config to restore: $(cat ${SNAP_CONFIG})"
 

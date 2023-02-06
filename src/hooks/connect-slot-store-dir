@@ -11,11 +11,13 @@ if [ -n "${SNAP_CONFIG}" ]; then
 	if [ "$(snapctl get --plug :store-dir z2mserial)" -eq 1 ]; then
 		echo "Serial-port is enabled on Z2M, wont enable ${SNAP_NAME} automatically. Connect interface and enable ZUI with «sudo zwave-js-ui.enable"
 		logger "${SNAP_NAME}: Serial-port is enabled on Z2M, wont enable zui before manually connected."
+		echo "disable" > "${SNAP_DATA}/.hook.install"
 	else
-		echo "Enabling ZUI"
-		logger "Enabling ZUI"
+		echo "Tell install-hook to enable ZUI"
+		logger "Tell install-hook to enable ZUI"
+		echo "enable" > "${SNAP_DATA}/.hook.install"
 		#snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
-		snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
+		#snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
 	fi
 else
 	echo "Do not have snap plug config"
