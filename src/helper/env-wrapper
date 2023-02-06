@@ -14,24 +14,27 @@ function lprint {
     fi
 }
 
-if [ -s "${SNAP_DATA}/.snap.config" ]; then
-	if [ -f "${SNAP_DATA}/.z2m-cpy" ]; then
-		rm "${SNAP_DATA}/.z2m-cpy"
-		SNAP_CONFIG="${SNAP_DATA}/snap.config"
-		lprint "Has snap config: $(cat ${SNAP_CONFIG})"
+SNAP_CONFIG="${SNAP_DATA}/.snap.config"
+if [ -s "${SNAP_CONFIG}" ]; then
+	Z2M_CPY="${SNAP_DATA}/.z2m-cpy"
+	lprint "${SNAP_CONFIG} exists, looking for ${Z2M_CPY}..."
+	if [ -f "${Z2M_CPY}" ]; then
+		lprint "${Z2M_CPY} exist, deleting it..."
+		rm "${Z2M_CPY}"
 
-		until [ "$(echo "${SNAP_CONFIG}"*)" = "${SNAP_CONFIG}" ]; do
-			lprint "${SNAP_NAME}: Waiting for Z2M snap.config" && sleep 2
-		done
+		lprint "Z2M snap-config to restore: $(cat ${SNAP_CONFIG})"
 
 		mapfile -t OPTS < <(jq -r 'keys[]' "${SNAP_CONFIG}")
 
 		SUCCESS=1
 		for OPT in "${OPTS[@]}"; do
-			lprint "${SNAP_NAME}: import configuration ${OPT}=$(jq -c ".${OPT}" snap.config)"
-			set -t "${OPT}"="$(jq -c ".$OPT" snap.config)"
+			OPTVAL="$(jq -c ".$OPT" "${SNAP_CONFIG}")"
+			lprint "${SNAP_NAME}: import configuration ${OPT}=${OPT_VAL}"
+			set -t "${OPT}"="${OPTVAL}"
 			if [ $? -ne 0 ]; then
+				lprint "Failed to set option: ${OPT}=${OPTVAL}"
 				SUCCESS=0
+		
 			fi
 		done
 
@@ -44,8 +47,10 @@ if [ -s "${SNAP_DATA}/.snap.config" ]; then
 		fi
 
 		if [ "${SUCCESS}" -eq 1 ]; then
-			lprint "Configuration is imported successfully"
+			lprint "Z2M Configuration is imported and updated successfully"
 			rm "${SNAP_CONFIG}"
+		else
+			lprint "Failed importing Z2M configuration"
 		fi
 	fi
 fi
