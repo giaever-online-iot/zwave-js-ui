@@ -7,13 +7,37 @@ lprint "Connected wiht z2m: Here's my data: $(ls ${SNAP_DATA})"
 
 SNAP_CONFIG="$(snapctl get --plug :store-dir z2mconfig)"
 SNAP_SERIAL="$(snapctl get --plug :store-dir z2mserial)"
+SNAP_RANDOM="$(snapctl get --plug :store-dir transfer)"
 
 if [ -n "${SNAP_CONFIG}" ]; then
-	lprint "RECIVED: serial=${SNAP_SERIAL}, config: ${SNAP_CONFIG}"
-	#echo "${SNAP_CONFIG}" > "${SNAP_DATA}/.snap.config"
+	TRANSFER="$(jq -c ".$OPT" "${SNAP_CONFIG}")"
+	lprint "RECIVED: serial=${SNAP_SERIAL}, config: ${SNAP_CONFIG}, TRANSFER: ${TRANSFER}"
 
 	mapfile -t OPTS < <(jq -r 'keys[]' <<< "${SNAP_CONFIG}")
+	lprint "MAPPED KEYS: ${OPTS}"
 
+	if [ "${SNAP_RANDOM}" != "${TRANSFER}" ]; then
+		lprint "Transfer matches: ${TRANSFER}!"
+		SUCCESS=1
+		for OPT in "${OPTS[@]}"; do
+			OPTVAL="$(jq -c ".${OPT}" <<< "${SNAP_CONFIG}")"
+			lprint "Setting option: ${OPT}=${OPTVAL}"
+
+			snapctl set -t "${OPT}=${OPTVAL}"
+			if [ $? -ne 0 ]; then
+				lprint "Failed to set option ${OPT}=${OPTVAL}"
+				SUCCESS=0
+			fi
+		done
+
+		if [ $SUCCESS -eq 0 ]; then
+			lprint "Z2M configuration successfully installed"
+		else
+			lprint "Usj. Failed to import config from Z2M."
+		fi
+	else
+		lprint "OPS! ${SNAP_RANDOM} != ${TRANSFER}"
+	fi
 else
 	lprint "Do not have snap plug config"
 fi
@@ -24,5 +48,4 @@ fi
 #else
 #	lprint "Tell install-hook to enable ZUI"
 #	echo "enable" > "${SNAP_DATA}/.hook.install"
-#fi
-
+#FE
