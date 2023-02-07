@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+export DAEMONIZED=1
+source $SNAP/helper/functions
+
+lprint "Disconnected wiht z2m!"
