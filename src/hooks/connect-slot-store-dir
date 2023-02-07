@@ -14,9 +14,9 @@ if [ -n "${SNAP_CONFIG}" ]; then
 	lprint "RECIVED: serial=${SNAP_SERIAL}, config: ${SNAP_CONFIG}, TRANSFER: ${TRANSFER}"
 
 	mapfile -t OPTS < <(jq -r 'keys[]' <<< "${SNAP_CONFIG}")
-	lprint "MAPPED KEYS: ${OPTS}"
+	lprint "MAPPED KEYS: ${OPTS[#]}"
 
-	if [ "${SNAP_RANDOM}" != "${TRANSFER}" ]; then
+	if [ "${SNAP_RANDOM}" == "${TRANSFER}" ]; then
 		lprint "Transfer matches: ${TRANSFER}!"
 		SUCCESS=1
 		for OPT in "${OPTS[@]}"; do
