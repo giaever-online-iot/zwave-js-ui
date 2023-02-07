@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+export DAEMONIZED=1
 source $SNAP/helper/functions
 
 set -e 
@@ -24,15 +25,16 @@ test_default_config
 
 if [ -s "${SNAP_DATA}/.hook.install" ]; then
 	if [ "$(cat "${SNAP_DATA}/.hook.install")" == "enable" ]; then
-		logger "Enabling ${SNAP_NAME}: hook.install=$(cat "${SNAP_DATA}/.hook.install")"
+		lprint "Enabling ${SNAP_NAME}: hook.install=$(cat "${SNAP_DATA}/.hook.install")"
 		snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
 	else
-		logger "Disabling ${SNAP_NAME}: hook.install=$(cat "${SNAP_DATA}/.hook.install")"
+		lprint "Disabling ${SNAP_NAME}: hook.install=$(cat "${SNAP_DATA}/.hook.install")"
 		snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"
 	fi
 	rm "${SNAP_DATA}/.hook.install"
 else
-	logger "Disabling ${SNAP_NAME}: see command «${SNAP_NAME}.help»"
+	echo "init-before" > "${SNAP_DATA}/.hook.install"
+	lprint "Disabling ${SNAP_NAME}: see command «${SNAP_NAME}.help»"
 	snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"
 fi
 

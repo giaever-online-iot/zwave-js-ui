@@ -111,10 +111,10 @@ function require_root {
 }
 
 function testnset_config {
-    lprint "${SNAP_NAME}: Testing ${1}, or setting ${2}"
+    lprint "Testing ${1}, or setting ${2}"
     RES=$(snapctl get ${1})
     if [ $? -ne 0 ] || [ -z "${RES}" ]; then
-        lprint "${SNAP_NAME}: Setting ${1}=${2}"
+        lprint "Setting ${1}=${2}"
         RES=$(snapctl set ${1}=${2})
         if [ $? -ne 0 ]; then
             lprint "${RES}"
