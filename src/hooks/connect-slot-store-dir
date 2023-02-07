@@ -10,17 +10,19 @@ SNAP_SERIAL="$(snapctl get --plug :store-dir z2mserial)"
 
 if [ -n "${SNAP_CONFIG}" ]; then
 	lprint "RECIVED: serial=${SNAP_SERIAL}, config: ${SNAP_CONFIG}"
-	echo "${SNAP_CONFIG}" > "${SNAP_DATA}/.snap.config"
+	#echo "${SNAP_CONFIG}" > "${SNAP_DATA}/.snap.config"
 
-	if [ "$(snapctl get --plug :store-dir z2mserial)" -eq 1 ]; then
-		lprint "Serial-port is enabled on Z2M, wont enable ${SNAP_NAME} automatically. Connect interface and enable ZUI with «sudo zwave-js-ui.enable"
-		echo "disable" > "${SNAP_DATA}/.hook.install"
-	else
-		lprint "Tell install-hook to enable ZUI"
-		echo "enable" > "${SNAP_DATA}/.hook.install"
-	fi
+	mapfile -t OPTS < <(jq -r 'keys[]' <<< "${SNAP_CONFIG}")
+
 else
 	lprint "Do not have snap plug config"
 fi
 
+#if [ "$(snapctl get --plug :store-dir z2mserial)" -eq 1 ]; then
+#	lprint "Serial-port is enabled on Z2M, wont enable ${SNAP_NAME} automatically. Connect interface and enable ZUI with «sudo zwave-js-ui.enable"
+#	echo "disable" > "${SNAP_DATA}/.hook.install"
+#else
+#	lprint "Tell install-hook to enable ZUI"
+#	echo "enable" > "${SNAP_DATA}/.hook.install"
+#fi
 
