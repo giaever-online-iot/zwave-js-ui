@@ -2,7 +2,7 @@
 
 source $SNAP/helper/functions
 
-if [ "$(jq -r '.zwave.deviceConfigPriorityDir' $SNAP_DATA/settings.json | grep zwavejs2mqtt | wl -c)" -ne 0 ]; then
+if [ "$(jq -r '.zwave.deviceConfigPriorityDir' "$SNAP_DATA/settings.json" | grep zwavejs2mqtt | wc -l)" -ne 0 ]; then
 	jq --arg deviceConfigPriorityDir "${SNAP_DATA}/config" '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
 	if [ $? -eq 0 ]; then
 		lprint "Renamed «config-folder» to: ${SNAP_DATA}/config"
