@@ -7,16 +7,16 @@ lprint "Connected wiht z2m: Here's my data: $(ls ${SNAP_DATA})"
 
 SNAP_CONFIG="$(snapctl get --plug :store-dir z2mconfig)"
 SNAP_SERIAL="$(snapctl get --plug :store-dir z2mserial)"
-SNAP_RANDOM="$(snapctl get --plug :store-dir transfer)"
+SNAP_TRANSFER="$(snapctl get --plug :store-dir transfer)"
 
 if [ -n "${SNAP_CONFIG}" ]; then
-	TRANSFER="$(jq -c ".$OPT" "${SNAP_CONFIG}")"
+	TRANSFER="$(jq -c ".session.secret" "${SNAP_CONFIG}")"
 	lprint "RECIVED: serial=${SNAP_SERIAL}, config: ${SNAP_CONFIG}, TRANSFER: ${TRANSFER}"
 
 	mapfile -t OPTS < <(jq -r 'keys[]' <<< "${SNAP_CONFIG}")
-	lprint "MAPPED KEYS: ${OPTS[#]}"
+	lprint "MAPPED KEYS: ${OPTS[@]}"
 
-	if [ "${SNAP_RANDOM}" == "${TRANSFER}" ]; then
+	if [ "${SNAP_TRANSFER}" == "${TRANSFER}" ]; then
 		lprint "Transfer matches: ${TRANSFER}!"
 		SUCCESS=1
 		for OPT in "${OPTS[@]}"; do
@@ -32,11 +32,12 @@ if [ -n "${SNAP_CONFIG}" ]; then
 
 		if [ $SUCCESS -eq 0 ]; then
 			lprint "Z2M configuration successfully installed"
+			echo "$([ "${SNAP_SERIAL}" -eq 0 ] && echo "enable" || echo "disable")" > "${SNAP_DATA}/.install.hook.service"
 		else
 			lprint "Usj. Failed to import config from Z2M."
 		fi
 	else
-		lprint "OPS! ${SNAP_RANDOM} != ${TRANSFER}"
+		lprint "OPS! ${SNAP_TRANSFER} != ${TRANSFER}"
 	fi
 else
 	lprint "Do not have snap plug config"

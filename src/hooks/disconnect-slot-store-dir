@@ -4,3 +4,4 @@ export DAEMONIZED=1
 source $SNAP/helper/functions
 
 lprint "Disconnected wiht z2m!"
+lprint "Should ZUI enable? = $(cat "${SNAP_DATA}/.install.hook.service")"
