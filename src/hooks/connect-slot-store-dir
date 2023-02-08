@@ -10,7 +10,7 @@ SNAP_SERIAL="$(snapctl get --plug :store-dir z2mserial)"
 SNAP_TRANSFER="$(snapctl get --plug :store-dir transfer)"
 
 if [ -n "${SNAP_CONFIG}" ]; then
-	TRANSFER="$(jq -c ".session.secret" "${SNAP_CONFIG}")"
+	TRANSFER="$(jq -c '."session.secret"' < <("${SNAP_CONFIG}"))"
 	lprint "RECIVED: serial=${SNAP_SERIAL}, config: ${SNAP_CONFIG}, TRANSFER: ${TRANSFER}"
 
 	mapfile -t OPTS < <(jq -r 'keys[]' <<< "${SNAP_CONFIG}")
