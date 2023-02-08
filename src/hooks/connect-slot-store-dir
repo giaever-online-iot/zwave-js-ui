@@ -30,7 +30,7 @@ if [ -n "${SNAP_CONFIG}" ]; then
 			fi
 		done
 
-		if [ $SUCCESS -eq 0 ]; then
+		if [ $SUCCESS -eq 1 ]; then
 			lprint "Z2M configuration successfully installed"
 			echo "$([ "${SNAP_SERIAL}" -eq 0 ] && echo "enable" || echo "disable")" > "${SNAP_DATA}/.install.hook.service"
 		else
