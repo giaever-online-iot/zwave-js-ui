@@ -3,5 +3,16 @@
 export DAEMONIZED=1
 source $SNAP/helper/functions
 
-lprint "Disconnected wiht z2m!"
-lprint "Should ZUI enable? = $(cat "${SNAP_DATA}/.install.hook.service")"
+SERVICE_FILE="${SNAP_DATA}/.install.hook.service"
+lprint "Disconneting from Z2M, service = $(cat "${SERVICE_FILE}")"
+
+if [ -s "${SERVICE_FILE}" ]; then
+	if [ "$(cat "${SERVICE_FILE}")" == "enable" ]; then
+		lprint "Enabling ${SNAP_NAME}: install.hook.service=$(cat "${SERVICE_FILE}")"
+		snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
+	else
+		lprint "Disabling ${SNAP_NAME}: install.hook.service=$(cat "${SERVICE_FILE}")"
+		snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"
+	fi
+	rm "${SERVICE_FILE}"
+fi

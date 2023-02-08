@@ -31,8 +31,10 @@ if [ -n "${SNAP_CONFIG}" ]; then
 		done
 
 		if [ $SUCCESS -eq 1 ]; then
-			lprint "Z2M configuration successfully installed"
-			echo "$([ "${SNAP_SERIAL}" -eq 0 ] && echo "enable" || echo "disable")" > "${SNAP_DATA}/.install.hook.service"
+			SERVICE_FILE="${SNAP_DATA}/.install.hook.service"
+			lprint "Z2M configuration successfully installed, writing service-file: ${SERVICE_FILE}"
+			echo "$([ "${SNAP_SERIAL}" -eq 0 ] && echo "enable" || echo "disable")" > "${SERVICE_FILE}"
+			lprint "Service=$(cat "${SERVICE_FILE}")"
 		else
 			lprint "Usj. Failed to import config from Z2M."
 		fi
@@ -42,11 +44,3 @@ if [ -n "${SNAP_CONFIG}" ]; then
 else
 	lprint "Do not have snap plug config"
 fi
-
-#if [ "$(snapctl get --plug :store-dir z2mserial)" -eq 1 ]; then
-#	lprint "Serial-port is enabled on Z2M, wont enable ${SNAP_NAME} automatically. Connect interface and enable ZUI with «sudo zwave-js-ui.enable"
-#	echo "disable" > "${SNAP_DATA}/.hook.install"
-#else
-#	lprint "Tell install-hook to enable ZUI"
-#	echo "enable" > "${SNAP_DATA}/.hook.install"
-#FE
