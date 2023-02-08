@@ -34,10 +34,10 @@ if [ -n "${SNAP_CONFIG}" ]; then
 			echo "$([ "${SNAP_SERIAL}" -eq 0 ] && echo "enable" || echo "disable")" > "${SERVICE_FILE}"
 			lprint "Service=$(cat "${SERVICE_FILE}")"
 		else
-			lprint "Usj. Failed to import config from Z2M."
+			lprint "Usj. Failed to import config from Z2M, keep Z2M running...."
 		fi
 	else
-		lprint "OPS! ${SNAP_TRANSFER} != ${TRANSFER}"
+		lprint "OPS! ${SNAP_TRANSFER} != ${TRANSFER}: Wont import anything and let Z2M running."
 	fi
 else
 	lprint "Do not have snap plug config"
