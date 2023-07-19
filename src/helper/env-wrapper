@@ -133,6 +133,8 @@ if [ -z "${MQTT_NAME}" ]; then
     unset MQTT_NAME
 fi
 
+export TZ=$(snapctl get timezone)
+
 export GIT_DIR="${SNAP}/lib/zwave-js-ui/.git"
 export ZWAVEJS_LOGS_DIR="${STORE_DIR}/logs/zwavejs"
 
