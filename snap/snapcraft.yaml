@@ -164,7 +164,6 @@ parts:
   dependencies:
     plugin: nil
     stage-snaps:
-      - jq
       - yq
     stage-packages:
       - git
