@@ -63,7 +63,7 @@ apps:
       STORE_DIR: $SNAP_DATA
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
       DAEMONIZED: 1
-    command: bin/yarn start
+    command: bin/npm start # FIXME
     command-chain:
       - helper/env-wrapper
     plugs:
@@ -77,7 +77,7 @@ apps:
     environment:
       STORE_DIR: $SNAP_DATA
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
-    command: bin/yarn start
+    command: bin/npm start # FIXME
     command-chain:
       - helper/env-wrapper
     plugs:
@@ -95,7 +95,7 @@ apps:
   restart:
     command: bin/restart
 
-layout:
+layout: # FIXME: npm cache is on `~/.npm`
   /usr/local/share/.cache/yarn:
     bind: $SNAP/.cache/yarn
   /usr/local/share/.yarn:
@@ -127,52 +127,29 @@ parts:
       # Used when testing an unreleased version of Z-wavejs
       # sed -i 's/"zwave-js".*$/"zwave-js"\: "10.0.5-0-pr-4836-ed10b36"/g' ${SNAPCRAFT_PART_BUILD}/package.json
 
-      # Link the bundled yarn 
-      mkdir "${SNAPCRAFT_PART_BUILD}/bin"
-      cd "${SNAPCRAFT_PART_BUILD}/bin"
-      YARN="$(find ${SNAPCRAFT_PART_BUILD} -name yarn-*.cjs -print0)"
-      ln -s "../${YARN:${#SNAPCRAFT_PART_BUILD}+1}" ./yarn
-      chmod +x ./yarn
-      cd "${SNAPCRAFT_PART_BUILD}"
-
-      # Necessary for the remote build; sometimes.
-      if [ -n "${http_proxy-}" ]; then
-        yarn config set httpProxy "${http_proxy}"
-      fi
-      if [ -n "${https_proxy-}" ]; then
-        yarn config set httpsProxy "${https_proxy}"
-      fi
-
-      yarn install
-      yarn build:server
-      yarn build:ui
-      yarn remove $(cat "${SNAPCRAFT_PART_BUILD}/package.json" | jq -r '.devDependencies | keys | join(" ")')
+      npm ci
+      npm run build:server
+      npm run build:ui
+      # remove dev dependencies
+      npm prune --omit=dev
       
       # Copy built version into install directory
       mkdir -p "${SNAPCRAFT_PART_INSTALL}/lib/" \
         && cp --archive --link --no-dereference "${SNAPCRAFT_PART_BUILD}" \
           "${SNAPCRAFT_PART_INSTALL}/lib/zwave-js-ui"
       
-      # Link yarn in install directory
-      mkdir "${SNAPCRAFT_PART_INSTALL}/bin" \
-        && cd "${SNAPCRAFT_PART_INSTALL}/bin" \
-        && ln -s "../lib/zwave-js-ui/bin/yarn" "yarn"
 
     filesets:
       zwave-js-ui-include:
         - bin
         - lib/zwave-js-ui/.git
-        - lib/zwave-js-ui/*.md
-        - lib/zwave-js-ui/bin/yarn
         - lib/zwave-js-ui/dist
         - lib/zwave-js-ui/node_modules
         - lib/zwave-js-ui/server
         - lib/zwave-js-ui/snippets
         - lib/zwave-js-ui/package.json
-        - lib/zwave-js-ui/.yarn
-        - lib/zwave-js-ui/yarn.lock
-        - lib/zwave-js-ui/.yarnrc.yml
         - lib/zwave-js-ui/LICENSE
+        - lib/zwave-js-ui/README.md
     stage:
       - $zwave-js-ui-include
   
