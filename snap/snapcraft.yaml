@@ -1,6 +1,6 @@
 name: zwave-js-ui
 base: core20
-version: 'v9.4.0'
+version: 'v9.4.1'
 summary: Full-featured Z-Wave Control Panel and MQTT Gateway.
 description: |
   Full-featured Z-Wave Control Panel and MQTT Gateway compatible with all known 500 and 
@@ -128,6 +128,7 @@ parts:
       # sed -i 's/"zwave-js".*$/"zwave-js"\: "10.0.5-0-pr-4836-ed10b36"/g' ${SNAPCRAFT_PART_BUILD}/package.json
 
       # Link the bundled yarn 
+      mkdir "${SNAPCRAFT_PART_BUILD}/bin"
       cd "${SNAPCRAFT_PART_BUILD}/bin"
       YARN="$(find ${SNAPCRAFT_PART_BUILD} -name yarn-*.cjs -print0)"
       ln -s "../${YARN:${#SNAPCRAFT_PART_BUILD}+1}" ./yarn
@@ -188,9 +189,9 @@ parts:
   nodejs:
     plugin: dump
     source:
-      - on amd64: https://nodejs.org/dist/v16.13.0/node-v16.13.0-linux-x64.tar.gz
-      - on arm64: https://nodejs.org/dist/v16.13.0/node-v16.13.0-linux-arm64.tar.gz
-      - on armhf: https://nodejs.org/dist/v16.13.0/node-v16.13.0-linux-armv7l.tar.gz
+      - on amd64: https://nodejs.org/dist/v20.10.0/node-v20.10.0-linux-x64.tar.gz
+      - on arm64: https://nodejs.org/dist/v20.10.0/node-v20.10.0-linux-arm64.tar.gz
+      - on armhf: https://nodejs.org/dist/v20.10.0/node-v20.10.0-linux-armv7l.tar.gz
     stage-packages:
       - on armhf:
           - libatomic1
