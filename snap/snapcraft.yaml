@@ -128,7 +128,7 @@ parts:
       # Used when testing an unreleased version of Z-wavejs
       # sed -i 's/"zwave-js".*$/"zwave-js"\: "10.0.5-0-pr-4836-ed10b36"/g' ${SNAPCRAFT_PART_BUILD}/package.json
       
-       # Necessary for the remote build; sometimes.
+      # Necessary for the remote build; sometimes.
       if [ -n "${http_proxy-}" ]; then
         npm config set proxy "${http_proxy}"
       fi
@@ -187,7 +187,7 @@ parts:
     prime:
       - -include
       - -share
-      - lib/node_modules
+      - -lib/node_modules
       - bin/npm
       - bin/node
       - -bin/npx
