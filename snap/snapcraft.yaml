@@ -63,6 +63,7 @@ apps:
       STORE_DIR: $SNAP_DATA
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
       DAEMONIZED: 1
+      npm_config_cache: /usr/local/share/.cache/npm
     command: bin/npm start # FIXME
     command-chain:
       - helper/env-wrapper
@@ -96,10 +97,10 @@ apps:
     command: bin/restart
 
 layout: # FIXME: npm cache is on `~/.npm`
-  /usr/local/share/.cache/yarn:
-    bind: $SNAP/.cache/yarn
-  /usr/local/share/.yarn:
-    symlink: $SNAP/lib/node_modules
+  /usr/local/share/.cache/npm:
+    bind: $SNAP/.cache/npm
+      #/usr/local/share/.yarn:
+      #symlink: $SNAP/lib/node_modules
 
 slots: # ZUI offers new config dir within data
   store-dir:
@@ -149,7 +150,7 @@ parts:
 
     filesets:
       zwave-js-ui-include:
-        - bin
+        #- bin
         - lib/zwave-js-ui/.git
         - lib/zwave-js-ui/dist
         - lib/zwave-js-ui/node_modules
@@ -164,6 +165,7 @@ parts:
   dependencies:
     plugin: nil
     stage-snaps:
+      - jq
       - yq
     stage-packages:
       - git
@@ -185,8 +187,8 @@ parts:
     prime:
       - -include
       - -share
-      - -lib/node_modules
-      - -bin/npm
+      - lib/node_modules
+      - bin/npm
       - -bin/npx
       - -bin/corepack
     override-stage: |
