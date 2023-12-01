@@ -138,4 +138,4 @@ export TZ=$(snapctl get timezone)
 export GIT_DIR="${SNAP}/lib/zwave-js-ui/.git"
 export ZWAVEJS_LOGS_DIR="${STORE_DIR}/logs/zwavejs"
 
-[ "$(basename "${1}")" == "yarn" ] && cd "${SNAP}/lib/zwave-js-ui" && exec "${@}" || exec "${@}"
+[ "$(basename "${1}")" == "npm" ] && cd "${SNAP}/lib/zwave-js-ui" && exec "${@}" || exec "${@}"
