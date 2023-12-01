@@ -1,6 +1,6 @@
 name: zwave-js-ui
 base: core20
-version: 'v9.5.0'
+version: 'v9.5.1'
 summary: Full-featured Z-Wave Control Panel and MQTT Gateway.
 description: |
   Full-featured Z-Wave Control Panel and MQTT Gateway compatible with all known 500 and 
@@ -64,7 +64,7 @@ apps:
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
       DAEMONIZED: 1
       npm_config_cache: /usr/local/share/.cache/npm
-    command: bin/npm start # FIXME
+    command: bin/npm start 
     command-chain:
       - helper/env-wrapper
     plugs:
@@ -78,7 +78,7 @@ apps:
     environment:
       STORE_DIR: $SNAP_DATA
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
-    command: bin/npm start # FIXME
+    command: bin/npm start 
     command-chain:
       - helper/env-wrapper
     plugs:
@@ -96,13 +96,13 @@ apps:
   restart:
     command: bin/restart
 
-layout: # FIXME: npm cache is on `~/.npm`
+layout: # Cache is set to (env) something outside the rw mount, to prevent storing it inside the store dir.
   /usr/local/share/.cache/npm:
     bind: $SNAP/.cache/npm
-      #/usr/local/share/.yarn:
-      #symlink: $SNAP/lib/node_modules
+  #/usr/local/share/.yarn: ?? Do we need this? Leave until proper testing is OK
+    #symlink: $SNAP/lib/node_modules
 
-slots: # ZUI offers new config dir within data
+slots: # ZUI offers new config dir within data (e.g for code-server snap)
   store-dir:
     interface: content
     content: vscs-content
