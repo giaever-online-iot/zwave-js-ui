@@ -130,10 +130,10 @@ parts:
 
        # Necessary for the remote build; sometimes.
       if [ -n "${http_proxy-}" ]; then
-        npm config set httpProxy "${http_proxy}"
+        npm config set proxy "${http_proxy}"
       fi
       if [ -n "${https_proxy-}" ]; then
-        npm config set httpsProxy "${https_proxy}"
+        npm config set https-proxy "${https_proxy}"
       fi
 
       npm ci
