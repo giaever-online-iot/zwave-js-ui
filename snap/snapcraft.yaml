@@ -150,7 +150,6 @@ parts:
 
     filesets:
       zwave-js-ui-include:
-        #- bin
         - lib/zwave-js-ui/.git
         - lib/zwave-js-ui/dist
         - lib/zwave-js-ui/node_modules
@@ -187,7 +186,7 @@ parts:
     prime:
       - -include
       - -share
-      - -lib/node_modules
+      - lib/node_modules/npm
       - bin/npm
       - bin/node
       - -bin/npx
