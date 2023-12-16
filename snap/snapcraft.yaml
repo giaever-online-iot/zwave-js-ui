@@ -1,6 +1,6 @@
 name: zwave-js-ui
 base: core20
-version: 'v9.5.1'
+version: 'v9.6.0'
 summary: Full-featured Z-Wave Control Panel and MQTT Gateway.
 description: |
   Full-featured Z-Wave Control Panel and MQTT Gateway compatible with all known 500 and 
@@ -177,7 +177,6 @@ parts:
       - on arm64: https://nodejs.org/dist/v20.10.0/node-v20.10.0-linux-arm64.tar.gz
       - on armhf: https://nodejs.org/dist/v20.10.0/node-v20.10.0-linux-armv7l.tar.gz
     stage-packages:
-      #- on armhf:
       - libatomic1
     organize:
       '*.md': nodejs/
