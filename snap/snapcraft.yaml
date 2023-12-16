@@ -198,7 +198,7 @@ parts:
   local:
     plugin: dump
     source: src/
-      #stage-packages:
-      #- uuid
+    stage-packages:
+      - uuid
     organize:
       hooks: snap/hooks
