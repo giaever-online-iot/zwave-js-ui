@@ -1,5 +1,5 @@
 name: zwave-js-ui
-base: core20
+base: core22
 version: 'v9.8.2'
 summary: Full-featured Z-Wave Control Panel and MQTT Gateway.
 description: |
@@ -145,20 +145,15 @@ parts:
       mkdir -p "${SNAPCRAFT_PART_INSTALL}/lib/" \
         && cp --archive --link --no-dereference "${SNAPCRAFT_PART_BUILD}" \
           "${SNAPCRAFT_PART_INSTALL}/lib/zwave-js-ui"
-      
-
-    filesets:
-      zwave-js-ui-include:
-        - lib/zwave-js-ui/.git
-        - lib/zwave-js-ui/dist
-        - lib/zwave-js-ui/node_modules
-        - lib/zwave-js-ui/server
-        - lib/zwave-js-ui/snippets
-        - lib/zwave-js-ui/package.json
-        - lib/zwave-js-ui/LICENSE
-        - lib/zwave-js-ui/README.md
     stage:
-      - $zwave-js-ui-include
+      - lib/zwave-js-ui/.git
+      - lib/zwave-js-ui/dist
+      - lib/zwave-js-ui/node_modules
+      - lib/zwave-js-ui/server
+      - lib/zwave-js-ui/snippets
+      - lib/zwave-js-ui/package.json
+      - lib/zwave-js-ui/LICENSE
+      - lib/zwave-js-ui/README.md
   
   dependencies:
     plugin: nil
