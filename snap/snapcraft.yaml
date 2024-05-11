@@ -51,7 +51,7 @@ license: MIT
 assumes:
   - command-chain
 
-architectures:
+platforms:
   - build-on: amd64
     build-for: amd64
   - build-on: amd64
