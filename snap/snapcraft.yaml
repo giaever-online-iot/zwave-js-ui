@@ -50,10 +50,14 @@ confinement: strict
 license: MIT
 assumes:
   - command-chain
+
 architectures:
   - build-on: amd64
-  - build-on: arm64
-  - build-on: armhf
+    build-for: amd64
+  - build-on: amd64
+    build-for: arm64
+  - build-on: amd64
+    build-for: armhf
 
 apps:
   zwave-js-ui:
