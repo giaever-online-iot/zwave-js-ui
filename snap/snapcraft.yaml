@@ -133,8 +133,8 @@ parts:
       - gcc
       - build-essential
     build-environment:
-      - LD_LIBRARY_PATH: "${LD_LIBRARY_PATH}:$(dirname $(find ${CRAFT_PART_NAME} -name libonig.so.2 -print0))"
-      - PATH: "${PATH}:${CRAFT_PART_NAME}/bin"
+      - LD_LIBRARY_PATH: "${LD_LIBRARY_PATH}:$(dirname $(find ${CRAFT_PART_BUILD} -name libonig.so.2 -print0))"
+      - PATH: "${PATH}:${CRAFT_PART_BUILD}/bin"
     override-build: |
       set +x
       # Used when testing an unreleased version of Z-wavejs
@@ -155,9 +155,9 @@ parts:
       npm prune --omit=dev
       
       # Copy built version into install directory
-      mkdir -p "${CRAFT_PART_NAME}/lib/" \
-        && cp --archive --link --no-dereference "${CRAFT_PART_NAME}" \
-          "${CRAFT_PART_NAME}/lib/zwave-js-ui"
+      mkdir -p "${CRAFT_PART_BUILD}/lib/" \
+        && cp --archive --link --no-dereference "${CRAFT_PART_INSTALL}" \
+          "${CRAFT_PART_BUILD}/lib/zwave-js-ui"
     stage:
       - lib/zwave-js-ui/.git
       - lib/zwave-js-ui/dist
