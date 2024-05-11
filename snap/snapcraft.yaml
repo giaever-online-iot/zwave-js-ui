@@ -1,5 +1,5 @@
 name: zwave-js-ui
-base: core22
+base: core24
 version: 'v9.12.0'
 summary: Full-featured Z-Wave Control Panel and MQTT Gateway.
 description: |
@@ -125,11 +125,12 @@ parts:
       - gcc
       - build-essential
     build-environment:
-      - LD_LIBRARY_PATH: "${LD_LIBRARY_PATH}:$(dirname $(find ${CRAFT_STAGE} -name libonig.so.2 -print0))"
-      - PATH: "${PATH}:${CRAFT_PART_BUILD}/bin"
+      - LD_LIBRARY_PATH: "${LD_LIBRARY_PATH}:$(dirname $(find ${CRAFT_PART_NAME} -name libonig.so.2 -print0))"
+      - PATH: "${PATH}:${CRAFT_PART_NAME}/bin"
     override-build: |
+      set +x
       # Used when testing an unreleased version of Z-wavejs
-      # sed -i 's/"zwave-js".*$/"zwave-js"\: "10.0.5-0-pr-4836-ed10b36"/g' ${CRAFT_PART_BUILD}/package.json
+      # sed -i 's/"zwave-js".*$/"zwave-js"\: "10.0.5-0-pr-4836-ed10b36"/g' ${CRAFT_PART_NAME}/package.json
       
       # Necessary for the remote build; sometimes.
       if [ -n "${http_proxy-}" ]; then
@@ -146,9 +147,9 @@ parts:
       npm prune --omit=dev
       
       # Copy built version into install directory
-      mkdir -p "${CRAFT_PART_INSTALL}/lib/" \
-        && cp --archive --link --no-dereference "${CRAFT_PART_BUILD}" \
-          "${CRAFT_PART_INSTALL}/lib/zwave-js-ui"
+      mkdir -p "${CRAFT_PART_NAME}/lib/" \
+        && cp --archive --link --no-dereference "${CRAFT_PART_NAME}" \
+          "${CRAFT_PART_NAME}/lib/zwave-js-ui"
     stage:
       - lib/zwave-js-ui/.git
       - lib/zwave-js-ui/dist
@@ -181,7 +182,7 @@ parts:
       '*.md': nodejs/
       LICENSE: nodejs/
     prime:
-      - usr/lib/${CRAFT_ARCH_TRIPLET}
+      - usr/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}
       - -include
       - -share
       - lib/node_modules/npm
