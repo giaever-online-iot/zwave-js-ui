@@ -121,11 +121,11 @@ parts:
       - gcc
       - build-essential
     build-environment:
-      - LD_LIBRARY_PATH: "${LD_LIBRARY_PATH}:$(dirname $(find ${SNAPCRAFT_STAGE} -name libonig.so.2 -print0))"
-      - PATH: "${PATH}:${SNAPCRAFT_PART_BUILD}/bin"
+      - LD_LIBRARY_PATH: "${LD_LIBRARY_PATH}:$(dirname $(find ${CRAFT_STAGE} -name libonig.so.2 -print0))"
+      - PATH: "${PATH}:${CRAFT_PART_BUILD}/bin"
     override-build: |
       # Used when testing an unreleased version of Z-wavejs
-      # sed -i 's/"zwave-js".*$/"zwave-js"\: "10.0.5-0-pr-4836-ed10b36"/g' ${SNAPCRAFT_PART_BUILD}/package.json
+      # sed -i 's/"zwave-js".*$/"zwave-js"\: "10.0.5-0-pr-4836-ed10b36"/g' ${CRAFT_PART_BUILD}/package.json
       
       # Necessary for the remote build; sometimes.
       if [ -n "${http_proxy-}" ]; then
@@ -142,9 +142,9 @@ parts:
       npm prune --omit=dev
       
       # Copy built version into install directory
-      mkdir -p "${SNAPCRAFT_PART_INSTALL}/lib/" \
-        && cp --archive --link --no-dereference "${SNAPCRAFT_PART_BUILD}" \
-          "${SNAPCRAFT_PART_INSTALL}/lib/zwave-js-ui"
+      mkdir -p "${CRAFT_PART_INSTALL}/lib/" \
+        && cp --archive --link --no-dereference "${CRAFT_PART_BUILD}" \
+          "${CRAFT_PART_INSTALL}/lib/zwave-js-ui"
     stage:
       - lib/zwave-js-ui/.git
       - lib/zwave-js-ui/dist
@@ -177,7 +177,7 @@ parts:
       '*.md': nodejs/
       LICENSE: nodejs/
     prime:
-      - usr/lib/${SNAPCRAFT_ARCH_TRIPLET}
+      - usr/lib/${CRAFT_ARCH_TRIPLET}
       - -include
       - -share
       - lib/node_modules/npm
@@ -187,7 +187,7 @@ parts:
       - -bin/corepack
     override-stage: |
       corepack disable
-      snapcraftctl stage
+      craftctl stage
 
   local:
     plugin: dump
