@@ -51,13 +51,20 @@ license: MIT
 assumes:
   - command-chain
 
-platforms:
-  amd64:
-  arm64:
-    build-on: [arm64, amd64]
+# platforms:
+#  amd64:
+#  arm64:
+#    build-on: [arm64, amd64]
+#    build-for: arm64
+#  amrhf:
+#    build-on: amd64
+#    build-for: armhf
+architectures:
+  - build-on: amd64
+    build-for: amd64
+  - build-on: arm64
     build-for: arm64
-  amrhf:
-    build-on: amd64
+  - build-on: arm64
     build-for: armhf
 
 apps:
