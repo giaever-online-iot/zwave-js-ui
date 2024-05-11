@@ -200,7 +200,7 @@ parts:
       - -bin/corepack
     override-stage: |
       corepack disable
-      craftctl stage
+      craftctl default 
 
   local:
     plugin: dump
