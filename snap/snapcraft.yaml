@@ -174,9 +174,9 @@ parts:
   nodejs:
     plugin: dump
     source:
-      - for amd64: https://nodejs.org/dist/v20.13.1/node-v20.13.1-linux-x64.tar.gz
-      - for arm64: https://nodejs.org/dist/v20.13.1/node-v20.13.1-linux-arm64.tar.gz
-      - for armhf: https://nodejs.org/dist/v20.13.1/node-v20.13.1-linux-armv7l.tar.gz
+      - to amd64: https://nodejs.org/dist/v20.13.1/node-v20.13.1-linux-x64.tar.gz
+      - to arm64: https://nodejs.org/dist/v20.13.1/node-v20.13.1-linux-arm64.tar.gz
+      - to armhf: https://nodejs.org/dist/v20.13.1/node-v20.13.1-linux-armv7l.tar.gz
     stage-packages:
       - libatomic1
     organize:
