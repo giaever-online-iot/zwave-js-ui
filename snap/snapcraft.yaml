@@ -52,12 +52,15 @@ assumes:
   - command-chain
 
 platforms:
-  build-for amd64:
+  amd64:
     build-on: amd64
-  build-for arm64:
+    build-for: amd64
+  arm64:
     build-on: amd64
-  build-for amrhf:
+    build-for: arm64
+  amrhf:
     build-on: amd64
+    build-for: armhf
 
 apps:
   zwave-js-ui:
