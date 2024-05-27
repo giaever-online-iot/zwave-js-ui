@@ -54,12 +54,10 @@ assumes:
 platforms:
   amd64:
   arm64:
-    build-on: [amd64, arm64]
-    build-for: [arm64]
 
-architectures:
-  - build-on: amd64
-    build-for: amd64
+#architectures:
+#  - build-on: amd64
+#    build-for: amd64
 #  - build-on: arm64
 #    build-for: arm64
 #  - build-on: arm64
