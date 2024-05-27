@@ -132,7 +132,7 @@ parts:
       - gcc
       - build-essential
     override-build: |
-      craftctl default
+      # craftctl default
       npm ci
       npm run build:server
       npm run build:ui
