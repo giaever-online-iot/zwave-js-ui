@@ -1,5 +1,5 @@
 name: zwave-js-ui
-base: core22
+base: core24
 version: 'v9.12.0'
 summary: Full-featured Z-Wave Control Panel and MQTT Gateway.
 description: |
@@ -51,21 +51,18 @@ license: MIT
 assumes:
   - command-chain
 
-# platforms:
-#  amd64:
-#  arm64:
-#    build-on: [arm64, amd64]
+platforms:
+  amd64:
+  arm64:
+  armhf:
+
+#architectures:
+#  - build-on: amd64
+#    build-for: amd64
+#  - build-on: arm64
 #    build-for: arm64
-#  amrhf:
-#    build-on: amd64
+#  - build-on: arm64
 #    build-for: armhf
-architectures:
-  - build-on: amd64
-    build-for: amd64
-  - build-on: arm64
-    build-for: arm64
-  - build-on: arm64
-    build-for: armhf
 
 apps:
   zwave-js-ui:
@@ -123,8 +120,10 @@ slots: # ZUI offers new config dir within data (e.g for code-server snap)
 
 parts:
   zwave-js-ui:
-    after: [nodejs, dependencies]
-    plugin: dump
+    after: [dependencies]
+    plugin: npm
+    npm-include-node: true
+    npm-node-version: 18.20.3
     source: https://github.com/zwave-js/zwave-js-ui.git
     #source-branch: "feat#2871"
     #source-tag: "v7.1.0"
@@ -132,41 +131,6 @@ parts:
     build-packages:
       - gcc
       - build-essential
-    build-environment:
-      - LD_LIBRARY_PATH: "${LD_LIBRARY_PATH}:$(dirname $(find ${CRAFT_PART_BUILD} -name libonig.so.2 -print0))"
-      - PATH: "${PATH}:${CRAFT_PART_BUILD}/bin"
-    override-build: |
-      set +x
-      # Used when testing an unreleased version of Z-wavejs
-      # sed -i 's/"zwave-js".*$/"zwave-js"\: "10.0.5-0-pr-4836-ed10b36"/g' ${CRAFT_PART_NAME}/package.json
-      
-      # Necessary for the remote build; sometimes.
-      if [ -n "${http_proxy-}" ]; then
-        npm config set proxy "${http_proxy}"
-      fi
-      if [ -n "${https_proxy-}" ]; then
-        npm config set https-proxy "${https_proxy}"
-      fi
-
-      npm ci
-      npm run build:server
-      npm run build:ui
-      # remove dev dependencies
-      npm prune --omit=dev
-      
-      # Copy built version into install directory
-      mkdir -p "${CRAFT_PART_INSTALL}/lib/" \
-        && cp --archive --link --no-dereference "${CRAFT_PART_BUILD}" \
-          "${CRAFT_PART_INSTALL}/lib/zwave-js-ui"
-    stage:
-      - lib/zwave-js-ui/.git
-      - lib/zwave-js-ui/dist
-      - lib/zwave-js-ui/node_modules
-      - lib/zwave-js-ui/server
-      - lib/zwave-js-ui/snippets
-      - lib/zwave-js-ui/package.json
-      - lib/zwave-js-ui/LICENSE
-      - lib/zwave-js-ui/README.md
   
   dependencies:
     plugin: nil
@@ -178,30 +142,6 @@ parts:
       - udev
       - iproute2
 
-  nodejs:
-    plugin: dump
-    source:
-      - on amd64: https://nodejs.org/dist/v20.13.1/node-v20.13.1-linux-x64.tar.gz
-      - on arm64: https://nodejs.org/dist/v20.13.1/node-v20.13.1-linux-arm64.tar.gz
-      - on armhf: https://nodejs.org/dist/v20.13.1/node-v20.13.1-linux-armv7l.tar.gz
-    stage-packages:
-      - libatomic1
-    organize:
-      '*.md': nodejs/
-      LICENSE: nodejs/
-    prime:
-      - usr/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}
-      - -include
-      - -share
-      - lib/node_modules/npm
-      - bin/npm
-      - bin/node
-      - -bin/npx
-      - -bin/corepack
-    override-stage: |
-      corepack disable
-      craftctl default 
-
   local:
     plugin: dump
     source: src/
@@ -209,3 +149,23 @@ parts:
       - uuid
     organize:
       hooks: snap/hooks
+
+#npm ci
+#npm run build:server
+#npm run build:ui
+# remove dev dependencies
+#npm prune --omit=dev
+
+# Copy built version into install directory
+#mkdir -p "${CRAFT_PART_INSTALL}/lib/" \
+#  && cp --archive --link --no-dereference "${CRAFT_PART_BUILD}" \
+#    "${CRAFT_PART_INSTALL}/lib/zwave-js-ui"
+#stage:
+#- lib/zwave-js-ui/.git
+#- lib/zwave-js-ui/dist
+#- lib/zwave-js-ui/node_modules
+#- lib/zwave-js-ui/server
+#- lib/zwave-js-ui/snippets
+#- lib/zwave-js-ui/package.json
+#- lib/zwave-js-ui/LICENSE
+#- lib/zwave-js-ui/README.md
