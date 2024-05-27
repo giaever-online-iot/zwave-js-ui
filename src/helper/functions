@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-export ZWAVE_JS_CONF="${SNAP}/lib/zwave-js-ui/node_modules/@zwave-js/config"
+export ZWAVE_JS_CONF="${SNAP}/lib/node_modules/zwave-js-ui/node_modules/@zwave-js/config"
 
 if [ -z "${DAEMONIZED}" ]; then
     DAEMONIZED=0

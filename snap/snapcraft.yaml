@@ -105,7 +105,8 @@ apps:
   restart:
     command: bin/restart
 
-layout: # Cache is set to (env) something outside the rw mount, to prevent storing it inside the store dir.
+layout: 
+  # Cache is set to (env) something outside the rw mount, to prevent storing it inside the store dir.
   /usr/local/share/.cache/npm:
     bind: $SNAP/.cache/npm
   #/usr/local/share/.yarn: ?? Do we need this? Leave until proper testing is OK
@@ -131,6 +132,17 @@ parts:
     build-packages:
       - gcc
       - build-essential
+    override-build: |
+      craftctl default
+      npm ci
+      npm run build:server
+      npm run build:ui
+    stage:
+      - -bin/corepack
+      - -bin/npx
+      - -lib/node_modules/corepack
+      - -lib/node_modules/npx
+
   
   dependencies:
     plugin: nil
@@ -143,6 +155,7 @@ parts:
       - iproute2
 
   local:
+    after: [dependencies]
     plugin: dump
     source: src/
     stage-packages:
