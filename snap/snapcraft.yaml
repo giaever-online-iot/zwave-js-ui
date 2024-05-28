@@ -160,7 +160,7 @@ parts:
     organize:
       .git: lib/node_modules/zwave-js-ui/.git
     stage-packages:
-      on armhf:
+      - on armhf:
         - libatomic1
     stage:
       - -bin/corepack
