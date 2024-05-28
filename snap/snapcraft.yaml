@@ -73,7 +73,7 @@ apps:
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
       DAEMONIZED: 1
       npm_config_cache: /usr/local/share/.cache/npm
-    command: bin/npm start 
+    command: bin/zwave-js-ui 
     command-chain:
       - helper/env-wrapper
     plugs:
@@ -87,7 +87,7 @@ apps:
     environment:
       STORE_DIR: $SNAP_DATA
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
-    command: bin/npm start 
+    command: bin/zwave-js-ui 
     command-chain:
       - helper/env-wrapper
     plugs:
@@ -122,9 +122,11 @@ slots: # ZUI offers new config dir within data (e.g for code-server snap)
 parts:
   zwave-js-ui:
     after: [dependencies]
-    plugin: npm
+    plugin: npm 
     npm-include-node: true
     npm-node-version: 18.20.3
+    build-environment:
+      - NODE_VERSION: 18.20.3
     source: https://github.com/zwave-js/zwave-js-ui.git
     #source-branch: "feat#2871"
     #source-tag: "v7.1.0"
@@ -133,16 +135,42 @@ parts:
       - gcc
       - build-essential
     override-build: |
-      craftctl default
+      if [ ! -f "${CRAFT_PART_INSTALL}/bin/node" ]; then
+        case ${CRAFT_ARCH_BUILD_ON} in
+          amd64)
+            NODE_ARCH=x64
+            ;;
+          armhf)
+            NODE_ARCH=armv7l
+            ;;
+          *)
+            NODE_ARCH=${CRAFT_ARCH_BUILD_ON}
+            ;;
+        esac
+          
+        curl -s "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.gz" | \
+          tar xzf - -C "${CRAFT_PART_INSTALL}/" --no-same-owner --strip-components=1
+      fi
+
       npm ci
       npm run build:server
       npm run build:ui
+      npm prune --omit=dev
+      craftctl default
+      cp --force --archive --link --no-dereference "${CRAFT_PART_BUILD}/.git" "${CRAFT_PART_INSTALL}"
+    organize:
+      .git: lib/node_modules/zwave-js-ui/.git
     stage:
       - -bin/corepack
       - -bin/npx
       - -lib/node_modules/corepack
       - -lib/node_modules/npx
 
+  #debug:
+  #  plugin: nil
+  #  after: [zwave-js-ui]
+  #  override-prime:
+  #    exit 1
   
   dependencies:
     plugin: nil
@@ -162,23 +190,3 @@ parts:
       - uuid
     organize:
       hooks: snap/hooks
-
-#npm ci
-#npm run build:server
-#npm run build:ui
-# remove dev dependencies
-#npm prune --omit=dev
-
-# Copy built version into install directory
-#mkdir -p "${CRAFT_PART_INSTALL}/lib/" \
-#  && cp --archive --link --no-dereference "${CRAFT_PART_BUILD}" \
-#    "${CRAFT_PART_INSTALL}/lib/zwave-js-ui"
-#stage:
-#- lib/zwave-js-ui/.git
-#- lib/zwave-js-ui/dist
-#- lib/zwave-js-ui/node_modules
-#- lib/zwave-js-ui/server
-#- lib/zwave-js-ui/snippets
-#- lib/zwave-js-ui/package.json
-#- lib/zwave-js-ui/LICENSE
-#- lib/zwave-js-ui/README.md
