@@ -159,6 +159,8 @@ parts:
       cp --force --archive --link --no-dereference "${CRAFT_PART_BUILD}/.git" "${CRAFT_PART_INSTALL}"
     organize:
       .git: lib/node_modules/zwave-js-ui/.git
+    stage-packages:
+      - libatomic1
     stage:
       - -bin/corepack
       - -bin/npx
