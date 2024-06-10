@@ -126,6 +126,7 @@ parts:
     npm-include-node: true
     npm-node-version: 18.20.3
     build-environment:
+      - DEBUG_BUILD: true
       - NODE_VERSION: 18.20.3
     source: https://github.com/zwave-js/zwave-js-ui.git
     #source-branch: "feat#2871"
@@ -134,6 +135,9 @@ parts:
       - gcc
       - build-essential
     override-build: |
+      if [ "${DEBUG_BUILD}" == True ]; then
+        echo "DEBUG"
+      fi
       if [ ! -f "${CRAFT_PART_INSTALL}/bin/node" ]; then
         case ${CRAFT_ARCH_BUILD_ON} in
           amd64)
@@ -155,6 +159,9 @@ parts:
       npm run build:ui
       npm prune --omit=dev
       craftctl default
+      if [ "${DEBUG_BUILD}" == True ]; then
+        echo "process.on(\"warning\", (warning) => { console.warn(\"Node.js warning: \" + warning.stack);});" >> "${CRAFT_PART_INSTALL}/bin/zwave-js-ui"
+      fi
       cp --force --archive --link --no-dereference "${CRAFT_PART_BUILD}/.git" "${CRAFT_PART_INSTALL}"
     organize:
       .git: lib/node_modules/zwave-js-ui/.git
