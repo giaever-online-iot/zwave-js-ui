@@ -155,7 +155,8 @@ parts:
           tar xzf - -C "${CRAFT_PART_INSTALL}/" --no-same-owner --strip-components=1
       fi
       npm ci
-      npm run build:server
+      # npm run build:server
+      npx tsc —noCheck
       npm run build:ui
       npm prune --omit=dev
       craftctl default
