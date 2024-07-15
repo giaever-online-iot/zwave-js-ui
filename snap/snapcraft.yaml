@@ -156,7 +156,7 @@ parts:
       fi
       npm ci
       # npm run build:server
-      npx tsc --noCheck
+      npx tsc --all && exit 1
       npm run build:ui
       npm prune --omit=dev
       craftctl default
