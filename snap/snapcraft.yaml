@@ -129,8 +129,8 @@ parts:
       - DEBUG_BUILD: true
       - NODE_VERSION: 20.15.1
     source: https://github.com/zwave-js/zwave-js-ui.git
-    source-branch: "master"
-    #source-tag: $SNAPCRAFT_PROJECT_VERSION
+    #source-branch: "master"
+    source-tag: $SNAPCRAFT_PROJECT_VERSION
     build-packages:
       - gcc
       - build-essential
