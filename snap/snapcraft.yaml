@@ -155,13 +155,25 @@ parts:
           tar xzf - -C "${CRAFT_PART_INSTALL}/" --no-same-owner --strip-components=1
       fi
       npm ci
+
+      ls
+
+      echo "Checking if @tsconfig/node18 directory exists:"
+      if [ -d "node_modules/@tsconfig/node18" ]; then
+        echo "@tsconfig/node18 is installed"
+      else
+        echo "@tsconfig/node18 is not installed"
+        npm install --no-save @tsconfig/node18
+      fi
+
       # npm run build:server
-      
+
       echo "TypeScript version:"
       npx tsc --version
       echo "TypeScript compiler options:"
       npx tsc --showConfig
-      npx tsc --esModuleInterop
+      
+      npx tsc --project tsconfig.json
 
       npm run build:ui
       npm prune --omit=dev
