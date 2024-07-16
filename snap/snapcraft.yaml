@@ -1,5 +1,5 @@
 name: zwave-js-ui
-base: core24
+base: core22
 version: 'v9.14.6'
 summary: Full-featured Z-Wave Control Panel and MQTT Gateway.
 description: |
@@ -124,10 +124,10 @@ parts:
     after: [dependencies]
     plugin: npm 
     npm-include-node: true
-    npm-node-version: 20.8.0
+    npm-node-version: 20.15.1
     build-environment:
       - DEBUG_BUILD: true
-      - NODE_VERSION: 20.8.0
+      - NODE_VERSION: 20.15.1
     source: https://github.com/zwave-js/zwave-js-ui.git
     source-branch: "master"
     #source-tag: $SNAPCRAFT_PROJECT_VERSION
