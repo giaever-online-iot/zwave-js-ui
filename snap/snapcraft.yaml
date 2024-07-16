@@ -156,11 +156,13 @@ parts:
       fi
       npm ci
       # npm run build:server
+      
       echo "TypeScript version:"
       npx tsc --version
       echo "TypeScript compiler options:"
       npx tsc --showConfig
       npx tsc --esModuleInterop
+
       npm run build:ui
       npm prune --omit=dev
       craftctl default
