@@ -129,7 +129,7 @@ parts:
       - DEBUG_BUILD: true
       - NODE_VERSION: 20.15.1
     source: https://github.com/zwave-js/zwave-js-ui.git
-    source-branch: "master"
+    source-branch: "esmoduleinterop"
     #source-tag: $SNAPCRAFT_PROJECT_VERSION
     build-packages:
       - gcc
@@ -156,22 +156,10 @@ parts:
       fi
       npm ci
 
-      ls
-
-      echo "Checking if @tsconfig/node18 directory exists:"
-      if [ -d "node_modules/@tsconfig/node18" ]; then
-        echo "@tsconfig/node18 is installed"
-      else
-        echo "@tsconfig/node18 is not installed"
-        npm install --no-save @tsconfig/node18
-        ls -la node_modules/@tsconfig/node18
-        node -e "const fs = require('fs'); const path = require('path'); const baseConfig = require('@tsconfig/node18/tsconfig.json'); const projectConfig = JSON.parse(fs.readFileSync('tsconfig.json', 'utf8')); delete projectConfig.extends; const newConfig = { ...baseConfig, ...projectConfig, compilerOptions: { ...baseConfig.compilerOptions, ...projectConfig.compilerOptions } }; fs.writeFileSync('tsconfig.json', JSON.stringify(newConfig, null, 2));"
-      fi
-
-      echo "TypeScript version:"
-      npx tsc --version
-      echo "TypeScript compiler options:"
-      npx tsc --showConfig
+      # echo "TypeScript version:"
+      # npx tsc --version
+      # echo "TypeScript compiler options:"
+      # npx tsc --showConfig
       
       npm run build:server
 
