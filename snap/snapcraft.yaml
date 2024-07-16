@@ -124,12 +124,12 @@ parts:
     after: [dependencies]
     plugin: npm 
     npm-include-node: true
-    npm-node-version: 20.15.1
+    npm-node-version: 20.8.0
     build-environment:
       - DEBUG_BUILD: true
-      - NODE_VERSION: 20.15.1
+      - NODE_VERSION: 20.8.0
     source: https://github.com/zwave-js/zwave-js-ui.git
-    source-branch: "esmoduleinterop"
+    #source-branch: "esmoduleinterop"
     #source-tag: $SNAPCRAFT_PROJECT_VERSION
     build-packages:
       - gcc
@@ -156,7 +156,7 @@ parts:
       fi
       npm ci
       # npm run build:server
-      npx tsc --all && exit 1
+      npx tsc --esModuleInterop
       npm run build:ui
       npm prune --omit=dev
       craftctl default
