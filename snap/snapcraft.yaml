@@ -129,7 +129,7 @@ parts:
       - DEBUG_BUILD: true
       - NODE_VERSION: 20.8.0
     source: https://github.com/zwave-js/zwave-js-ui.git
-    #source-branch: "esmoduleinterop"
+    source-branch: "master"
     #source-tag: $SNAPCRAFT_PROJECT_VERSION
     build-packages:
       - gcc
@@ -156,6 +156,10 @@ parts:
       fi
       npm ci
       # npm run build:server
+      echo "TypeScript version:"
+      npx tsc --version
+      echo "TypeScript compiler options:"
+      npx tsc --showConfig
       npx tsc --esModuleInterop
       npm run build:ui
       npm prune --omit=dev
