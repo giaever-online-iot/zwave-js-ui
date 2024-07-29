@@ -18,6 +18,7 @@
         "matchPackageNames": ["zwave-js/zwave-js-ui"],
         "matchUpdateTypes": ["major", "minor", "patch"],
         "commitMessageTopic": "zwave-js-ui",
+        "labels": ["dependencies", "no-stale"],
         "commitMessageExtra": "to {{newVersion}}",
         "prBodyNotes": [
           "This PR updates the version of zwave-js-ui in the snapcraft.yaml file to match the latest GitHub release."
@@ -25,4 +26,3 @@
       }
     ]
   }
-  
