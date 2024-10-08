@@ -48,8 +48,8 @@ description: |
 grade: stable
 confinement: strict
 license: MIT
-assumes:
-  - command-chain
+#assumes:
+#  - command-chain
 
 platforms:
   amd64:
