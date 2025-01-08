@@ -83,7 +83,7 @@ if [ ${OPT_HELP} = true ]; then
     echo "  $ sudo systemctl restart snapd"
     echo ""
     echo " Now list available serial slots with:"
-    echo "  $ sudo snap iterface serial-port"
+    echo "  $ sudo snap interface serial-port"
     echo ""
     echo " And connect it to ${SNAP_NAME} with:"
     echo "  $ sudo snap connect ${SNAP_NAME}:serial-port <slot name>"
