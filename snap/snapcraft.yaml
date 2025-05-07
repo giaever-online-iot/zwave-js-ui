@@ -122,21 +122,18 @@ slots: # ZUI offers new config dir within data (e.g for code-server snap)
 parts:
   zwave-js-ui:
     after: [dependencies]
-    plugin: npm 
-    npm-include-node: true
-    npm-node-version: 20.15.1
     build-environment:
-      - DEBUG_BUILD: "True"
+      - DEBUG_BUILD: "true"
       - NODE_VERSION: 20.15.1
+    plugin: npm
+    npm-include-node: true
+    npm-node-version: $NODE_VERSION
     source: https://github.com/zwave-js/zwave-js-ui.git
     source-tag: $SNAPCRAFT_PROJECT_VERSION
     build-packages:
       - gcc
       - build-essential
-    override-build: |
-      if [ "${DEBUG_BUILD}" == True ]; then
-        echo "DEBUG"
-      fi
+    override-build: | # shell
       if [ ! -f "${CRAFT_PART_INSTALL}/bin/node" ]; then
         case ${CRAFT_ARCH_BUILD_ON} in
           amd64)
@@ -154,21 +151,24 @@ parts:
           tar xzf - -C "${CRAFT_PART_INSTALL}/" --no-same-owner --strip-components=1
       fi
 
-      # For some reasons seems that snapcraft sets NODE_ENV to `production` by default
-      # this causes the build to fail as devDependencies are not installed
       npm ci --include=dev
-
+      
       npm run build:server
-
       npm run build:ui
+
       npm prune --omit=dev
+
       craftctl default
-      if [ "${DEBUG_BUILD}" == True ]; then
+      if [ "${DEBUG_BUILD}" == true ]; then
+        echo "DEBUG"
         echo "process.on(\"warning\", (warning) => { console.warn(\"Node.js warning: \" + warning.stack);});" >> "${CRAFT_PART_INSTALL}/bin/zwave-js-ui"
       fi
+
       cp --force --archive --link --no-dereference "${CRAFT_PART_BUILD}/.git" "${CRAFT_PART_INSTALL}"
+
     organize:
       .git: lib/node_modules/zwave-js-ui/.git
+
     stage-packages:
       - on armhf:
         - libatomic1
