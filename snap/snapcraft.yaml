@@ -154,14 +154,8 @@ parts:
           tar xzf - -C "${CRAFT_PART_INSTALL}/" --no-same-owner --strip-components=1
       fi
 
-      # For some reasons seems that snapcraft sets NODE_ENV to `production` by default
-      # this causes the build to fail as devDependencies are not installed
-      npm ci --include=dev
+      npm i zwave-js-ui
 
-      npm run build:server
-
-      npm run build:ui
-      npm prune --omit=dev
       craftctl default
       if [ "${DEBUG_BUILD}" == True ]; then
         echo "process.on(\"warning\", (warning) => { console.warn(\"Node.js warning: \" + warning.stack);});" >> "${CRAFT_PART_INSTALL}/bin/zwave-js-ui"
