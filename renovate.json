@@ -6,8 +6,8 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": [
-        "^snap/snapcraft\\.yaml$"
+      "managerFilePatterns": [
+        "/^snap/snapcraft\\.yaml$/"
       ],
       "matchStrings": [
         "version: \"(?<currentValue>.*)\"\\n"
