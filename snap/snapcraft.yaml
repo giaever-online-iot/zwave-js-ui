@@ -2,7 +2,7 @@ name: zwave-js-ui
 base: core24
 version: "v10.4.1"
 summary: Full-featured Z-Wave Control Panel and MQTT Gateway.
-description: |
+description: | # markdown
   Full-featured Z-Wave Control Panel and MQTT Gateway compatible with all known 500 and 
   700 series Z-Wave controller hardware adapters, Z-Wave JS runs on almost anything with 
   a little bit of computing power and a serial port.
@@ -48,21 +48,11 @@ description: |
 grade: stable
 confinement: strict
 license: MIT
-#assumes:
-#  - command-chain
 
 platforms:
   amd64:
   arm64:
   armhf:
-
-#architectures:
-#  - build-on: amd64
-#    build-for: amd64
-#  - build-on: arm64
-#    build-for: arm64
-#  - build-on: arm64
-#    build-for: armhf
 
 apps:
   zwave-js-ui:
@@ -127,7 +117,7 @@ parts:
       - NODE_VERSION: 20.15.1
     plugin: npm
     npm-include-node: true
-    npm-node-version: $NODE_VERSION
+    npm-node-version: 20.15.1
     source: https://github.com/zwave-js/zwave-js-ui.git
     source-tag: $SNAPCRAFT_PROJECT_VERSION
     build-packages:
@@ -156,7 +146,14 @@ parts:
       npm run build:server
       npm run build:ui
 
-      npm prune --omit=dev
+      npm prune --omit=dev && find ${CRAFT_PART_INSTALL} -mindepth 1 -maxdepth 1 \
+          ! -name "node_modules" \
+          ! -name "snippets" \
+          ! -name ".git" \
+          ! -name "package.json" \
+          ! -name "server" \
+          ! -name "dist" \
+        -exec rm -rfv {} \;
 
       craftctl default
       if [ "${DEBUG_BUILD}" == true ]; then
@@ -184,7 +181,6 @@ parts:
       - jq
       - yq
     stage-packages:
-      - git
       - udev
       - iproute2
 

@@ -2,22 +2,14 @@
 
 source $SNAP/helper/functions
 
-if [ "$(jq -r '.zwave.deviceConfigPriorityDir' "$SNAP_DATA/settings.json" | grep zwavejs2mqtt | wc -l)" -ne 0 ]; then
-	jq --arg deviceConfigPriorityDir "${SNAP_DATA}/config" '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
-	if [ $? -eq 0 ]; then
-		lprint "Renamed «config-folder» to: ${SNAP_DATA}/config"
-		mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
-	else
-		lprint "Renaming «config-folder» was unsuccessful. You must do this manually after application has booted."
-	fi
-fi
-
-# WITH S0+n NETWORK KEY IS NOT USED ANYMORE
-#export NETWORK_KEY=$(snapctl get network.key)
-# SETTINGS_KEY=$(same_network_key "${NETWORK_KEY}")
-# if [ $? -ne 0 ]; then
-#     snapctl set network.key="${SETTINGS_KEY}"
-#     export NETWORK_KEY="${SETTINGS_KEY}"
+# if [ "$(jq -r '.zwave.deviceConfigPriorityDir' "$SNAP_DATA/settings.json" | grep zwavejs2mqtt | wc -l)" -ne 0 ]; then
+# 	jq --arg deviceConfigPriorityDir "${SNAP_DATA}/config" '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
+# 	if [ $? -eq 0 ]; then
+# 		lprint "Renamed «config-folder» to: ${SNAP_DATA}/config"
+# 		mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
+# 	else
+# 		lprint "Renaming «config-folder» was unsuccessful. You must do this manually after application has booted."
+# 	fi
 # fi
 
 OPT_HELP=false
@@ -135,7 +127,7 @@ fi
 
 export TZ=$(snapctl get timezone)
 
-export GIT_DIR="${SNAP}/lib/node_modules/zwave-js-ui/.git"
+#export GIT_DIR="${SNAP}/lib/node_modules/zwave-js-ui/.git"
 export ZWAVEJS_LOGS_DIR="${STORE_DIR}/logs/zwavejs"
 
 [ "$(basename "${1}")" == "npm" ] && cd "${SNAP}/lib/node_modules/zwave-js-ui" && exec "${@}" || exec "${@}"

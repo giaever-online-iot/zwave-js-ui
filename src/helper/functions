@@ -14,52 +14,15 @@ function lprint {
     fi
 }
 
-function ensure_zwavejs_config {
-    # Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG
-    # if [ "$(find ${ZWAVE_JS_CONF} -maxdepth 0 -empty -exec echo empty \;)" == "empty" ]; then
-    #     logger "Config directory is empty, copying data from ${SNAP}/snap/zwave-js/config"
-    #     rsync -raz "${SNAP}/snap/zwave-js/config" "${ZWAVE_JS_CONF}/.."
-    # else
-    #     logger "Config directory ${ZWAVE_JS_CONF} exists"
-    # fi
-    return 0
-}
-
-function get_network_key {
-    if [ -f "${SNAP_DATA}/settings.json" ]; then
-        SETTINGS_KEY=$(jq '.zwave.networkKey' -r ${SNAP_DATA}/settings.json)
-        if [ "${SETTINGS_KEY}" != "" ] && [ "${1}" != "${SETTINGS_KEY}" ]; then
-            lprint "${SETTINGS_KEY}"
-            return 1
-        fi
-        return 0
-    fi
-    return 0
-}
-
-function same_network_key {
-    # SKIP NOW: NETWORK KEY SHOULD NOT BE USED
-    # FAVOR SETTING
-    # if [ -f "${SNAP_DATA}/settings.json" ]; then
-    #     SETTINGS_KEY=$(jq '.zwave.networkKey' -r ${SNAP_DATA}/settings.json)
-    #     if [ "${SETTINGS_KEY}" != "" ] && [ "${1}" != "${SETTINGS_KEY}" ]; then
-    #         echo "${SETTINGS_KEY}"
-    #         return 1
-    #     fi
-    #     return 0
-    # fi
-    return 0
-}
-
 function plug_connected {
     if ! snapctl is-connected "${1}"; then
-        lprint "Missing plug: «${1}»" >&2
-	lprint "Connect with:"
-	if [ "${1}" == "serial-port" ]; then
-		lprint "$ sudo snap connect ${SNAP_NAME}:${1} <slot name>"
-	else
-		lprint "$ sudo snap connect ${SNAP_NAME}:${1}"
-	fi
+        lprint "Missing plug: «${1}»"
+	    lprint "Connect with:"
+        if [ "${1}" == "serial-port" ]; then
+            lprint "$ sudo snap connect ${SNAP_NAME}:${1} <slot name>"
+        else
+            lprint "$ sudo snap connect ${SNAP_NAME}:${1}"
+        fi
         return 1
     fi
     return 0
@@ -125,26 +88,45 @@ function testnset_config {
     return 0
 }
 
-function test_priority_dir {
-    Z2M_SETTINGS="${SNAP_DATA}/settings.json"
+sfn=settings.json
 
-    if ! [ -w "${Z2M_SETTINGS}" ]; then
-        return 1
+function zui_settings_file {
+    realpath -e "${SNAP_DATA}/${sfn}" 2>&- | test_perm "${1}"
+}
+
+function test_perm {
+    test -${1:-r} {} && (echo {} && exit 0) || (echo {} && exit 1)
+}
+
+function set_device_priority_dir {
+    lprint ".zwave.deviceConfigPriorityDir: «${1:-None}»"
+    DEV_DIR="${1}" yq '.zwave.deviceConfigPriorityDir = strenv(DEV_DIR)' "${2:-"$(zui_settings_file "w")"}" && exit $?
+}
+
+function test_device_priority_dir {
+    ZUI_SETTINGS=$(zui_settings_file "w")
+    
+    [ $? -ne 0 ] && echo "Cannot read/write to settings" && exit 1
+
+    DEV_DIR=$(realpath -eL $(yq -re '.zwave.deviceConfigPriorityDirs' "${ZUI_SETTINGS}" 2>&-) 2>&-)
+    NDEV_DIR=${DEV_DIR}
+
+    if [[ "${DEV_DIR}" =~ ^"$(dirname ${SNAP_DATA})" ]]; then
+        NDEV_DIR=$(sed -E "s#$(dirname ${SNAP_DATA})/(current|x?[0-9]+)#${SNAP_DATA}#g" <<< $DEV_DIR)
     fi
 
-	PRIORITY_DIR=$(echo "$(sed -E "s#$(dirname ${SNAP_DATA})/(current|[0-9]+)#${SNAP_DATA}#g" <<< $(cat "${Z2M_SETTINGS}" | jq '.zwave.deviceConfigPriorityDir'))" | tr -d '"')
-
-    if [[ -d $(dirname "${PRIORITY_DIR}") && -w "${PRIORITY_DIR}" ]]; then
-            jq --arg deviceConfigPriorityDir ${PRIORITY_DIR} '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' "${Z2M_SETTINGS}" > "${Z2M_SETTINGS}.tmp"
-            if [ $? -eq 0 ]; then
-                mv "${Z2M_SETTINGS}.tmp" "${Z2M_SETTINGS}"
-            fi
-    elif ! [[ "${PRIORITY_DIR}" =~ ^"$(dirname $SNAP_DATA)"* ]]; then 
-            jq --arg deviceConfigPriorityDir "${SNAP_DATA}/devicePriorityConfig" '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' "${Z2M_SETTINGS}" > "${Z2M_SETTINGS}.tmp"
-            if [ $? -eq 0 ]; then
-                mv "${Z2M_SETTINGS}.tmp" "${Z2M_SETTINGS}"
-            fi
+    if [ -d "${NDEV_DIR}" ] || [ -r "${NDEV_DIR}" ]; then
+        if [ "${NDEV_DIR}" != "${DEV_DIR}" ]; then
+            set_device_priority_dir "${NDEV_DIR}" "${ZUI_SETTINGS}" || return $?
+        fi
+    elif [ -r "${NDEV_DIR}" ]; then
+        set_device_priority_dir "" "${ZUI_SETTINGS}" || return $?
     fi
+
+    if [ ! -w "${NDEV_DIR}" ]; then 
+        lprint ".zwave.deviceConfigPriorityDir not writable: ${NDEV_DIR}"
+    fi
+    
     return 0
 }
 
