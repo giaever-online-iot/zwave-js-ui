@@ -88,38 +88,39 @@ function testnset_config {
     return 0
 }
 
-sfn=settings.json
-
 function zui_settings_file {
-    realpath -e "${SNAP_DATA}/${sfn}" 2>&- | test_perm "${1}"
+    realpath -e "${SNAP_DATA}/settings.json" 2>&- | test_perm "${1}"
 }
 
 function test_perm {
-    test -${1:-r} {} && (echo {} && exit 0) || (echo {} && exit 1)
+    read -r F
+    test -${1:-r} "${F}" && (echo "${F}" && return 0) || (echo "${F}" && return 1)
+    return $?
 }
 
 function set_device_priority_dir {
     lprint ".zwave.deviceConfigPriorityDir: «${1:-None}»"
-    DEV_DIR="${1}" yq '.zwave.deviceConfigPriorityDir = strenv(DEV_DIR)' "${2:-"$(zui_settings_file "w")"}" && exit $?
+    DEV_DIR="${1}" yq -i '.zwave.deviceConfigPriorityDir = strenv(DEV_DIR)' "${2:-"$(zui_settings_file "w")"}" && return $?
 }
 
 function test_device_priority_dir {
+    set -x
     ZUI_SETTINGS=$(zui_settings_file "w")
     
     [ $? -ne 0 ] && echo "Cannot read/write to settings" && exit 1
 
-    DEV_DIR=$(realpath -eL $(yq -re '.zwave.deviceConfigPriorityDirs' "${ZUI_SETTINGS}" 2>&-) 2>&-)
+    DEV_DIR=$(yq -re '.zwave.deviceConfigPriorityDir' "${ZUI_SETTINGS}" 2>&-)
     NDEV_DIR=${DEV_DIR}
 
     if [[ "${DEV_DIR}" =~ ^"$(dirname ${SNAP_DATA})" ]]; then
         NDEV_DIR=$(sed -E "s#$(dirname ${SNAP_DATA})/(current|x?[0-9]+)#${SNAP_DATA}#g" <<< $DEV_DIR)
     fi
 
-    if [ -d "${NDEV_DIR}" ] || [ -r "${NDEV_DIR}" ]; then
+    if [ -d "${NDEV_DIR}" ] && [ -r "${NDEV_DIR}" ]; then
         if [ "${NDEV_DIR}" != "${DEV_DIR}" ]; then
             set_device_priority_dir "${NDEV_DIR}" "${ZUI_SETTINGS}" || return $?
         fi
-    elif [ -r "${NDEV_DIR}" ]; then
+    elif [ ! -r "${NDEV_DIR}" ]; then
         set_device_priority_dir "" "${ZUI_SETTINGS}" || return $?
     fi
 

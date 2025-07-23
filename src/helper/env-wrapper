@@ -2,16 +2,6 @@
 
 source $SNAP/helper/functions
 
-# if [ "$(jq -r '.zwave.deviceConfigPriorityDir' "$SNAP_DATA/settings.json" | grep zwavejs2mqtt | wc -l)" -ne 0 ]; then
-# 	jq --arg deviceConfigPriorityDir "${SNAP_DATA}/config" '.zwave.deviceConfigPriorityDir = $deviceConfigPriorityDir' $SNAP_DATA/settings.json > $SNAP_DATA/tmp.json
-# 	if [ $? -eq 0 ]; then
-# 		lprint "Renamed «config-folder» to: ${SNAP_DATA}/config"
-# 		mv $SNAP_DATA/tmp.json $SNAP_DATA/settings.json
-# 	else
-# 		lprint "Renaming «config-folder» was unsuccessful. You must do this manually after application has booted."
-# 	fi
-# fi
-
 OPT_HELP=false
 
 if [ "${1}" = "--help" ]; then
@@ -89,8 +79,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Not needed anymore as of ZWAVEJS_EXTERNAL_CONFIG?
-# ensure_zwavejs_config
 
 export SERVER_HOST=$(snapctl get server.host)
 export SERVER_PORT=$(snapctl get server.port)
