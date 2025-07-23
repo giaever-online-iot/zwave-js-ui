@@ -138,7 +138,7 @@ function test_default_config {
     testnset_config "server.ssl" false
     testnset_config "server.force-disable-ssl" false
 
-    testnset_config "session.cookie-secure" $(snap get server.ssl)
+    testnset_config "session.cookie-secure" $(snapctl get server.ssl)
     testnset_config "session.secret" $(uuid)
 
     testnset_config "mqtt.name" ""
