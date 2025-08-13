@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 
-ZJS_LOGGING_TO_FILE="$(jq '.zwave.logToFile' -r ${SNAP_DATA}/settings.json)"
-ZUI_LOGGING_TO_FILE="$(jq '.gateway.logToFile' -r ${SNAP_DATA}/settings.json)"
+ZJS_LOGGING_TO_FILE="$(yq '.zwave.logToFile' -r ${SNAP_DATA}/settings.json)"
+ZUI_LOGGING_TO_FILE="$(yq '.gateway.logToFile' -r ${SNAP_DATA}/settings.json)"
 
 echo "${Z2M_LOGGING_TO_FILE}"
 echo "${ZJS_LOGGING_TO_FILE}"
