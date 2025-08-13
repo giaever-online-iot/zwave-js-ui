@@ -104,10 +104,13 @@ function set_device_priority_dir {
 }
 
 function test_device_priority_dir {
-    # set -x
+    set -x
     ZUI_SETTINGS=$(zui_settings_file "w")
     
-    [ $? -ne 0 ] && echo "Cannot read/write to settings" && exit 1
+    if [ $? -ne 0 ]; then
+        echo "Cannot read/write to settings"
+        exit 1
+    fi
 
     DEV_DIR=$(yq -re '.zwave.deviceConfigPriorityDir' "${ZUI_SETTINGS}" 2>&-)
     NDEV_DIR=${DEV_DIR}
