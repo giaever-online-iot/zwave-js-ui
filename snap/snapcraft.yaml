@@ -1,6 +1,6 @@
 name: zwave-js-ui
 base: core24
-version: "v11.3.1"
+version: "v11.4.0"
 summary: Full-featured Z-Wave Control Panel and MQTT Gateway.
 description: | # markdown
   Full-featured Z-Wave Control Panel and MQTT Gateway compatible with all known 500 and 
