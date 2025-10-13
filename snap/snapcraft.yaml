@@ -153,6 +153,7 @@ parts:
           ! -name "package.json" \
           ! -name "server" \
           ! -name "dist" \
+          ! -name "usr/lib" \
         -exec rm -rfv {} \;
 
       craftctl default
