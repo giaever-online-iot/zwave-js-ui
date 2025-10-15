@@ -130,7 +130,7 @@ parts:
   zwave-js-ui:
     after: [dependencies]
     build-environment:
-      - DEBUG_BUILD: "true"
+      - DEBUG_BUILD: "false"
       - NODE_VERSION: 22.20.0
     plugin: npm
     npm-include-node: true
