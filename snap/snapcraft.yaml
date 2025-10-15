@@ -1,7 +1,7 @@
 name: zwave-js-ui
 title: Zwave JS UI
 base: core24
-version: "v11.5.0"
+version: "v11.4.1"
 summary: Full-featured Z-Wave Control Panel and MQTT Gateway.
 description: | # markdown
   Full-featured Z-Wave Control Panel and MQTT Gateway compatible with all known 500 and 
@@ -163,15 +163,16 @@ parts:
       npm run build:server
       npm run build:ui
 
-      npm prune --omit=dev && find ${CRAFT_PART_INSTALL} -mindepth 1 -maxdepth 1 \
-          ! -name "node_modules" \
-          ! -name "snippets" \
-          ! -name ".git" \
-          ! -name "package.json" \
-          ! -name "server" \
-          ! -name "dist" \
-          ! -name "usr" \
-        -exec rm -rfv {} \;
+      npm prune --omit=dev 
+      #&& find ${CRAFT_PART_INSTALL} -mindepth 1 -maxdepth 1 \
+      #    ! -name "node_modules" \
+      #    ! -name "snippets" \
+      #    ! -name ".git" \
+      #    ! -name "package.json" \
+      #    ! -name "server" \
+      #    ! -name "dist" \
+      #    ! -name "usr" \
+      #  -exec rm -rfv {} \;
 
       craftctl default
       if [ "${DEBUG_BUILD}" == true ]; then
