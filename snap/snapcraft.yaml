@@ -131,10 +131,10 @@ parts:
     after: [dependencies]
     build-environment:
       - DEBUG_BUILD: "true"
-      - NODE_VERSION: 20.15.1
+      - NODE_VERSION: 22.20.0
     plugin: npm
     npm-include-node: true
-    npm-node-version: 20.15.1
+    npm-node-version: 22.20.0
     source: https://github.com/zwave-js/zwave-js-ui.git
     source-tag: $SNAPCRAFT_PROJECT_VERSION
     build-packages:
