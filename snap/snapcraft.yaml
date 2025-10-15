@@ -159,7 +159,7 @@ parts:
       npm install --global --prefix "${CRAFT_PART_INSTALL}" zwave-js-ui@${SNAPCRAFT_PROJECT_VERSION#v}
 
       # Clean up unnecessary files
-      find ${CRAFT_PART_INSTALL} -mindepth 1 -maxdepth 1 \
+      find "${CRAFT_PART_INSTALL}" -mindepth 1 -maxdepth 1 \
           ! -name "node_modules" \
           ! -name "bin" \
           ! -name "lib" \
