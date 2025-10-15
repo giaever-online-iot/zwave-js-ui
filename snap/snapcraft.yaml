@@ -135,12 +135,9 @@ parts:
     plugin: npm
     npm-include-node: true
     npm-node-version: 22.20.0
-    source: https://github.com/zwave-js/zwave-js-ui.git
-    source-tag: $SNAPCRAFT_PROJECT_VERSION
-    build-packages:
-      - gcc
-      - build-essential
+    source: .
     override-build: | # shell
+      # Install Node.js if not already present
       if [ ! -f "${CRAFT_PART_INSTALL}/bin/node" ]; then
         case ${CRAFT_ARCH_BUILD_ON} in
           amd64)
@@ -158,19 +155,14 @@ parts:
           tar xzf - -C "${CRAFT_PART_INSTALL}/" --no-same-owner --strip-components=1
       fi
 
-      npm ci --include=dev
-      
-      npm run build:server
-      npm run build:ui
+      # Install zwave-js-ui from npm registry
+      npm install --global --prefix "${CRAFT_PART_INSTALL}" zwave-js-ui@${SNAPCRAFT_PROJECT_VERSION#v}
 
-      npm prune --omit=dev && find ${CRAFT_PART_INSTALL} -mindepth 1 -maxdepth 1 \
+      # Clean up unnecessary files
+      find ${CRAFT_PART_INSTALL} -mindepth 1 -maxdepth 1 \
           ! -name "node_modules" \
-          ! -name "snippets" \
-          ! -name ".git" \
-          ! -name "package.json" \
-          ! -name "server" \
-          ! -name "dist" \
-          ! -name "usr" \
+          ! -name "bin" \
+          ! -name "lib" \
         -exec rm -rfv {} \;
 
       craftctl default
@@ -178,11 +170,6 @@ parts:
         echo "DEBUG"
         echo "process.on(\"warning\", (warning) => { console.warn(\"Node.js warning: \" + warning.stack);});" >> "${CRAFT_PART_INSTALL}/bin/zwave-js-ui"
       fi
-
-      cp --force --archive --link --no-dereference "${CRAFT_PART_BUILD}/.git" "${CRAFT_PART_INSTALL}"
-
-    organize:
-      .git: lib/node_modules/zwave-js-ui/.git
 
     stage-packages:
       - on armhf:
