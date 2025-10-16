@@ -80,7 +80,7 @@ apps:
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
       DAEMONIZED: 1
       npm_config_cache: /usr/local/share/.cache/npm
-    command: bin/zwave-js-ui 
+    command: lib/node_modules/zui-snap/node_modules/.bin/zwave-js-ui
     command-chain:
       - helper/env-wrapper
     plugs:
@@ -94,7 +94,8 @@ apps:
     environment:
       STORE_DIR: $SNAP_DATA
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
-    command: bin/zwave-js-ui 
+      npm_config_cache: /usr/local/share/.cache/npm
+    command: lib/node_modules/zui-snap/node_modules/.bin/zwave-js-ui
     command-chain:
       - helper/env-wrapper
     plugs:
@@ -131,58 +132,24 @@ parts:
     after: [dependencies]
     build-environment:
       - DEBUG_BUILD: "false"
-      - NODE_VERSION: 22.20.0
+    build-snaps:
+      - yq
     plugin: npm
     npm-include-node: true
     npm-node-version: 22.20.0
-    source: https://github.com/zwave-js/zwave-js-ui.git
-    source-tag: $SNAPCRAFT_PROJECT_VERSION
-    build-packages:
-      - gcc
-      - build-essential
+    source: src/node
     override-build: | # shell
-      if [ ! -f "${CRAFT_PART_INSTALL}/bin/node" ]; then
-        case ${CRAFT_ARCH_BUILD_ON} in
-          amd64)
-            NODE_ARCH=x64
-            ;;
-          armhf)
-            NODE_ARCH=armv7l
-            ;;
-          *)
-            NODE_ARCH=${CRAFT_ARCH_BUILD_ON}
-            ;;
-        esac
-          
-        curl -s "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.gz" | \
-          tar xzf - -C "${CRAFT_PART_INSTALL}/" --no-same-owner --strip-components=1
-      fi
-
-      npm ci --include=dev
-      
-      npm run build:server
-      npm run build:ui
-
-      npm prune --omit=dev && find ${CRAFT_PART_INSTALL} -mindepth 1 -maxdepth 1 \
-          ! -name "node_modules" \
-          ! -name "snippets" \
-          ! -name ".git" \
-          ! -name "package.json" \
-          ! -name "server" \
-          ! -name "dist" \
-          ! -name "usr" \
-        -exec rm -rfv {} \;
+      set -x
+      ZUIV="${SNAPCRAFT_PROJECT_VERSION#v}" yq -i '.version=env(ZUIV),.dependencies.zwave-js-ui=env(ZUIV)' -o=j "${CRAFT_PART_BUILD}/package.json"
+      #cat "${CRAFT_PART_BUILD}/package.json"
 
       craftctl default
+
+      # ! add extra debugging
       if [ "${DEBUG_BUILD}" == true ]; then
         echo "DEBUG"
-        echo "process.on(\"warning\", (warning) => { console.warn(\"Node.js warning: \" + warning.stack);});" >> "${CRAFT_PART_INSTALL}/bin/zwave-js-ui"
+        echo "process.on(\"warning\", (warning) => { console.warn(\"Node.js warning: \" + warning.stack);});" >> "${CRAFT_PART_INSTALL}/lib/node_modules/zui-snap/node_modules/.bin/zwave-js-ui"
       fi
-
-      cp --force --archive --link --no-dereference "${CRAFT_PART_BUILD}/.git" "${CRAFT_PART_INSTALL}"
-
-    organize:
-      .git: lib/node_modules/zwave-js-ui/.git
 
     stage-packages:
       - on armhf:
