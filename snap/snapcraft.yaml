@@ -94,7 +94,7 @@ apps:
     environment:
       STORE_DIR: $SNAP_DATA
       ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
-      #npm_config_cache: /usr/local/share/.cache/npm
+      npm_config_cache: /usr/local/share/.cache/npm
     command: lib/node_modules/zui-snap/node_modules/.bin/zwave-js-ui
     command-chain:
       - helper/env-wrapper
@@ -131,27 +131,25 @@ parts:
   zwave-js-ui:
     after: [dependencies]
     build-environment:
-      #- DEBUG_BUILD: "false"
-      - NODE_VERSION: 22.20.0
-      - NODE_ENV: "development"
+      - DEBUG_BUILD: "false"
     build-snaps:
       - yq
     plugin: npm
     npm-include-node: true
     npm-node-version: 22.20.0
-    source: .
+    source: src/node
     override-build: | # shell
       set -x
-      
-      PJSON="${CRAFT_PART_BUILD}/package.json" && echo "" > ${PJSON} \
-        && yq -i '.name="zui-snap"' -o=j "${PJSON}" \
-        && ZUIV="${SNAPCRAFT_PROJECT_VERSION#v}" yq -i '.version=env(ZUIV),.dependencies.zwave-js-ui=env(ZUIV)' -o=j "${PJSON}" \
-        && cat "${PJSON}"
+      ZUIV="${SNAPCRAFT_PROJECT_VERSION#v}" yq -i '.version=env(ZUIV),.dependencies.zwave-js-ui=env(ZUIV)' -o=j "${CRAFT_PART_BUILD}/package.json"
+      #cat "${CRAFT_PART_BUILD}/package.json"
+
       craftctl default
-      #  if [ "${DEBUG_BUILD}" == true ]; then
-      #    echo "DEBUG"
-      #    echo "process.on(\"warning\", (warning) => { console.warn(\"Node.js warning: \" + warning.stack);});" >> "${CRAFT_PART_INSTALL}/bin/zwave-js-ui"
-      #  fi
+
+      # ! add extra debugging
+      if [ "${DEBUG_BUILD}" == true ]; then
+        echo "DEBUG"
+        echo "process.on(\"warning\", (warning) => { console.warn(\"Node.js warning: \" + warning.stack);});" >> "${CRAFT_PART_INSTALL}/lib/node_modules/zui-snap/node_modules/.bin/zwave-js-ui"
+      fi
 
     stage-packages:
       - on armhf:
@@ -161,12 +159,6 @@ parts:
       - -bin/npx
       - -lib/node_modules/corepack
       - -lib/node_modules/npx
-      - -lib/node_modules/zui-snap/src
-      - -lib/node_modules/zui-snap/snap
-      - -lib/node_modules/zui-snap/renovate.json
-      - -lib/node_modules/zui-snap/.vscode
-      - -lib/node_modules/zui-snap/LICENSE
-      - -lib/node_modules/zui-snap/README.md
 
   dependencies:
     plugin: nil
