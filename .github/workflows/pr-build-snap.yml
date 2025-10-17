@@ -4,8 +4,8 @@ on:
   pull_request:
     branches:
       - main
-    paths-ignore:
-      - '.github/**'
+    #paths-ignore:
+    #  - '.github/**'
 
 jobs:
   build:
@@ -34,8 +34,9 @@ jobs:
     - name: Remote build with Launchpad
       id: remote-build
       run: |
-        ls -al ./
+        set -x
         #set -o pipefail
+        ls -al ./
         echo "LOG" > build.log
         snapcraft remote-build --verbosity brief --launchpad-accept-public-upload # | tee build.log
         #echo "remote_build_log<<EOF" >> $GITHUB_OUTPUT
