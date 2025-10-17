@@ -34,11 +34,9 @@ jobs:
     - name: Remote build with Launchpad
       id: remote-build
       run: |
-        set -x
-        #set -o pipefail
-        ls -al ./
+        set -ox pipefail
         echo "LOG" > build.log
-        snapcraft remote-build --verbosity brief --launchpad-accept-public-upload # | tee build.log
+        snapcraft remote-build --verbosity verbose --launchpad-accept-public-upload # | tee build.log
         #echo "remote_build_log<<EOF" >> $GITHUB_OUTPUT
         cat build.log
         #echo "EOF" >> $GITHUB_OUTPUT
