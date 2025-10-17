@@ -11,7 +11,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v5
 
     - name: Install snapcraft and yq
       run: |
@@ -26,14 +26,11 @@ jobs:
         PLATFORMS=$(yq e '.platforms | keys | join(" ")' snap/snapcraft.yaml)
         echo "PLATFORMS=$PLATFORMS" >> $GITHUB_ENV
 
-    #- name: Authenticate with Snap Store
-    #  run: snapcraft login --with ${{ secrets.STORE_LOGIN }}
-
     - name: Remote build with Launchpad
       id: remote-build
       run: |
         set -o pipefail
-        snapcraft remote-build --launchpad-accept-public-upload -q --verbosity debug | tee build.log
+        snapcraft remote-build --launchpad-accept-public-upload | tee build.log
         echo "remote_build_log<<EOF" >> $GITHUB_OUTPUT
         cat build.log
         echo "EOF" >> $GITHUB_OUTPUT
@@ -51,7 +48,8 @@ jobs:
         done
 
     - name: Upload built snap artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v5
       with:
         name: zui-snap-artifacts
         path: "*.snap"
+
