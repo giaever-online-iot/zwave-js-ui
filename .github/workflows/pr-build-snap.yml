@@ -17,8 +17,8 @@ jobs:
       - name: Extract platforms from snapcraft.yaml
         id: extract
         run: |
-          PLATFORMS="[\"$(yq '.platforms | keys | join("\",\"")' snap/snapcraft.yaml)\"]"
-          echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
+          PLATFORMS=$(yq e '.platforms | keys | map("\""+.+"\"") | join(",")' snap/snapcraft.yaml)
+          echo "platforms=[$PLATFORMS]" >> $GITHUB_OUTPUT
 
   build:
     needs: extract
@@ -32,10 +32,8 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Set up environment for platform ${{ matrix.platform }}
-        run: |
-          echo "Building Snap for platform ${{ matrix.platform }}"
-          sudo snap install snapcraft --classic --channel=latest/stable
+        run: echo "Building Snap for platform ${{ matrix.platform }}"
 
       - name: Build Snap for ${{ matrix.platform }}
         run: |
-          sudo snapcraft
+          snapcraft pack
