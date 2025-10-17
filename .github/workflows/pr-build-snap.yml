@@ -11,10 +11,12 @@ jobs:
     outputs:
       platforms: ${{ steps.extract.outputs.platforms }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
       - name: Extract platforms from snapcraft.yaml
         id: extract
         run: |
-          ls -al ./
           PLATFORMS=$(yq e '.platforms | keys' snap/snapcraft.yaml | jq -R -s -c 'split("\n")[:-1]')
           echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
 
