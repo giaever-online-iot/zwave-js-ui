@@ -4,8 +4,6 @@ on:
   pull_request:
     branches:
       - main
-    #paths-ignore:
-    #  - '.github/**'
 
 jobs:
   extract:
@@ -17,7 +15,7 @@ jobs:
         id: extract
         run: |
           PLATFORMS=$(yq e '.platforms | keys' snap/snapcraft.yaml | jq -R -s -c 'split("\n")[:-1]')
-          echo "::set-output name=platforms::$PLATFORMS"
+          echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
 
   build:
     needs: extract
