@@ -38,4 +38,4 @@ jobs:
 
       - name: Build Snap for ${{ matrix.platform }}
         run: |
-          snapcraft --use-lxd --target-arch=${{ matrix.platform }}
+          snapcraft --use-lxd
