@@ -1,0 +1,57 @@
+name: PR Build Snap with Remote Launchpad Build
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install snapcraft and yq
+      run: |
+        sudo snap install snapcraft --classic
+        sudo snap install yq
+
+    - name: Extract version and platforms from snapcraft.yaml
+      id: extract-info
+      run: |
+        VERSION=$(yq e '.version' snap/snapcraft.yaml)
+        echo "VERSION=${VERSION#v}" >> $GITHUB_ENV
+        PLATFORMS=$(yq e '.platforms | keys | join(" ")' snap/snapcraft.yaml)
+        echo "PLATFORMS=$PLATFORMS" >> $GITHUB_ENV
+
+    - name: Authenticate with Snap Store
+      run: snapcraft login --with ${{ secrets.STORE_LOGIN }}
+
+    - name: Remote build with Launchpad
+      id: remote-build
+      run: |
+        set -o pipefail
+        snapcraft remote-build --launchpad-accept-public-upload -q --verbosity debug | tee build.log
+        echo "remote_build_log<<EOF" >> $GITHUB_OUTPUT
+        cat build.log
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Verify snaps for all architectures
+      run: |
+        for arch in $PLATFORMS; do
+          FILE="zwave-js-ui_v${VERSION}_${arch}.snap"
+          if [ ! -f "$FILE" ]; then
+            echo "Missing snap file for architecture: $arch"
+            exit 1
+          else
+            echo "Found snap file: $FILE"
+          fi
+        done
+
+    - name: Upload built snap artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: zui-snap-artifacts
+        path: "*.snap"
