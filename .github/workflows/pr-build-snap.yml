@@ -1,4 +1,4 @@
-name: PR Build Snap with Remote Launchpad Build
+name: PR Build Snap
 
 on:
   pull_request:
@@ -6,54 +6,31 @@ on:
       - main
 
 jobs:
-  build:
+  extract:
     runs-on: ubuntu-latest
-
+    outputs:
+      platforms: ${{ steps.extract.outputs.platforms }}
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v5
+      - name: Extract platforms from snapcraft.yaml
+        id: extract
+        run: |
+          PLATFORMS=$(yq e '.platforms | keys | join(",")' snap/snapcraft.yaml)
+          echo "::set-output name=platforms::$PLATFORMS"
 
-    - name: Install snapcraft and yq
-      run: |
-        sudo snap install snapcraft --classic
-        sudo snap install yq
+  build:
+    needs: extract
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [${{ needs.extract.outputs.platforms }}]
+      fail-fast: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Extract version and platforms from snapcraft.yaml
-      id: extract-info
-      run: |
-        VERSION=$(yq e '.version' snap/snapcraft.yaml)
-        echo "VERSION=${VERSION#v}" >> $GITHUB_ENV
-        PLATFORMS=$(yq e '.platforms | keys | join(" ")' snap/snapcraft.yaml)
-        echo "PLATFORMS=$PLATFORMS" >> $GITHUB_ENV
+      - name: Set up environment for platform ${{ matrix.platform }}
+        run: echo "Building Snap for platform ${{ matrix.platform }}"
 
-    #- name: Authenticate with Snap Store
-    #  run: snapcraft login --with ${{ secrets.STORE_LOGIN }}
-
-    - name: Remote build with Launchpad
-      id: remote-build
-      run: |
-        ls -al ./
-        #set -o pipefail
-        echo "LOG" > build.log
-        snapcraft remote-build --verbosity brief --launchpad-accept-public-upload # | tee build.log
-        #echo "remote_build_log<<EOF" >> $GITHUB_OUTPUT
-        cat build.log
-        #echo "EOF" >> $GITHUB_OUTPUT
-
-    - name: Verify snaps for all architectures
-      run: |
-        for arch in $PLATFORMS; do
-          FILE="zwave-js-ui_v${VERSION}_${arch}.snap"
-          if [ ! -f "$FILE" ]; then
-            echo "Missing snap file for architecture: $arch"
-            exit 1
-          else
-            echo "Found snap file: $FILE"
-          fi
-        done
-
-    - name: Upload built snap artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: zui-snap-artifacts
-        path: "*.snap"
+      - name: Build Snap for ${{ matrix.platform }}
+        run: |
+          snapcraft
