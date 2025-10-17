@@ -26,8 +26,8 @@ jobs:
         PLATFORMS=$(yq e '.platforms | keys | join(" ")' snap/snapcraft.yaml)
         echo "PLATFORMS=$PLATFORMS" >> $GITHUB_ENV
 
-    - name: Authenticate with Snap Store
-      run: snapcraft login --with ${{ secrets.STORE_LOGIN }}
+    #- name: Authenticate with Snap Store
+    #  run: snapcraft login --with ${{ secrets.STORE_LOGIN }}
 
     - name: Remote build with Launchpad
       id: remote-build
