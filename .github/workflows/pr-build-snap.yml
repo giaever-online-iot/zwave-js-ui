@@ -17,8 +17,8 @@ jobs:
       - name: Extract platforms from snapcraft.yaml
         id: extract
         run: |
-          PLATFORMS=$(yq e '.platforms | keys' snap/snapcraft.yaml | jq -R -s -c 'split("\n")[:-1]')
-          echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
+          PLATFORMS=$(yq e '.platforms | keys' -o=j snap/snapcraft.yaml)
+          echo "platforms=[$PLATFORMS]" >> $GITHUB_OUTPUT
 
   build:
     needs: extract
