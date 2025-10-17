@@ -32,7 +32,9 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Set up environment for platform ${{ matrix.platform }}
-        run: echo "Building Snap for platform ${{ matrix.platform }}"
+        run: |
+          echo "Building Snap for platform ${{ matrix.platform }}"
+          snap install snapcraft --classic
 
       - name: Build Snap for ${{ matrix.platform }}
         run: |
