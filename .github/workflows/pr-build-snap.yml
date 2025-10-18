@@ -18,7 +18,7 @@ jobs:
         env:
           launchpad_credentials: ${{secrets.LAUNCHPAD_CREDENTIALS}}
         run: |
-          printenv | grep launch
+          printenv
 
       - name: Extract platforms from snapcraft.yaml
         id: extract
