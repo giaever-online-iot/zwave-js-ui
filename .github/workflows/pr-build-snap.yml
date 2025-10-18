@@ -31,11 +31,5 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Set up environment for platform ${{ matrix.platform }}
-        run: |
-          sudo snap install snapcraft --classic
-
       - name: Build Snap for ${{ matrix.platform }}
         uses: snapcore/action-build@v1
-        with:
-          target-arch: ${{ matrix.platform }}
