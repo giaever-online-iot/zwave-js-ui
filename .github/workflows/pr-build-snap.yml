@@ -33,8 +33,15 @@ jobs:
 
       - name: Build Snap for ${{ matrix.platform }}
         uses: snapcore/action-build@v1
+        id: snapcraft
+
+      - name: Get basename ${{ steps.snapcraft.outputs.snap }} from path
+        id: snap_fn
+        run: |
+          filename=$(basename "${{ steps.snapcraft.outputs.snap }}")
+          echo "filename=$snap_fn" >> $GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.snapcraft.outputs.snap }}
+          name: ${{ steps.snap_fn.outputs.filename }}
           path: ${{ steps.snapcraft.outputs.snap }}
