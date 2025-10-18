@@ -31,10 +31,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
       - name: Get secret
-        env:
-          LAUNCHPAD_CREDENTIALS: ${{ secrets.LAUNCHPAD_CREDENTIALS }}
-        run: |
-          echo "LP AUTH: ${LAUNCHPAD_CREDENTIALS}"
+        uses: 1arp/create-a-file-action@0.4.5
+        with:
+          content: |
+            ${{ secrets.LAUNCHPAD_CREDENTIALS }}
+          file: "test"
+          
       # - name: Setup QEMU
       #   uses: docker/setup-qemu-action@v3
       #   with:
