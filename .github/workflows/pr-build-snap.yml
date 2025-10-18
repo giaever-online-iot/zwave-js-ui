@@ -18,7 +18,7 @@ jobs:
         id: extract
         run: |
           PLATFORMS= $(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)
-          echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
+          echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
           echo $PLATFORMS
 
   build:
