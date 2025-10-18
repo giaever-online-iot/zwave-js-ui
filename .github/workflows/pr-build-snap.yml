@@ -59,7 +59,7 @@ jobs:
 
       - name: Add snap filename
         run: |
-          echo "${{ steps.snap_fn.outputs.filename.split('.') }}"
+          echo "${{ steps.snap_fn.outputs.filename|split('.') }}"
           
         
           
