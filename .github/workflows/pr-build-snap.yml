@@ -22,7 +22,7 @@ jobs:
 
   build:
     needs: extract
-    runs-on: ubuntu-24-0
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         platform: ${{ fromJson(needs.extract.outputs.platforms) }}
