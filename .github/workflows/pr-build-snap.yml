@@ -29,7 +29,6 @@ jobs:
     strategy:
       matrix:
         platform: ${{ fromJson(needs.extract.outputs.platforms) }}
-        lp-cred: ${{needs.extract.outputs.lpc}}
       fail-fast: true
     steps:
       - name: Checkout code
