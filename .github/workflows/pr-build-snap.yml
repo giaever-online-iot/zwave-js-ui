@@ -38,6 +38,7 @@ jobs:
       - name: Get basename of snap package
         id: snap_fn
         run: |
+          dpkg --print-architecture
           echo "${{ steps.snapcraft.outputs.snap }}"
           echo "filename=$(basename "${{ steps.snapcraft.outputs.snap }}")" >> $GITHUB_OUTPUT
 
