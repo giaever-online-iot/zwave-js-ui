@@ -30,15 +30,15 @@ jobs:
     strategy:
       matrix:
         platform: ${{ fromJson(needs.extract.outputs.platforms) }}
-        lp_cred: ${{needs.extract.outputs.lpc}}
+        lp-cred: ${{needs.extract.outputs.lpc}}
       fail-fast: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
         
-      - name: Get secret ${{ lp_cred }}
+      - name: Get secret ${{ matrix.lp-cred }}
         run: |
-          echo "${{ matrix.lp_cred }}"
+          echo "${{ matrix.lp-cred }}"
           
           
       # - name: Setup QEMU
