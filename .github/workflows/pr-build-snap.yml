@@ -35,11 +35,11 @@ jobs:
         uses: snapcore/action-build@v1
         id: snapcraft
 
-      - name: Get basename ${{ steps.snapcraft.outputs.snap }} from path
+      - name: Get basename of snap package
         id: snap_fn
         run: |
-          filename=$(basename "${{ steps.snapcraft.outputs.snap }}")
-          echo "filename=$snap_fn" >> $GITHUB_OUTPUT
+          echo "${{ steps.snapcraft.outputs.snap }}"
+          echo "filename=$(basename "${{ steps.snapcraft.outputs.snap }}")" >> $GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
         with:
