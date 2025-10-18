@@ -61,16 +61,11 @@ jobs:
     if: ${{ success() }}
     steps:
       - name: Post artifact link comment
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_ID: ${{ github.run_id }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
         run: |
-          ARTIFACT_URL="https://github.com/$REPO/actions/runs/$RUN_ID/artifacts"
+          ARTIFACT_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts"
           COMMENT_BODY="✅ All builds completed successfully. Download [artifacts]($ARTIFACT_URL)."
           
-          curl -s -H "Authorization: token $GITHUB_TOKEN" \
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
                -X POST \
-               -d "{\"body\": \"$COMMENT_BODY\"}" \
-               "https://api.github.com/repos/$REPO/issues/$PR_NUMBER/comments"
+               -d "{\"body\": \"${COMMENT_BODY}\"}" \
+               "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
