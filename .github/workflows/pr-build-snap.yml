@@ -35,9 +35,10 @@ jobs:
       - name: Set up environment for platform ${{ matrix.platform }}
         run: |
           echo "Building Snap for platform ${{ matrix.platform }}"
-          sudo snap install snapcraft --classic --channel=latest/stable
+          sudo snap install snapcraft --classic
           sudo snap install lxd
           sudo usermod -a -G lxd $USER
+          groups $USER
           sudo lxd init --auto
 
       - name: Build Snap for ${{ matrix.platform }}
