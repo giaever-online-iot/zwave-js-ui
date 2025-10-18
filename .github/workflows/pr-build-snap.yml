@@ -16,10 +16,10 @@ jobs:
 
       - name: Launchpad secret
         env:
-          launchpad_credentials: ${{secrets.LAUNCHPAD_CREDENTIALS}}
+          launchpad_credentials: ${{secrets.snap.LAUNCHPAD_CREDENTIALS}}
         run: |
           printenv
-          echo "${{ secrets.LAUNCHPAD_CREDENTIALS }}"
+          echo "${{ secrets.snap.LAUNCHPAD_CREDENTIALS }}"
 
       - name: Extract platforms from snapcraft.yaml
         id: extract
