@@ -22,7 +22,7 @@ jobs:
 
   build:
     needs: extract
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24-0
     strategy:
       matrix:
         platform: ${{ fromJson(needs.extract.outputs.platforms) }}
@@ -34,6 +34,8 @@ jobs:
       - name: Build Snap for ${{ matrix.platform }}
         uses: snapcore/action-build@v1
         id: snapcraft
+        with:
+          snapcraft-args: [remote-build]
 
       - name: Get basename of snap package
         id: snap_fn
