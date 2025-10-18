@@ -36,5 +36,6 @@ jobs:
           sudo snap install snapcraft --classic
 
       - name: Build Snap for ${{ matrix.platform }}
-        run: |
-          snapcraft pack
+        uses: snapcore/action-build@v1
+        with:
+          target-arch: ${{ matrix.platform }}
