@@ -64,4 +64,4 @@ jobs:
     if: ${{ success() }}
     steps:
       - run: |
-          yq '.* artifact.yaml
+          yq '.' artifact.yaml
