@@ -35,7 +35,7 @@ jobs:
         uses: snapcore/action-build@v1
         id: snapcraft
         with:
-          snapcraft-args: [remote-build]
+          snapcraft-args: remote-build --build-for  ${{ matrix.platform }} --launchpad-accept-public-upload --launchpad-timeout
 
       - name: Get basename of snap package
         id: snap_fn
