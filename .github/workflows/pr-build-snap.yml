@@ -31,8 +31,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
       - name: Get secret
-        with:
-          lp_cred: ${{ secrets.LAUNCHPAD_CREDENTIALS }}
+        env:
+          LAUNCHPAD_CREDENTIALS: ${{ secrets.LAUNCHPAD_CREDENTIALS }}
+        run: |
+          echo "LP AUTH: ${LAUNCHPAD_CREDENTIALS}"
       # - name: Setup QEMU
       #   uses: docker/setup-qemu-action@v3
       #   with:
