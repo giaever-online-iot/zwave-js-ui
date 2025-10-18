@@ -17,9 +17,8 @@ jobs:
       - name: Extract platforms from snapcraft.yaml
         id: extract
         run: |
-          PLATFORMS= $(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)
+          echo "Extract platforms from snapcraft.yaml"
           echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
-          echo $PLATFORMS
 
   build:
     needs: extract
@@ -34,12 +33,7 @@ jobs:
 
       - name: Set up environment for platform ${{ matrix.platform }}
         run: |
-          echo "Building Snap for platform ${{ matrix.platform }}"
           sudo snap install snapcraft --classic
-          sudo snap install lxd
-          sudo usermod -a -G lxd $USER
-          groups $USER
-          sudo lxd init --auto
 
       - name: Build Snap for ${{ matrix.platform }}
         run: |
