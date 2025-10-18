@@ -8,6 +8,7 @@ on:
 jobs:
   extract:
     runs-on: ubuntu-latest
+    environment: snap
     outputs:
       platforms: ${{ steps.extract.outputs.platforms }}
     steps:
@@ -16,9 +17,12 @@ jobs:
         
       - name: Extract platforms from snapcraft.yaml
         id: extract
+        env:
+          LAUNCHPAD_CREDENTIALS: ${{ secrets.LAUNCHPAD_CREDENTIALS }}
         run: |
           echo "Extract platforms from snapcraft.yaml"
           echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
+          echo "lpc=${LAUNCHPAD_CREDENTIALS}" >> $GITHUB_OUTPUT
 
   build:
     needs: extract
@@ -26,16 +30,16 @@ jobs:
     strategy:
       matrix:
         platform: ${{ fromJson(needs.extract.outputs.platforms) }}
+        lp_cred: ${{needs.extract.outputs.lpc}}
       fail-fast: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-      - name: Get secret
-        uses: 1arp/create-a-file-action@0.4.5
-        with:
-          content: |
-            ${{ secrets.LAUNCHPAD_CREDENTIALS }}
-          file: "test"
+        
+      - name: Get secret ${{ lp_cred }}
+        run: |
+          echo "${{ matrix.lp_cred }}"
+          
           
       # - name: Setup QEMU
       #   uses: docker/setup-qemu-action@v3
