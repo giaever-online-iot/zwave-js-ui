@@ -30,12 +30,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          # see https://github.com/tonistiigi/binfmt/issues/215
+          # also see: https://bugs.launchpad.net/ubuntu/+source/qemu/+bug/2096782
+          image: 'tonistiigi/binfmt:master'
 
       - name: Build Snap for ${{ matrix.platform }}
-        uses: snapcore/action-build@v1
+        uses: canonical/snapcraft-multiarch-action@v1
         id: snapcraft
         with:
-          snapcraft-args: remote-build --build-for  ${{ matrix.platform }} --launchpad-accept-public-upload --launchpad-timeout 30
+          architecture: ${{ matrix.platform }}
 
       - name: Get basename of snap package
         id: snap_fn
