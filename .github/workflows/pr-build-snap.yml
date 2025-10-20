@@ -59,21 +59,19 @@ jobs:
         with:
           name: ${{ steps.build.outputs.filename }}
           path: ${{ steps.snapcraft.outputs.snap }}
-          overwrite: true
 
       - name: Persist artifact URL to env
         id: snap
         run: | 
-          FINFO="${{ steps.build.outputs.filename }}.txt"
+          FINFO="${{ steps.build.outputs.filename }}.json"
           echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform }}'}" | yq '.' -oj -I0 > "${FINFO}"
+          cat "${FINFO}"
           echo "finfo=${FINFO}" >> $GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
-        id: finfo
         with:
-          name: ${{ matrix.platform }}.json
-          path: |
-            echo "${FINFO}"
+          name: ${{ steps.snap.outputs.finfo }}
+          path: ${{ steps.snap.outputs.finfo }}
           
   post_comment:
     runs-on: ubuntu-latest
@@ -88,11 +86,11 @@ jobs:
       - name: Aggregate artifact infos
         id: aggregate
         run: |
-          ls artifacts/*
-          echo "Artifacts built:" >> $GITHUB_OUTPUT 
-          for sfi in artifacts/*.finfo.json; doo
+          set +x
+          find ./ -name "*.json"
+
+          for sfi in find ./ -name "*.json"; do
             echo "${sfi}"
-            cat ${sfi}
             echo "- $(cat "${sfi}" | yq '.arch'): [$(cat "${sfi}" | yq '.name')]( $(cat "${sfi}" | yq '.url') )"
           done
           
