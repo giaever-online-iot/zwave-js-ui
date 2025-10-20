@@ -82,7 +82,7 @@ jobs:
       - run: |
           echo "Token length: ${{ secrets.ZUI_PAT_TOKEN }}"
           
-      - uses: peter-evans/create-or-update-comment@v3
+      - uses: peter-evans/create-or-update-comment@v5
         with:
           token: ${{ secrets.ZUI_PAT_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
