@@ -52,9 +52,16 @@ jobs:
           echo "filename=$(basename "${{ steps.snapcraft.outputs.snap }}")" >> $GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
+        id: uploads
         with:
           name: ${{ steps.build.outputs.filename }}
           path: ${{ steps.snapcraft.outputs.snap }}
+
+      - name: Persist artifact URL to env
+        run: echo "ARTIFACT_URL_${{ matrix.platforms }}=${{ steps.upload.outputs.artifact-url }}" >> $GITHUB_ENV
+
+      - name: Use the saved URL
+        run: echo "A_U_${{ matrix.platform }} is ${ARTIFACT_URL_${{ matrix.platforms }}}"
           
   post_comment:
     runs-on: ubuntu-latest
