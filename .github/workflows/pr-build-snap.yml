@@ -11,12 +11,15 @@ jobs:
     outputs:
       platforms: ${{ steps.extract.outputs.platforms }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        
       - name: Extract platforms from snapcraft.yaml
         id: extract
+        env:
+          LAUNCHPAD_CREDENTIALS: ${{ secrets.LAUNCHPAD_CREDENTIALS }}
         run: |
-          ls -al
-          PLATFORMS=$(yq '.platforms | keys | join(",")' snap/snapcraft.yaml)
-          echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
+          echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
 
   build:
     needs: extract
@@ -28,10 +31,59 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-
-      - name: Set up environment for platform ${{ matrix.platform }}
-        run: echo "Building Snap for platform ${{ matrix.platform }}"
+    
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        with: # see 
+          # https://github.com/tonistiigi/binfmt/issues/215
+          # https://bugs.launchpad.net/ubuntu/+source/qemu/+bug/2096782
+          image: 'tonistiigi/binfmt:master'
 
       - name: Build Snap for ${{ matrix.platform }}
+        uses: canonical/snapcraft-multiarch-action@v1
+        id: snapcraft
+        with:
+          architecture: ${{ matrix.platform }}
+
+      - name: Get basename of snap package
+        id: build
         run: |
-          snapcraft pack
+          echo "${{ steps.snapcraft.outputs.snap }}"
+          echo "filename=$(basename "${{ steps.snapcraft.outputs.snap }}")" >> $GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.filename }}
+          path: ${{ steps.snapcraft.outputs.snap }}
+          
+  post_comment:
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ success() }}
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: ./artifacts
+          
+      - name: Aggregate artifact infos
+        id: aggregate
+        run: |
+          echo "Artifacts builds:" > artifact-list.md
+          for sfp in artifacts/*.snap; do
+            sfn=$(basename "${sfp}")
+            echo "[${sfn##*_}](${sfp})" >> artifact-list.md
+          done
+          echo "filelist<<EOF" >> $GITHUB_OUTPUT
+          cat artifact-list.md >> $GITHUB_OUTPUT
+          echo "Download [artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts)" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - run: |
+          echo "Token length: ${{ secrets.ZUI_PAT_TOKEN }}"
+          
+      - uses: peter-evans/create-or-update-comment@v3
+        with:
+          token: ${{ secrets.ZUI_PAT_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: ${{ steps.aggregate.outputs.filelist }}
