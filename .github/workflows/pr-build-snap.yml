@@ -72,7 +72,7 @@ jobs:
         id: finfo
         with:
           name: ${{ steps.snap.outputs.finfo }}
-          path: ./${{ steps.snap.outputs.finfo }}
+          path: ./
           overwrite: true
           
   post_comment:
