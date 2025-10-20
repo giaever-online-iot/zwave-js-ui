@@ -58,10 +58,11 @@ jobs:
           path: ${{ steps.snapcraft.outputs.snap }}
 
       - name: Persist artifact URL to env
-        run: echo "ARTIFACT_URL_${{ matrix.platform }}=${{ steps.upload.outputs.artifact-url }}" >> $GITHUB_ENV
+        run: | 
+          FINFO="${{ steps.build.outputs.filename }}.finfo"
+          echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform}}'}" | yq -oj -I0 -i "${FINFO}"
+          echo "FINFO: $(cat "${FINFO})"
 
-      - name: Use the saved URL
-        run: echo "A_U_${{ matrix.platform }} is $(echo "${ARTIFACT_URL_${{ matrix.platform }}}" )"
           
   post_comment:
     runs-on: ubuntu-latest
