@@ -63,10 +63,12 @@ jobs:
           FINFO="${{ steps.build.outputs.filename }}.finfo"
           echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform}}'}" | yq -oj -I0 > "${FINFO}"
           echo "finfo=$(cat "${FINFO}")" >> $GITHUB_OUTPUT
+          echo "finfo_fn=${FINFO}" >> $GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
         with:
-          path: ${{ steps.build.output.filename }}
+          name: ${{ steps.snap.outputs.finfo_fn }}
+          path: ${{ steps.snap.outputs.finfo }}
 
           
   post_comment:
