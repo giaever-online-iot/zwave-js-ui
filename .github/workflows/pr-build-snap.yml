@@ -76,7 +76,7 @@ jobs:
           done
           echo "filelist<<EOF" >> $GITHUB_OUTPUT
           cat artifact-list.md >> $GITHUB_OUTPUT
-          echo "Download [artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts)" >> $GITHUB_TOKEN
+          echo "Download [artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts)" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           
       - uses: peter-evans/create-or-update-comment@v3
