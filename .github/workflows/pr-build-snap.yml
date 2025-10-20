@@ -78,12 +78,8 @@ jobs:
           cat artifact-list.md >> $GITHUB_OUTPUT
           echo "Download [artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts)" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
-      - run: |
-          echo "Token length: ${{ secrets.ZUI_PAT_TOKEN }}"
           
       - uses: peter-evans/create-or-update-comment@v5
         with:
-          token: ${{ secrets.ZUI_PAT_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
           body: ${{ steps.aggregate.outputs.filelist }}
