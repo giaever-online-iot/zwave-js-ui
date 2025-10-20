@@ -64,7 +64,7 @@ jobs:
           echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform}}'}" | yq -oj -I0 > "${FINFO}"
           echo "finfo=$(cat "${FINFO}")" >> $GITHUB_OUTPUT
 
-      - uses: action/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           path: ${{ steps.build.output.filename }}
 
@@ -82,15 +82,15 @@ jobs:
       - name: Aggregate artifact infos
         id: aggregate
         run: |
-          echo "Artifacts builds:" > artifact-list.md
-          for sfp in artifacts/*.snap; do
-            sfn=$(basename "${sfp}")
-            echo "[${sfn##*_}](${sfp})" >> artifact-list.md
+          echo "Artifacts built:" > artifact-list.md
+          for sfi in artifacts/*.snap.finfo; do
+            sfn=
+            echo "- [$(cat "${sfi}" | yq '.name')]($(cat "${sfi}" | yq '.url')) ("$(cat "${sfi}" | yq '.arch'))" >> artifact-list.md
           done
           echo "filelist<<EOF" >> $GITHUB_OUTPUT
           cat artifact-list.md >> $GITHUB_OUTPUT
-          echo "Download [artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts)" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+          cat artifact-list.md
           
       - uses: peter-evans/create-or-update-comment@v5
         with:
