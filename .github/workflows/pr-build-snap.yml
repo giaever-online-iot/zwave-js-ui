@@ -28,6 +28,9 @@ jobs:
       matrix:
         platform: ${{ fromJson(needs.extract.outputs.platforms) }}
       fail-fast: true
+    outputs:
+      artifact_url: ${{ steps.upload.outputs.artifact-url }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -61,16 +64,16 @@ jobs:
       - name: Persist artifact URL to env
         id: snap
         run: | 
-          FINFO="${{ steps.build.outputs.filename }}.finfo"
-          echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform}}'}" | yq -oj -I0 > "${FINFO}"
+          FINFO="${{ steps.build.outputs.filename }}.finfo.json"
+          echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform}}'}" | yq '.' -oj -I0 > "${FINFO}"
           cat "${FINFO}"
-          cat "${FINFO}" > "${FINFO}"
           echo "finfo=${FINFO}" >> $GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
+        id: fiul
         with:
           name: ${{ steps.snap.outputs.finfo }}
-          path: ${{ steps.snap.outputs.finfo }}
+          path: ./${{ steps.snap.outputs.finfo }}
           overwrite: true
           
   post_comment:
