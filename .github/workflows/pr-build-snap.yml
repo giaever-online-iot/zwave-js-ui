@@ -62,7 +62,7 @@ jobs:
           FINFO="${{ steps.build.outputs.filename }}.finfo"
           touch "${FINFO}"
           echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform}}'}" | yq -oj -I0 -i "${FINFO}"
-          echo "FINFO: $(cat "${FINFO})"
+          echo "FINFO: $(cat "${FINFO}")"
 
           
   post_comment:
