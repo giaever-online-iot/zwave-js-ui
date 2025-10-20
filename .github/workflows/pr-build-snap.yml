@@ -60,8 +60,7 @@ jobs:
       - name: Persist artifact URL to env
         run: | 
           FINFO="${{ steps.build.outputs.filename }}.finfo"
-          touch "${FINFO}"
-          echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform}}'}" | yq -oj -I0 -i "${FINFO}"
+          echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform}}'}" | yq -oj -I0 > "${FINFO}"
           echo "FINFO: $(cat "${FINFO}")"
 
           
