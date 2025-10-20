@@ -91,7 +91,9 @@ jobs:
           ls artifacts/*
           echo "filelist<<EOF" >> $GITHUB_OUTPUT
           echo "Artifacts built:" >> $GITHUB_OUTPUT 
-          for sfi in artifacts/*.finfo.json; do
+          for sfi in artifacts/*.finfo.json; doo
+            echo "${sfi}"
+            cat ${sfi}
             echo "- $(cat "${sfi}" | yq '.arch'): [$(cat "${sfi}" | yq '.name')]( $(cat "${sfi}" | yq '.url') )"
           done
           echo "EOF" >> $GITHUB_OUTPUT
