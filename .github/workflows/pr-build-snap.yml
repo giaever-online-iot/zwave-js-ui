@@ -58,10 +58,15 @@ jobs:
           path: ${{ steps.snapcraft.outputs.snap }}
 
       - name: Persist artifact URL to env
+        id: snap
         run: | 
           FINFO="${{ steps.build.outputs.filename }}.finfo"
           echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform}}'}" | yq -oj -I0 > "${FINFO}"
-          echo "FINFO: $(cat "${FINFO}")"
+          echo "finfo=$(cat "${FINFO}")" >> $GITHUB_OUTPUT
+
+      - uses: action/upload-artifact@v4
+        with:
+          path: ${{ steps.build.output.filename }}
 
           
   post_comment:
