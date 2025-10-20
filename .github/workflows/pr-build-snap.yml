@@ -61,7 +61,7 @@ jobs:
         run: echo "ARTIFACT_URL_${{ matrix.platform }}=${{ steps.upload.outputs.artifact-url }}" >> $GITHUB_ENV
 
       - name: Use the saved URL
-        run: echo "A_U_${{ matrix.platform }} is ${ARTIFACT_URL_${{ matrix.platform }}}"
+        run: echo "A_U_${{ matrix.platform }} is $(echo "${ARTIFACT_URL_${{ matrix.platform }}}" )"
           
   post_comment:
     runs-on: ubuntu-latest
