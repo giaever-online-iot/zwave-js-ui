@@ -52,7 +52,7 @@ jobs:
           echo "filename=$(basename "${{ steps.snapcraft.outputs.snap }}")" >> $GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
-        id: uploads
+        id: upload
         with:
           name: ${{ steps.build.outputs.filename }}
           path: ${{ steps.snapcraft.outputs.snap }}
