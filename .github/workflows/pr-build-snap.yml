@@ -64,16 +64,14 @@ jobs:
       - name: Persist artifact URL to env
         id: snap
         run: | 
-          FINFO="${{ steps.build.outputs.filename }}.finfo.json"
-          echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform}}'}" | yq '.' -oj -I0 > "${FINFO}"
+          FINFO="${{ steps.build.outputs.filename }}.txt"
+          echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform }}'}" | yq '.' -oj -I0 > "${FINFO}"
           echo "finfo=${FINFO}" >> $GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
         id: finfo
         with:
           name: ${{ steps.snap.outputs.finfo }}
-          path: ${{ steps.snap.outputs.finfo }}
-          overwrite: true
           
   post_comment:
     runs-on: ubuntu-latest
