@@ -66,11 +66,10 @@ jobs:
         run: | 
           FINFO="${{ steps.build.outputs.filename }}.finfo.json"
           echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform}}'}" | yq '.' -oj -I0 > "${FINFO}"
-          cat "${FINFO}"
           echo "finfo=${FINFO}" >> $GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
-        id: fiul
+        id: finfo
         with:
           name: ${{ steps.snap.outputs.finfo }}
           path: ./${{ steps.snap.outputs.finfo }}
@@ -91,7 +90,7 @@ jobs:
         run: |
           echo "filelist<<EOF" >> $GITHUB_OUTPUT
           echo "Artifacts built:" >> $GITHUB_OUTPUT 
-          for sfi in artifacts/*.snap.finfo.json; do
+          for sfi in artifacts/*.finfo.json; do
             echo "- $(cat "${sfi}" | yq '.arch'): [$(cat "${sfi}" | yq '.name')]( $(cat "${sfi}" | yq '.url') )"
           done
           echo "EOF" >> $GITHUB_OUTPUT
