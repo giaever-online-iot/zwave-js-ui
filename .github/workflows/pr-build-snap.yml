@@ -71,6 +71,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         id: finfo
         with:
+          name: ${{ steps.snap.outputs.finfo }}
           path: ./${{ steps.snap.outputs.finfo }}
           overwrite: true
           
