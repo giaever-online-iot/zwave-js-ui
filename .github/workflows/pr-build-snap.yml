@@ -88,6 +88,7 @@ jobs:
       - name: Aggregate artifact infos
         id: aggregate
         run: |
+          ls artifacts/*
           echo "filelist<<EOF" >> $GITHUB_OUTPUT
           echo "Artifacts built:" >> $GITHUB_OUTPUT 
           for sfi in artifacts/*.finfo.json; do
