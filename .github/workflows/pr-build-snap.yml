@@ -123,12 +123,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          collaborators=$(curl -s \
+          coll=$(curl -s \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/collaborators?per_page=10")
-          reviewers=$(echo "$collaborators" | jq -r '.[] | select(.permissions.push == true or .permissions.admin == true or .permissions.maintain == true) | .login' | paste -sd "," -)
-          echo "reviewers=$reviewers" >> $GITHUB_OUTPUT
+          echo "${coll}"
+          rev=$(echo "$coll" | jq -r '.[] | select(.permissions.push == true or .permissions.admin == true or .permissions.maintain == true) | .login' | paste -sd "," -)
+          echo "${rev}"
+          echo "reviewers=$rev" >> $GITHUB_OUTPUT
 
       - name: Assign reviewers on PR
         if: ${{ success() }}
