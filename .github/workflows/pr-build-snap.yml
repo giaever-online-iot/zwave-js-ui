@@ -59,7 +59,7 @@ jobs:
         id: upload
         with:
           name: ./pkg/${{ steps.build.outputs.filename }}
-          path: ./pkg/${{ steps.snapcraft.outputs.snap }}
+          path: ${{ github.workspace }}/pkg/${{ steps.snapcraft.outputs.snap }}
 
       - name: Persist artifact URL to env
         id: snap
