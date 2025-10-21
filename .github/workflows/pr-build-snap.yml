@@ -120,12 +120,11 @@ jobs:
           reviewers=$(echo "$collaborators" | jq -r '.[] | select(.permissions.push == true or .permissions.admin == true or .permissions.maintain == true) | .login' | paste -sd "," -)
           echo "reviewers=$reviewers" >> $GITHUB_OUTPUT
 
-      - name: Request review from collaborators
-        uses: hmarr/auto-request-review@v2
+      - name: Assign reviewers on PR
+        uses: hkusu/review-assign-action@v1
         with:
           reviewers: ${{ steps.get_collaborators.outputs.reviewers }}
-          pr: ${{ github.event.pull_request.number }}
-
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
   notify-failure:
     runs-on: ubuntu-latest
