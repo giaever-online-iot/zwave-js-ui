@@ -91,7 +91,7 @@ jobs:
         id: aggregate
         run: |
           set +x
-          ls -al ./artifacs
+          ls -al ./pkg
           find ./ -name "*.json"
 
           #for sfi in find ./ -name "*.json"; do
