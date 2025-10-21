@@ -38,7 +38,8 @@ jobs:
     
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v3
-        with: # see 
+        with: 
+          # see 
           # https://github.com/tonistiigi/binfmt/issues/215
           # https://bugs.launchpad.net/ubuntu/+source/qemu/+bug/2096782
           image: 'tonistiigi/binfmt:master'
@@ -60,7 +61,6 @@ jobs:
         with:
           name: ${{ steps.build.outputs.filename }}
           path: ${{ github.workspace }}/pkg
-          #${{ steps.build.outputs.filename }}
 
       - name: Persist artifact URL to env
         id: snap
@@ -76,7 +76,6 @@ jobs:
         with:
           name: ${{ steps.snap.outputs.finfo }}
           path: ${{ github.workspace }}/pkg
-          #${{ steps.snap.outputs.finfo }}
           
   post_comment:
     runs-on: ubuntu-latest
@@ -91,11 +90,8 @@ jobs:
       - name: Aggregate artifact infos
         id: aggregate
         run: |
-          set +x
-          ls -al ./pkg
           JSONS="$(find ./ -type f -name "*.json")"
           echo "${JSONS}"
-
           echo "Packages built successfully!" > filelist.md
           for sfi in ${JSONS}; do
             MD="- $(cat "${sfi}" | yq '.arch'): [$(cat "${sfi}" | yq '.name')]($(cat "${sfi}" | yq '.url'))"
