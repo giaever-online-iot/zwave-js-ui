@@ -59,7 +59,8 @@ jobs:
         id: upload
         with:
           name: ${{ steps.build.outputs.filename }}
-          path: ${{ github.workspace }}/pkg/${{ steps.build.outputs.filename }}
+          path: ${{ github.workspace }}/pkg
+          #${{ steps.build.outputs.filename }}
 
       - name: Persist artifact URL to env
         id: snap
