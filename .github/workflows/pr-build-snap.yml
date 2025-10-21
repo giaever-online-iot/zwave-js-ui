@@ -20,6 +20,7 @@ jobs:
           LAUNCHPAD_CREDENTIALS: ${{ secrets.LAUNCHPAD_CREDENTIALS }}
         run: |
           echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
+          #echo "platforms=$(echo "{'platforms': {'amd64': null}}" | yq e '.platforms | keys ' -o=j -I=0)" >> $GITHUB_OUTPUT
 
   build:
     needs: extract
@@ -28,6 +29,9 @@ jobs:
       matrix:
         platform: ${{ fromJson(needs.extract.outputs.platforms) }}
       fail-fast: true
+    outputs:
+      artifact_url: ${{ steps.upload.outputs.artifact-url }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -48,13 +52,31 @@ jobs:
       - name: Get basename of snap package
         id: build
         run: |
-          echo "${{ steps.snapcraft.outputs.snap }}"
+          mkdir -p pkg/ && mv -f "${{ steps.snapcraft.outputs.snap }}" "pkg/"
           echo "filename=$(basename "${{ steps.snapcraft.outputs.snap }}")" >> $GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
+        id: upload
         with:
           name: ${{ steps.build.outputs.filename }}
-          path: ${{ steps.snapcraft.outputs.snap }}
+          path: ${{ github.workspace }}/pkg
+          #${{ steps.build.outputs.filename }}
+
+      - name: Persist artifact URL to env
+        id: snap
+        run: | 
+          FINFO="$(FN="${{ steps.build.outputs.filename}}" && echo "${FN%.*}").json"
+          echo "${FINFO}"
+          echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform }}'}" | yq '.' -oj -I0 > "pkg/${FINFO}"
+          echo "finfo=${FINFO}" >> $GITHUB_OUTPUT
+
+      - run: echo "${{ steps.snap.outputs.finfo }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.snap.outputs.finfo }}
+          path: ${{ github.workspace }}/pkg
+          #${{ steps.snap.outputs.finfo }}
           
   post_comment:
     runs-on: ubuntu-latest
@@ -64,19 +86,25 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v5
         with:
-          path: ./artifacts
+          path: ./pkg
           
       - name: Aggregate artifact infos
         id: aggregate
         run: |
-          echo "Artifacts builds:" > artifact-list.md
-          for sfp in artifacts/*.snap; do
-            sfn=$(basename "${sfp}")
-            echo "[${sfn##*_}](${sfp})" >> artifact-list.md
+          set +x
+          ls -al ./pkg
+          JSONS="$(find ./ -type f -name "*.json")"
+          echo "${JSONS}"
+
+          echo "Packages built successfully!" > filelist.md
+          for sfi in ${JSONS}; do
+            MD="- $(cat "${sfi}" | yq '.arch'): [$(cat "${sfi}" | yq '.name')]($(cat "${sfi}" | yq '.url'))"
+            echo "${MD}"
+            echo "${MD}" >> filelist.md
           done
+
           echo "filelist<<EOF" >> $GITHUB_OUTPUT
-          cat artifact-list.md >> $GITHUB_OUTPUT
-          echo "Download [artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts)" >> $GITHUB_OUTPUT
+          cat filelist.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           
       - uses: peter-evans/create-or-update-comment@v5
