@@ -75,7 +75,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.snap.outputs.finfo }}
-          path: ./arch/${{ step.snap.outputs.finfo }}
+          path: ./arch/${{ steps.snap.outputs.finfo }}
           overwrite: false
           
   post_comment:
