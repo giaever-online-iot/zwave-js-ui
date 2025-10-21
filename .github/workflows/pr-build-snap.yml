@@ -53,13 +53,13 @@ jobs:
         id: build
         run: |
           mkdir -p pkg/ && mv -f "${{ steps.snapcraft.outputs.snap }}" "pkg/"
-          echo "filename=pkg/$(basename "${{ steps.snapcraft.outputs.snap }}")" >> $GITHUB_OUTPUT
+          echo "filename=$(basename "${{ steps.snapcraft.outputs.snap }}")" >> $GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
         id: upload
         with:
           name: ${{ steps.build.outputs.filename }}
-          path: ${{ github.workspace }}/${{ steps.build.outputs.filename }}
+          path: ${{ github.workspace }}/pkg/${{ steps.build.outputs.filename }}
 
       - name: Persist artifact URL to env
         id: snap
