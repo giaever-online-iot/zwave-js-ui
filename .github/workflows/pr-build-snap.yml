@@ -103,7 +103,9 @@ jobs:
             echo "${MD}" >> filelist.md
           done
 
-          echo "filelist=$(cat filelist.md)" >> $GITHUB_OUTPUT
+          echo "filelist<<EOF" >> $GITHUB_OUTPUT
+          cat filelist.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           
       - uses: peter-evans/create-or-update-comment@v5
         with:
