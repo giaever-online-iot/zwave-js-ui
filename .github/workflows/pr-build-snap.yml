@@ -52,14 +52,14 @@ jobs:
       - name: Get basename of snap package
         id: build
         run: |
-          mkdir -p pkg/ && mv -f "${{ steps.snapcraft.outputs.snap }}" "./pkg/"
-          echo "filename=$(basename "${{ steps.snapcraft.outputs.snap }}")" >> $GITHUB_OUTPUT
+          mkdir -p pkg/ && mv -f "${{ steps.snapcraft.outputs.snap }}" "pkg/"
+          echo "filename=pkg/$(basename "${{ steps.snapcraft.outputs.snap }}")" >> $GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
         id: upload
         with:
-          name: ./pkg/${{ steps.build.outputs.filename }}
-          path: ${{ github.workspace }}/pkg/${{ steps.snapcraft.outputs.snap }}
+          name: ${{ steps.build.outputs.filename }}
+          path: ${{ github.workspace }}/${{ steps.build.outputs.filename }}
 
       - name: Persist artifact URL to env
         id: snap
@@ -75,7 +75,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.snap.outputs.finfo }}
-          path: ./${{ steps.snap.outputs.finfo }}
+          path: ${{ github.workspace }}/${{ steps.snap.outputs.finfo }}
           
   post_comment:
     runs-on: ubuntu-latest
