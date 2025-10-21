@@ -19,8 +19,8 @@ jobs:
         env:
           LAUNCHPAD_CREDENTIALS: ${{ secrets.LAUNCHPAD_CREDENTIALS }}
         run: |
-          # echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
-          echo "platforms=$(echo "{'platforms': {'amd64': null}}" | yq e '.platforms | keys ' -o=j -I=0)" >> $GITHUB_OUTPUT
+          echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
+          #echo "platforms=$(echo "{'platforms': {'amd64': null}}" | yq e '.platforms | keys ' -o=j -I=0)" >> $GITHUB_OUTPUT
 
   build:
     needs: extract
