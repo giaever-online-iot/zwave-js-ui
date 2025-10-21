@@ -92,8 +92,8 @@ jobs:
         id: aggregate
         run: |
           set +x
-          ls -al ./ 
-          $JSONS=$(find ./ -type f -name "*.json")
+          ls -al ./pkg
+          JSONS="$(find ./ -type f -name "*.json")"
           echo "${JSONS}"
 
           echo "Packages built successfully!" > filelist.md
