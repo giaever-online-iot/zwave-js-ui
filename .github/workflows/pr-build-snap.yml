@@ -124,7 +124,7 @@ jobs:
         uses: hkusu/review-assign-action@v1
         with:
           reviewers: ${{ steps.get_collaborators.outputs.reviewers }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   notify-failure:
     runs-on: ubuntu-latest
