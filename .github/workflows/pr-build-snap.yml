@@ -121,10 +121,10 @@ jobs:
           echo "reviewers=$reviewers" >> $GITHUB_OUTPUT
 
       - name: Request review from collaborators
-        uses: peter-evans/request-review@v2
+        uses: hmarr/auto-request-review@v2
         with:
           reviewers: ${{ steps.get_collaborators.outputs.reviewers }}
-          issue-number: ${{ github.event.pull_request.number }}
+          pr: ${{ github.event.pull_request.number }}
 
 
   notify-failure:
