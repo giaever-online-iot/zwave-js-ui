@@ -141,5 +141,5 @@ jobs:
         if: ${{ failure() }}
         uses: hkusu/review-assign-action@v1
         with:
-          reviewers: []
+          reviewers: ""
           github-token: ${{ secrets.GITHUB_TOKEN }}
