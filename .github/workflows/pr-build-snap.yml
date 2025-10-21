@@ -125,8 +125,15 @@ jobs:
           echo "reviewers=$reviewers" >> $GITHUB_OUTPUT
 
       - name: Assign reviewers on PR
+        if: ${{ success() }}
         uses: hkusu/review-assign-action@v1
         with:
-          reviewers: ${{ success() ? steps.get_collaborators.outputs.reviewers : "" }}
+          reviewers: ${{ steps.get_collaborators.outputs.reviewers }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Assign reviewers on PR
+        if: ${{ !success() }}
+        uses: hkusu/review-assign-action@v1
+        with:
+          reviewers: []
+          github-token: ${{ secrets.GITHUB_TOKEN }}
