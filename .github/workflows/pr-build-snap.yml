@@ -66,8 +66,8 @@ jobs:
         run: | 
           FINFO="$(FN="${{ steps.build.outputs.filename}}" && echo "${FN%.*}").json"
           echo "${FINFO}"
-          echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform }}'}" | yq '.' -oj -I0 > "${FINFO}"
-          cat "${FINFO}"
+          echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform }}'}" | yq '.' -oj -I0 > "pkg/${FINFO}"
+          cat "pkg/${FINFO}"
           echo "finfo=${FINFO}" >> $GITHUB_OUTPUT
 
       - run: echo "${{ steps.snap.outputs.finfo }}"
