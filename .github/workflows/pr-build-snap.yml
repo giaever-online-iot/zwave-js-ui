@@ -75,7 +75,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.snap.outputs.finfo }}
-          path: ${{ github.workspace }}/${{ steps.snap.outputs.finfo }}
+          path: ${{ github.workspace }}/pkg/${{ steps.snap.outputs.finfo }}
           
   post_comment:
     runs-on: ubuntu-latest
@@ -85,7 +85,7 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v5
         with:
-          path: ./artifacts
+          path: ./pkg
           
       - name: Aggregate artifact infos
         id: aggregate
