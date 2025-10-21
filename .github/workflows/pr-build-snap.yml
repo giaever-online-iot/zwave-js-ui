@@ -68,7 +68,6 @@ jobs:
           FINFO="$(FN="${{ steps.build.outputs.filename}}" && echo "${FN%.*}").json"
           echo "${FINFO}"
           echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform }}'}" | yq '.' -oj -I0 > "pkg/${FINFO}"
-          cat "pkg/${FINFO}"
           echo "finfo=${FINFO}" >> $GITHUB_OUTPUT
 
       - run: echo "${{ steps.snap.outputs.finfo }}"
@@ -93,13 +92,17 @@ jobs:
         id: aggregate
         run: |
           set +x
-          ls -al ./pkg
-          find ./ -name "*.json"
+          $JSONS=$(find ./pkg -type f -name "*.json")
+          echo "${JSONS}"
 
-          #for sfi in find ./ -name "*.json"; do
-          #  echo "${sfi}"
-          #  echo "- $(cat "${sfi}" | yq '.arch'): [$(cat "${sfi}" | yq '.name')]( $(cat "${sfi}" | yq '.url') )"
-          #done
+          echo "Packages built successfully!" > filelist.md
+          for sfi in ${JSONS}; do
+            MD="- $(cat "${sfi}" | yq '.arch'): [$(cat "${sfi}" | yq '.name')]($(cat "${sfi}" | yq '.url'))"
+            echo "${MD}"
+            echo "${MD}" >> filelist.md
+          done
+
+          echo "filelist=$(cat filelist.md)" >> $GITHUB_OUTPUT
           
       - uses: peter-evans/create-or-update-comment@v5
         with:
