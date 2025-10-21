@@ -105,10 +105,11 @@ jobs:
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            ${{ 
-              success() && steps.aggregate.outputs.filelist || 
-              format('Hey @{}, the build has failed. Please check the build logs and update your PR accordingly.', github.event.pull_request.user.login)
-            }}
+            ${{ success() ? 
+              steps.aggregate.outputs.filelist 
+            : format(
+              'Hey @{}, the build has failed. Please check the build logs and update your PR accordingly.', github.event.pull_request.user.login
+            )}}
 
       - name: Get repo collaborators with write or higher access
         if: ${{ success() }}
@@ -126,6 +127,6 @@ jobs:
       - name: Assign reviewers on PR
         uses: hkusu/review-assign-action@v1
         with:
-          reviewers: ${{ success_() && steps.get_collaborators.outputs.reviewers || "[]" }}
+          reviewers: ${{ success_() ? steps.get_collaborators.outputs.reviewers : "[]" }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
