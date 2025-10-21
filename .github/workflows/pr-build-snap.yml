@@ -92,7 +92,7 @@ jobs:
         id: aggregate
         run: |
           set +x
-          ls -al ./
+          ls -al ./arch
           find ./ -name "*.json"
 
           #for sfi in find ./ -name "*.json"; do
