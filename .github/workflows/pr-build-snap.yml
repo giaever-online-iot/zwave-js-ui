@@ -127,6 +127,6 @@ jobs:
       - name: Assign reviewers on PR
         uses: hkusu/review-assign-action@v1
         with:
-          reviewers: ${{ success() ? steps.get_collaborators.outputs.reviewers : "[]" }}
+          reviewers: ${{ success() ? steps.get_collaborators.outputs.reviewers : format("[]") }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
