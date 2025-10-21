@@ -100,16 +100,22 @@ jobs:
           cat filelist.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Post success or failure comment
+      - name: Post success comment
+        if: ${{ success() }}
+        uses: peter-evans/create-or-update-comment@v5
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: ${{ steps.aggregate.outputs.filelist }}
+
+      - name: Post failure comment
+        if: ${{ failure() }}
         uses: peter-evans/create-or-update-comment@v5
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            ${{ success() ? 
-              steps.aggregate.outputs.filelist 
-            : format(
-              'Hey @{}, the build has failed. Please check the build logs and update your PR accordingly.', github.event.pull_request.user.login
-            )}}
+            Hey @${{ github.event.pull_request.user.login }}, the build has failed.  
+            Please check the build logs and update your PR accordingly.
+
 
       - name: Get repo collaborators with write or higher access
         if: ${{ success() }}
@@ -132,7 +138,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Assign reviewers on PR
-        if: ${{ !success() }}
+        if: ${{ failure() }}
         uses: hkusu/review-assign-action@v1
         with:
           reviewers: []
