@@ -59,7 +59,7 @@ jobs:
         with:
           name: ${{ steps.build.outputs.filename }}
           path: ${{ steps.snapcraft.outputs.snap }}
-          overwrite: yes
+          overwrite: true
 
       - name: Persist artifact URL to env
         id: snap
@@ -75,7 +75,7 @@ jobs:
         with:
           name: ${{ steps.snap.outputs.finfo }}
           path: ${{ steps.snap.outputs.finfo }}
-          overwrite: no
+          overwrite: false
           
   post_comment:
     runs-on: ubuntu-latest
