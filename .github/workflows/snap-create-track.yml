@@ -14,7 +14,7 @@ jobs:
       snap: zwave-js-ui
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Snapcraft CLI
         run: |
