@@ -19,8 +19,8 @@ jobs:
         env:
           LAUNCHPAD_CREDENTIALS: ${{ secrets.LAUNCHPAD_CREDENTIALS }}
         run: |
-          #echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
-          echo "platforms=$(echo "{'platforms': {'amd64': null}}" | yq e '.platforms | keys ' -o=j -I=0)" >> $GITHUB_OUTPUT
+          echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
+          #echo "platforms=$(echo "{'platforms': {'amd64': null}}" | yq e '.platforms | keys ' -o=j -I=0)" >> $GITHUB_OUTPUT
 
   build:
     needs: extract
@@ -29,6 +29,9 @@ jobs:
       matrix:
         platform: ${{ fromJson(needs.extract.outputs.platforms) }}
       fail-fast: true
+    outputs:
+      artifact_url: ${{ steps.upload.outputs.artifact-url }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -84,7 +87,6 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           path: ./pkg
-
       - name: Aggregate artifact infos
         if: ${{ success() }}
         id: aggregate
