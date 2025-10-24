@@ -5,6 +5,7 @@ on:
     workflows: ["PR Build Snap"]
     types:
       - completed
+    workflow_dispatch:  # Add this for manual testing
 
 jobs:
   create-track:
