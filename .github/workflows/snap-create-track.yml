@@ -1,0 +1,32 @@
+name: Create Snap Track
+
+on:
+  workflow_run:
+    workflows: ["PR Build Snap"]
+    types:
+      - completed
+
+jobs:
+  create-track:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      snap: zwave-js-ui
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Snapcraft CLI
+        run: |
+          sudo snap install snapcraft --classic
+
+      - name: Retrive current tracks, version etc
+        id: tracks
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        run:
+          tracks=$(snapcraft list-tracks zwave-js-ui)
+          echo "${tracks}"
+          echo "tracks=${tracks}" >> $GITHUB_OUTPUT
+          version=$(yq '.version' snap/snapcraft.yaml)
+          echo "${version}"
