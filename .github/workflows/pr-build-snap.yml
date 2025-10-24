@@ -29,9 +29,6 @@ jobs:
       matrix:
         platform: ${{ fromJson(needs.extract.outputs.platforms) }}
       fail-fast: true
-    outputs:
-      artifact_url: ${{ steps.upload.outputs.artifact-url }}
-      artifact_id: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
