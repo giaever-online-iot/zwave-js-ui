@@ -30,3 +30,4 @@ jobs:
           echo "tracks=${tracks}" >> $GITHUB_OUTPUT
           version=$(yq '.version' snap/snapcraft.yaml)
           echo "${version}"
+          echo "yes"
