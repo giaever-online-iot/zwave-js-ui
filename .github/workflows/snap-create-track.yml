@@ -3,8 +3,8 @@ name: Create Snap Track
 on:
   workflow_run:
     workflows: ["PR Build Snap"]
-    types:
-      - completed
+    #types:
+    #  - completed
     workflow_dispatch:  # Add this for manual testing
 
 jobs:
@@ -27,8 +27,15 @@ jobs:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
           tracks=$(snapcraft list-tracks zwave-js-ui)
-          echo "${tracks}"
-          # echo "tracks=${tracks}" >> $GITHUB_OUTPUT
-          version=$(yq '.version' snap/snapcraft.yaml)
-          echo "version=${version}" >> $GITHUB_OUTPUT
-          echo "yes"
+          echo "all: ${tracks}"
+          echo "all=$(echo "${traks}" | awk 'NR > 1 && $1 ~ /^v/ {print $1}' | paste -sd, - | sed 's/.*/[&]/' | yq '.' -oj -I0)" >> $GITHUB_OUTPUT
+          echo "default=$(echo "${tracks}" | grep default | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "current=$(yq '.version' snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
+
+      - name: Output test
+        run: |
+          echo "${{ steps.tracks.outputs.all }}"
+          echo "${{ steps.tracks.outputs.all }}" | yq '.' -oj
+
+          echo "Default: ${{ steps.tracks.outputs.default }}"
+          echo "Current: ${{ steps.tracks.outputs.current }}"
