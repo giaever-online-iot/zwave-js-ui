@@ -5,6 +5,7 @@ on:
     workflows: ["PR Build Snap"]
     types:
       - completed
+    workflow_dispatch:  # Add this for manual testing
 
 jobs:
   create-track:
@@ -24,9 +25,10 @@ jobs:
         id: tracks
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-        run:
+        run: |
           tracks=$(snapcraft list-tracks zwave-js-ui)
           echo "${tracks}"
           echo "tracks=${tracks}" >> $GITHUB_OUTPUT
           version=$(yq '.version' snap/snapcraft.yaml)
-          echo "${version}"
+          echo "version=${version}" >> $GITHUB_OUTPUT
+          echo "yes"
