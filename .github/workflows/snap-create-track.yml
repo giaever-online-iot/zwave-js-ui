@@ -28,7 +28,7 @@ jobs:
         run: |
           tracks=$(snapcraft list-tracks zwave-js-ui)
           echo "${tracks}"
-          echo "tracks=${tracks}" >> $GITHUB_OUTPUT
+          # echo "tracks=${tracks}" >> $GITHUB_OUTPUT
           version=$(yq '.version' snap/snapcraft.yaml)
           echo "version=${version}" >> $GITHUB_OUTPUT
           echo "yes"
