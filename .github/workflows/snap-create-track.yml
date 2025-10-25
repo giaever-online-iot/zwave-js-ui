@@ -25,7 +25,7 @@ jobs:
         id: tracks
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-        run:
+        run: |
           tracks=$(snapcraft list-tracks zwave-js-ui)
           echo "${tracks}"
           echo "tracks=${tracks}" >> $GITHUB_OUTPUT
