@@ -33,7 +33,7 @@ jobs:
           echo "current=$(yq '.version' snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
 
       - name: Output test
-        run:
+        run: |
           echo "${{ steps.tracks.outputs.all }}"
           echo "${{ steps.tracks.outputs.all }}" | yq '.' -oj
 
