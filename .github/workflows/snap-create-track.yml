@@ -55,7 +55,7 @@ jobs:
               -d "track-name=v${1}"
           }
 
-          if [[ -z "$(cat "${all}" | yq '.. | select(. == env(vc))')" ]]; then
+          if [[ -z "$(echo "${all}" | yq '.. | select(. == env(vc))')" ]]; then
             # create track for vc
             create_track "${vc}"
           fi
