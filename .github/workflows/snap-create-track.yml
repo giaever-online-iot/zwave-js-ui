@@ -73,7 +73,7 @@ jobs:
             snapcraft set-default-track -v zwave-js-ui "v${nvd}"
           else
             echo "NVD is ${nvd}, VD is ${vd}, VC is ${vc}: No new track to set default"
-            snapcraft set-default-track -v zwave-js-ui "${vd}"
+            snapcraft set-default-track -v zwave-js-ui "v${vd}"
           fi
 
           export SNAPCRAFT_STORE_CREDENTIALS="${ secrets.SNAPCRAFT_STORE_CREDENTIALS }"
