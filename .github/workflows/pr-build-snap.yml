@@ -19,17 +19,14 @@ jobs:
       - name: Extract platforms from snapcraft.yaml
         id: extract
         run: |
-          #platforms=$(yq 'with_entries(.value = {})' <<< yq e '.platforms | keys |= ..' -oj -I0 snap/snapcraft.yaml)
-          #echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
-          #echo "platforms=$(echo "{'platforms': {'amd64': null}}" | yq e '.platforms | keys ' -o=j -I=0)" >> $GITHUB_OUTPUT
-
-          echo "platforms=$(yq '.platforms | keys |= ..' -oj -I0 snap/snapcraft.yaml | yq 'with_entries(.value = {})' -oj -I0)" >> $GITHUB_OUTPUT
+          echo "platforms=$(yq '.platforms | keys |= ..' -oj -I0 snap/snapcraft.yaml)" >>> $GITHUB_OUTPUT
 
       - name: Build for ${{ steps.extract.outputs.platforms }}
         id: build
         run: |
           set -x
-          platforms="$(echo "${{ steps.extract.outputs.platforms }}" | yq '.' -oj)"
+          platforms="$(echo "${{ steps.extract.outputs.platforms}}" | yq 'with_entries(.value = {})' -oj -I0)"
+          echo $platforms
           #echo ${{ steps.extract.outputs.platforms }} | yq '.' -oj
           #yq '.' -oj <<< "${{ steps.extract.outputs.platforms }}"
           #platforms="$(echo ${{ steps.extract.outputs.platforms }} | yq '.' -oj)"
