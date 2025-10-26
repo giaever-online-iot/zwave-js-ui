@@ -29,9 +29,10 @@ jobs:
         id: build
         run: |
           set -x
-          yq '.' -oj <<< "${{ steps.extract.outputs.platforms }}"
-          platforms="$(echo ${{ steps.extract.outputs.platforms }} | yq '.' -oj)"
-          yq '. | keys | join(",")' <<< $platforms 
+          echo "${{ steps.extract.outputs.platforms }}"
+          #yq '.' -oj <<< "${{ steps.extract.outputs.platforms }}"
+          #platforms="$(echo ${{ steps.extract.outputs.platforms }} | yq '.' -oj)"
+          #yq '. | keys | join(",")' <<< $platforms 
           exit 1
           #sudo snap install snapcraft --classic
           #export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}"
