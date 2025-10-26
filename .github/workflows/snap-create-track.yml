@@ -24,18 +24,61 @@ jobs:
       - name: Retrive current tracks, version etc
         id: tracks
         env:
+          SNAP_NAME: ${{ env.snap }}
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
           tracks="$(snapcraft list-tracks zwave-js-ui)"
           echo "all: ${tracks}"
-          echo "all=$(echo "${tracks}" | awk 'NR > 1 && $1 ~ /^v/ {print "\""substr($1, 2)"\""}' | paste -sd, - | sed 's/.*/[&]/'| yq '.' -oj -I0)" >> $GITHUB_OUTPUT
+
+          all="{}"
+          for track in $(echo "${tracks}" | awk 'NR > 1 && $1 ~ /^v/ {print substr($1, 2)}'); do 
+            export t="${track}" 
+            export v="${t/./}" 
+            all=$(echo $all | yq '. += {env(t): {"value": env(v)}}' -oj -I0)
+          done
+
+          echo "all=$(echo "${all}")" >> $GITHUB_OUTPUT
           echo "default=$(V="$(echo "${tracks}" | grep default | cut -d' ' -f1)" && echo "${V#v}")" >> $GITHUB_OUTPUT
           echo "current=$(V="$(yq '.version' snap/snapcraft.yaml)" && echo "${V#v}")" >> $GITHUB_OUTPUT
 
       - name: Output test
+        env:
+          SESSION_COOKIE: ${{ secrets.SNAPCRAFT_SESSION_COOKIE }}
         run: |
-          echo "${{ steps.tracks.outputs.all }}"
-          echo "${{ steps.tracks.outputs.all }}" | yq '.' -oj
+          set -x
+          all="${{ steps.tracks.outputs.all }}"
+          echo "${all}" | yq '.' -oj
 
-          echo "Default: ${{ steps.tracks.outputs.default }}"
-          echo "Current: ${{ steps.tracks.outputs.current }}"
+          vd="${{ steps.tracks.outputs.default }}"
+          vc="${{ steps.tracks.outputs.current }}"
+
+          function create_track {
+            curl -s -w "\nHTTP_CODE:%{http_code}\n" \
+              -X POST "https://snapcraft.io/${SNAP_NAME}/create-track" \
+              -H "Cookie: session=${SESSION_COOKIE};" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -H "Origin: https://snapcraft.io" \
+              -H "Referer: https://snapcraft.io/${SNAP_NAME}/releases" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -H "Origin: https://snapcraft.io" \
+              -H "Referer: https://snapcraft.io/${SNAP_NAME}/releases"
+              -d "track-name=${0}"
+          }
+
+          if [[ -z "$(cat "${all}" | yq '.. | select(. == env(vc))')" ]]; then
+            # create track for vc
+            create_track "${vc}"
+          fi
+
+          export major="${vc%.*}"
+          export minor="${vc#*.}"
+          nvd=$(echo $jtracks | yq '.versions[] | (select(
+            split(".") | .[0] | tonumber <= env(major) and split(".") | .[1] | tonumber < env(minor) or
+            split(".") | .[0] | tonumber < env(major)
+          ))' -oj | paste -sd, - | sed 's/.*/[&]/' | yq '.[-1]' -oj)
+
+          if [[ "${nvd}" != "${vc}" && "${nvd}" != "${vd}" ]]; then
+            echo "Set new track to ${nvd}"
+          else
+            echo "NVD is ${nvd}, VD is ${vd}, VC is ${vc}: No new track to set default"
+          fi
