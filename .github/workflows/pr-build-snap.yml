@@ -27,7 +27,7 @@ jobs:
         id: build
         run: |
           set -x
-          echo ${{ steps.extract.outputs.platforms }}
+          yq '.' -oj <<< "${{ steps.extract.outputs.platforms }}"
           platforms="$(echo ${{ steps.extract.outputs.platforms }} | yq '.' -oj)"
           yq '. | keys | join(",")' <<< $platforms 
           #sudo snap install snapcraft --classic
