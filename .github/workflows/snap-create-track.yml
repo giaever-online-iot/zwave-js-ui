@@ -68,7 +68,7 @@ jobs:
             split(".") | .[0] | tonumber < env(major)
           ))' -oj | paste -sd, - | sed 's/.*/[&]/' | yq '.[-1]' -oj)
 
-          if [[ "${nvd}" != "${vc}" && "${nvd}" != "${vd}" ]]; then
+          if [ "${nvd}" != "${vc}" && "${nvd}" != "${vd}" ]; then
             echo "Set new track to ${nvd}"
           else
             echo "NVD is ${nvd}, VD is ${vd}, VC is ${vc}: No new track to set default"
