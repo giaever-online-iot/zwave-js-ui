@@ -19,7 +19,7 @@ jobs:
       - name: Extract platforms from snapcraft.yaml
         id: extract
         run: |
-          echo "platforms=$(yq e '.platforms | keys |= ..' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
+          echo "platforms=$(yq e '.platforms | keys |= ..' -oj -I0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
           #echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
           #echo "platforms=$(echo "{'platforms': {'amd64': null}}" | yq e '.platforms | keys ' -o=j -I=0)" >> $GITHUB_OUTPUT
 
@@ -27,7 +27,7 @@ jobs:
         id: build
         run: |
           set -x
-          platforms="$(echo ${{ steps.extract.output.platforms }} | yq '.' -oj)"
+          platforms="$(echo ${{ steps.extract.outputs.platforms }} | yq '.' -oj)"
           yq '. | keys | join(",")' <<< $platforms 
           #sudo snap install snapcraft --classic
           #export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}"
