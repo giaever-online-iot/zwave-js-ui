@@ -12,7 +12,7 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     env:
-      snap: zwave-js-ui
+      SNAP_NAME: zwave-js-ui
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -24,7 +24,6 @@ jobs:
       - name: Retrive current tracks, version etc
         id: tracks
         env:
-          SNAP_NAME: "${snap }"
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
           tracks="$(snapcraft list-tracks zwave-js-ui)"
