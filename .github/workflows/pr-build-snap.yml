@@ -28,6 +28,8 @@ jobs:
           sudo snap install snapcraft --classic
           export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}"
           snapcraft whoami
+          mkdir -p ~/.local/share/snapcraft
+          echo "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
           snapcraft remote-build -v --launchpad-accept-public-upload \
             --build-for=$(echo "${{ steps.extract.outputs.platforms }}" | yq '. | join(",")') \
             --launchpad-timeout=10
