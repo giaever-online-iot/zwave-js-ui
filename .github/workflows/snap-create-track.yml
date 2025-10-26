@@ -60,7 +60,7 @@ jobs:
             create_track "${vc}"
           fi
 
-          export major="${vc%%.*})"
+          export major="${vc%%.*}"
           export minor="${vc##*.}"
 
           nvd=$(echo $all | yq '.[] | (select(
