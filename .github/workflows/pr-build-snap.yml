@@ -26,12 +26,6 @@ jobs:
         run: |
           set -x
           platforms="$(echo "${{ steps.extract.outputs.platforms}}" | yq 'to_entries | map({"key": .value, "value": {}}) | from_entries' -oj -I0)"
-          echo $platforms
-          #echo ${{ steps.extract.outputs.platforms }} | yq '.' -oj
-          #yq '.' -oj <<< "${{ steps.extract.outputs.platforms }}"
-          #platforms="$(echo ${{ steps.extract.outputs.platforms }} | yq '.' -oj)"
-          #yq '. | keys | join(",")' <<< $platforms 
-          exit 1
           #sudo snap install snapcraft --classic
           #export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}"
           #snapcraft whoami
@@ -41,10 +35,11 @@ jobs:
           #  --build-for=$(yq '. | keys | join(",")' <<< $platforms) #\
           #  #--launchpad-timeout=900
 
-          #for p in $(echo "${platforms}" | yq '. | keys | join(" ")'); do 
-          #  platforms=$(echo $platforms | path=".${p}.snf" val="$(ls -d "${PWD}"/zwave-js-ui*_${p}.snap)" yq 'eval(strenv(path)) = strenv(val)')
-          #  platforms=$(echo $platforms | path=".${p}.lfn" val="$(ls -d "${PWD}"/snapcraft-*_${p}_*.txt)" yq 'eval(strenv(path)) = strenv(val)')
-          #done
+          for p in $(echo "${platforms}" | yq '. | keys | join(" ")'); do 
+            echo $p
+            #platforms=$(echo $platforms | path=".${p}.snf" val="$(ls -d "${PWD}"/zwave-js-ui*_${p}.snap)" yq 'eval(strenv(path)) = strenv(val)')
+            #platforms=$(echo $platforms | path=".${p}.lfn" val="$(ls -d "${PWD}"/snapcraft-*_${p}_*.txt)" yq 'eval(strenv(path)) = strenv(val)')
+          done
 
           #echo "platforms=$(echo "${platforms}" | yq '.' -oj -I0)" >> $GITHUB_OUTPUT
 
