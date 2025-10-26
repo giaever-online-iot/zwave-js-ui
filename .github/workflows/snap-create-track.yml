@@ -39,8 +39,8 @@ jobs:
           all="${{ steps.tracks.outputs.all }}"
           echo "${all}"
 
-          #export vd="${{ steps.tracks.outputs.default }}"
-          #export vc="${{ steps.tracks.outputs.current }}"
+          export vd="${{ steps.tracks.outputs.default }}"
+          export vc="${{ steps.tracks.outputs.current }}"
 
           #function create_track {
           #  curl -s -w "\nHTTP_CODE:%{http_code}\n" \
@@ -60,13 +60,13 @@ jobs:
           #  create_track "${vc}"
           #fi
 
-          #export major="${vc%%.*}"
-          #export minor="${vc##*.}"
+          export major="${vc%%.*}"
+          export minor="${vc##*.}"
 
-          #nvd=$(echo $all | yq '.[] | (select(
-          #  split(".") | .[0] | tonumber <= env(major) and split(".") | .[1] | tonumber < env(minor) or
-          #  split(".") | .[0] | tonumber < env(major)
-          #))' -oj | paste -sd, - | sed 's/.*/[&]/' | yq '.[-1]' -oj)
+          nvd=$(echo $all | yq '.[] | (select(
+            split(".") | .[0] | tonumber <= env(major) and split(".") | .[1] | tonumber < env(minor) or
+            split(".") | .[0] | tonumber < env(major)
+          ))' -oj | paste -sd, - | sed 's/.*/[&]/' | yq '.[-1]' -oj)
 
           #if [[ "${nvd}" != "${vc}" && "${nvd}" != "${vd}" ]]; then
           #  echo "Set new track to ${nvd}"
