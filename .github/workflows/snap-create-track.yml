@@ -63,10 +63,10 @@ jobs:
           export major="${vc%%.*}"
           export minor="${vc##*.}"
 
-          nvd=$(echo "$all" | yq '.[] | tostring | (select(
+          nvd=$(echo "[$(echo "$all" | yq '.[] | tostring | (select(
             split(".") | .[0] | tonumber <= env(major) and split(".") | .[1] | tonumber < env(minor) or
             split(".") | .[0] | tonumber < env(major)
-          ))' -oj | yq '.[-1]' -oj)
+          ))' -oj | paste -sd,)]" | yq '.[-1])
 
           if [ "${nvd}" != "${vc}" -o "${nvd}" != "${vd}" ]; then
             echo "Set new track to ${nvd}"
