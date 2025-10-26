@@ -53,7 +53,7 @@ jobs:
               -H "Content-Type: application/x-www-form-urlencoded" \
               -H "Origin: https://snapcraft.io" \
               -H "Referer: https://snapcraft.io/${SNAP_NAME}/releases" \
-              -d "track-name=${0}"
+              -d "track-name=${1}"
           }
 
           if [[ -z "$(cat "${all}" | yq '.. | select(. == env(vc))')" ]]; then
