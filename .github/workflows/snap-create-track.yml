@@ -29,7 +29,7 @@ jobs:
         run: |
           tracks="$(snapcraft list-tracks zwave-js-ui)"
           echo "all: ${tracks}"
-          echo "all=$(echo "${tracks}" | awk 'NR > 1 && $1 ~ /^v/ {print "\""substr($1, 2)"\""}' | paste -sd, - | sed 's/.*/[&]/') | yq '.' -oj -I0" >> $GITHUB_OUTPUT
+          echo "all=$(echo "${tracks}" | awk 'NR > 1 && $1 ~ /^v/ {print "\""substr($1, 2)"\""}' | paste -sd, - | sed 's/.*/[&]/')" >> $GITHUB_OUTPUT
 
           echo "default=$(V="$(echo "${tracks}" | grep default | cut -d' ' -f1)" && echo "${V#v}")" >> $GITHUB_OUTPUT
           echo "current=$(V="$(yq '.version' snap/snapcraft.yaml)" && echo "${V#v}")" >> $GITHUB_OUTPUT
