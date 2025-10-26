@@ -56,7 +56,6 @@ jobs:
           }
 
           if [[ -z "$(echo "${all}" | yq '.. | select(. == env(vc))')" ]]; then
-            # create track for vc
             create_track "${vc}"
           fi
 
@@ -68,8 +67,10 @@ jobs:
             split(".") | .[0] | tonumber < env(major)
           ))' -oj | paste -sd,)]" | yq '.[-1]')
 
-          if [ "${nvd}" != "${vc}" -o "${nvd}" != "${vd}" ]; then
+          if [ "${nvd}" != "${vd}" ]; then
+            snapcraft set-default-track -v zwave-js-ui "${nvd}"
             echo "Set new track to ${nvd}"
           else
             echo "NVD is ${nvd}, VD is ${vd}, VC is ${vc}: No new track to set default"
+            snapcraft set-default-track -v zwave-js-ui "${vd}"
           fi
