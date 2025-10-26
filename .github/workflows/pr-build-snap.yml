@@ -25,7 +25,7 @@ jobs:
         id: build
         run: |
           set -x
-          platforms="$(echo "${{ steps.extract.outputs.platforms}}" | yq 'with_entries(.value = {})' -oj -I0)"
+          platforms="$(echo "${{ steps.extract.outputs.platforms}}" | yq 'to_entries | map({"key": .value, "value": {}}) | from_entries' -oj -I0)"
           echo $platforms
           #echo ${{ steps.extract.outputs.platforms }} | yq '.' -oj
           #yq '.' -oj <<< "${{ steps.extract.outputs.platforms }}"
