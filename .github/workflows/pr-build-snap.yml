@@ -10,17 +10,21 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       platforms: ${{ steps.extract.outputs.platforms }}
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
         
       - name: Extract platforms from snapcraft.yaml
         id: extract
-        env:
-          LAUNCHPAD_CREDENTIALS: ${{ secrets.LAUNCHPAD_CREDENTIALS }}
         run: |
           #echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
           echo "platforms=$(echo "{'platforms': {'amd64': null}}" | yq e '.platforms | keys ' -o=j -I=0)" >> $GITHUB_OUTPUT
+
+      - name: Build form ${{ steps.extract.outputs.platforms }}
+        run: |
+          snapcraft remote-build
 
 #  build:
 #    needs: extract
