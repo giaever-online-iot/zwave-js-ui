@@ -24,7 +24,9 @@ jobs:
 
       - name: Build form ${{ steps.extract.outputs.platforms }}
         run: |
+          set -x
           sudo snap install snapcraft --classic
+          export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}"
           snapcraft remote-build -v --launchpad-accept-public-upload
 
 #  build:
