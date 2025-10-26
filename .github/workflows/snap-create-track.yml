@@ -36,7 +36,7 @@ jobs:
       - name: Output test
         run: |
           set -x
-          all="$(echo "${{ steps.tracks.outputs.all }}" | yq '.' -oj -I0)
+          all="$(echo "${{ steps.tracks.outputs.all }}" | yq '.' -oj -I0)"
           echo "${all}"
 
           #export vd="${{ steps.tracks.outputs.default }}"
