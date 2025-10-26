@@ -67,7 +67,7 @@ jobs:
             split(".") | .[0] | tonumber < env(major)
           ))' -oj | paste -sd,)]" | yq '.[-1]')
 
-          if [ "${nvd}" != "${vd}" ]; then
+          if [ "${nvd}" != "${vd}" -a "${nvd}" != "${vc}" ]; then
             export SNAPCRAFT_STORE_CREDENTIALS="$(echo "${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}")"
             snapcraft set-default-track -v zwave-js-ui "v${nvd}"
             echo "Set new track to ${nvd}"
