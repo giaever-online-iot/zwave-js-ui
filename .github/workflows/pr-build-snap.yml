@@ -34,7 +34,7 @@ jobs:
           echo "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
           snapcraft remote-build -v --launchpad-accept-public-upload \
             --build-for=$(echo "${{ steps.extract.outputs.platforms }}" | yq '. | join(",")') \
-            --launchpad-timeout=10
+            --launchpad-timeout=900
 #  build:
 #    needs: extract
 #    runs-on: ubuntu-latest
