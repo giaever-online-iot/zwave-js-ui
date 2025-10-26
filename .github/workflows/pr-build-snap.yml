@@ -22,12 +22,12 @@ jobs:
           #echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
           echo "platforms=$(echo "{'platforms': {'amd64': null}}" | yq e '.platforms | keys ' -o=j -I=0)" >> $GITHUB_OUTPUT
 
-      - name: Build form ${{ steps.extract.outputs.platforms }}
+      - name: Build for ${{ steps.extract.outputs.platforms }}
         run: |
           set -x
           sudo snap install snapcraft --classic
           export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}"
-          snapcraft remote-build -v --launchpad-accept-public-upload
+          snapcraft remote-build -v --launchpad-accept-public-upload --build-for=$(echo "${{ steps.extract.outputs.platforms }}" | yq '. | join(",")')
 
 #  build:
 #    needs: extract
