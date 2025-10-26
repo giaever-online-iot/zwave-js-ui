@@ -36,7 +36,7 @@ jobs:
             --build-for=$(echo "${{ steps.extract.outputs.platforms }}" | yq '. | join(",")') #\
             #--launchpad-timeout=900
 
-          echo "builds=$(ls -d "$PWD"/*.snap | awk 'NR > 0 && $1 ~ /^\// {print "\""$1"\""}' | paste -sd, - | sed 's/.*/[&]/')" >> $GITHUB_CONTENT
+          echo "builds=$(ls -d "$PWD"/*.snap | awk 'NR > 0 && $1 ~ /^\// {print "\""$1"\""}' | paste -sd, - | sed 's/.*/[&]/')" >> $GITHUB_OUTPUT
           echo "${{ steps.build.outputs.builds }}"
 
   upload:
