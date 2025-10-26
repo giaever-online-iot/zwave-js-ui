@@ -20,7 +20,7 @@ jobs:
         id: extract
         run: |
           #echo "platforms=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
-          echo "platforms=$(echo "['amd64']" | yq '.' -oj -I0)" >> $GITHUB_ACTION
+          echo "platforms=$(echo "['amd64']" | yq '.' -oj -I0)" >> $GITHUB_OUTPUT
 
       - name: Build for ${{ steps.extract.outputs.platforms }}
         id: build
