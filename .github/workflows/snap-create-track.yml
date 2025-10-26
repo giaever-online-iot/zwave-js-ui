@@ -24,7 +24,7 @@ jobs:
       - name: Retrive current tracks, version etc
         id: tracks
         env:
-          SNAP_NAME: ${{ env.snap }}
+          SNAP_NAME: "${snap }"
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
           tracks="$(snapcraft list-tracks zwave-js-ui)"
@@ -45,7 +45,7 @@ jobs:
 
           function create_track {
             curl -s -w "\nHTTP_CODE:%{http_code}\n" \
-              -X POST "https://snapcraft.io/${SNAP_NAME}/create-track" \
+              -X POST "https://snapcraft.io/${{ SNAP_NAME }}/create-track" \
               -H "Cookie: session=${{ secrets.SNAPCRAFT_SESSION_COOKIE }};" \
               -H "Content-Type: application/x-www-form-urlencoded" \
               -H "Origin: https://snapcraft.io" \
@@ -63,7 +63,8 @@ jobs:
 
           export major="${vc%%.*})"
           export minor="${vc##*.}"
-          nvd=$(echo $jtracks | yq '.versions[] | (select(
+
+          nvd=$(echo $all | yq '.[] | (select(
             split(".") | .[0] | tonumber <= env(major) and split(".") | .[1] | tonumber < env(minor) or
             split(".") | .[0] | tonumber < env(major)
           ))' -oj | paste -sd, - | sed 's/.*/[&]/' | yq '.[-1]' -oj)
