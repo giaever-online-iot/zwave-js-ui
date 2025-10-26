@@ -9,8 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      platforms: ${{ steps.extract.outputs.platforms }}
-      builds: ${{ steps.build.outputs.builds }}
+      platforms: ${{ steps.build.outputs.builds }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -20,7 +19,8 @@ jobs:
       - name: Extract platforms from snapcraft.yaml
         id: extract
         run: |
-          echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
+          echo "platforms=$(yq e '.platforms | keys |= ..' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
+          #echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
           #echo "platforms=$(echo "{'platforms': {'amd64': null}}" | yq e '.platforms | keys ' -o=j -I=0)" >> $GITHUB_OUTPUT
 
       - name: Build for ${{ steps.extract.outputs.platforms }}
@@ -33,23 +33,29 @@ jobs:
           mkdir -p ~/.local/share/snapcraft
           echo "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
           snapcraft remote-build -v --launchpad-accept-public-upload \
-            --build-for=$(echo "${{ steps.extract.outputs.platforms }}" | yq '. | join(",")') #\
+            --build-for=$(echo "${{ steps.extract.outputs.platforms }}" | yq '. | keys | join(",")') #\
             #--launchpad-timeout=900
 
-          echo "builds=$(ls -d "$PWD"/*.snap | awk 'NR > 0 && $1 ~ /^\// {print "\""$1"\""}' | paste -sd, - | sed 's/.*/[&]/')" >> $GITHUB_OUTPUT
-          echo "${{ steps.build.outputs.builds }}"
+          platforms="${{ steps.extract.output.platforms }}"
+          for p in $(echo "${platforms}" | yq '. | keys | join(" ")'); do 
+            platforms=$(echo $platforms | path=".${p}.snf" val="$(ls -d "${PWD}"/zwave-js-ui*_${p}.snap)" yq 'eval(strenv(path)) = strenv(val)')
+            platforms=$(echo $platforms | path=".${p}.lfn" val="$(ls -d "${PWD}"/snapcraft-*_${p}_*.txt)" yq 'eval(strenv(path)) = strenv(val)')
+          done
+
+          echo "platforms=$(echo "${platforms}" | yq '.' -oj -I0)" >> $GITHUB_OUTPUT
 
   upload:
     needs: build 
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform: ${{ fromJson(needs.extract.outputs.platforms) }}
-        build: ${{ fromJson(needs.extract.outputs.platforms) }}
+        platform: ${{ fromJson(needs.build.outputs.platforms) }}
       fail-fast: true
     steps:
-      - name: For build ${{ matrix.build }} (${{ matrix.platform }})
+      - name: For build platform
         run: |
+          echo "${{ matrix.platform }}"
+          echo "${{ matrix.platform }}" | yq '.' -oj -I2
           ls -al ./
 #      - name: Checkout code
 #        uses: actions/checkout@v5
