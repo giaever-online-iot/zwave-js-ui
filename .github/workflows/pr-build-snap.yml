@@ -10,8 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       platforms: ${{ steps.extract.outputs.platforms }}
-    env:
-      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+    #env:
+    #  SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -27,7 +27,8 @@ jobs:
           set -x
           sudo snap install snapcraft --classic
           export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}"
-          snapcraft remote-build -v --launchpad-accept-public-upload --build-for=$(echo "${{ steps.extract.outputs.platforms }}" | yq '. | join(",")')
+          snapcraft whoami
+          #snapcraft remote-build -v --launchpad-accept-public-upload --build-for=$(echo "${{ steps.extract.outputs.platforms }}" | yq '. | join(",")')
 
 #  build:
 #    needs: extract
