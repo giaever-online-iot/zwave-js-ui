@@ -28,8 +28,9 @@ jobs:
           sudo snap install snapcraft --classic
           export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}"
           snapcraft whoami
-          snapcraft remote-build -v --launchpad-accept-public-upload --build-for=$(echo "${{ steps.extract.outputs.platforms }}" | yq '. | join(",")')
-
+          snapcraft remote-build -v --launchpad-accept-public-upload \
+            --build-for=$(echo "${{ steps.extract.outputs.platforms }}" | yq '. | join(",")') \
+            --launchpad-timeout=10
 #  build:
 #    needs: extract
 #    runs-on: ubuntu-latest
