@@ -40,8 +40,8 @@ jobs:
           all="${{ steps.tracks.outputs.all }}"
           echo "${all}" | yq '.' -oj
 
-          vd="${{ steps.tracks.outputs.default }}"
-          vc="${{ steps.tracks.outputs.current }}"
+          export vd="${{ steps.tracks.outputs.default }}"
+          export vc="${{ steps.tracks.outputs.current }}"
 
           function create_track {
             curl -s -w "\nHTTP_CODE:%{http_code}\n" \
