@@ -39,37 +39,37 @@ jobs:
           all="$(echo "${{ steps.tracks.outputs.all }}" | yq '.' -oj -I0)
           echo "${all}"
 
-          export vd="${{ steps.tracks.outputs.default }}"
-          export vc="${{ steps.tracks.outputs.current }}"
+          #export vd="${{ steps.tracks.outputs.default }}"
+          #export vc="${{ steps.tracks.outputs.current }}"
 
-          function create_track {
-            curl -s -w "\nHTTP_CODE:%{http_code}\n" \
-              -X POST "https://snapcraft.io/${SNAP_NAME}/create-track" \
-              -H "Cookie: session=${{ secrets.SNAPCRAFT_SESSION_COOKIE }};" \
-              -H "Content-Type: application/x-www-form-urlencoded" \
-              -H "Origin: https://snapcraft.io" \
-              -H "Referer: https://snapcraft.io/${SNAP_NAME}/releases" \
-              -H "Content-Type: application/x-www-form-urlencoded" \
-              -H "Origin: https://snapcraft.io" \
-              -H "Referer: https://snapcraft.io/${SNAP_NAME}/releases" \
-              -d "track-name=${1}"
-          }
+          #function create_track {
+          #  curl -s -w "\nHTTP_CODE:%{http_code}\n" \
+          #    -X POST "https://snapcraft.io/${SNAP_NAME}/create-track" \
+          #    -H "Cookie: session=${{ secrets.SNAPCRAFT_SESSION_COOKIE }};" \
+          #    -H "Content-Type: application/x-www-form-urlencoded" \
+          #    -H "Origin: https://snapcraft.io" \
+          #    -H "Referer: https://snapcraft.io/${SNAP_NAME}/releases" \
+          #    -H "Content-Type: application/x-www-form-urlencoded" \
+          #    -H "Origin: https://snapcraft.io" \
+          #    -H "Referer: https://snapcraft.io/${SNAP_NAME}/releases" \
+          #    -d "track-name=${1}"
+          #}
 
-          if [[ -z "$(cat "${all}" | yq '.. | select(. == env(vc))')" ]]; then
-            # create track for vc
-            create_track "${vc}"
-          fi
+          #if [[ -z "$(cat "${all}" | yq '.. | select(. == env(vc))')" ]]; then
+          #  # create track for vc
+          #  create_track "${vc}"
+          #fi
 
-          export major="${vc%%.*}"
-          export minor="${vc##*.}"
+          #export major="${vc%%.*}"
+          #export minor="${vc##*.}"
 
-          nvd=$(echo $all | yq '.[] | (select(
-            split(".") | .[0] | tonumber <= env(major) and split(".") | .[1] | tonumber < env(minor) or
-            split(".") | .[0] | tonumber < env(major)
-          ))' -oj | paste -sd, - | sed 's/.*/[&]/' | yq '.[-1]' -oj)
+          #nvd=$(echo $all | yq '.[] | (select(
+          #  split(".") | .[0] | tonumber <= env(major) and split(".") | .[1] | tonumber < env(minor) or
+          #  split(".") | .[0] | tonumber < env(major)
+          #))' -oj | paste -sd, - | sed 's/.*/[&]/' | yq '.[-1]' -oj)
 
-          if [[ "${nvd}" != "${vc}" && "${nvd}" != "${vd}" ]]; then
-            echo "Set new track to ${nvd}"
-          else
-            echo "NVD is ${nvd}, VD is ${vd}, VC is ${vc}: No new track to set default"
-          fi
+          #if [[ "${nvd}" != "${vc}" && "${nvd}" != "${vd}" ]]; then
+          #  echo "Set new track to ${nvd}"
+          #else
+          #  echo "NVD is ${nvd}, VD is ${vd}, VC is ${vc}: No new track to set default"
+          #fi
