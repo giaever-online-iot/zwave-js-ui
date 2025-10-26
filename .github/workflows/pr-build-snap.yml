@@ -57,7 +57,6 @@ jobs:
       - name: For build platform
         run: |
           echo "${{ matrix.platform }}"
-          echo "${{ matrix.platform }}" | yq '.' -oj -I2
           ls -al ./
 #      - name: Checkout code
 #        uses: actions/checkout@v5
