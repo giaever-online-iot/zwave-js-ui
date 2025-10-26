@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      platforms: ${{ steps.build.outputs.builds }}
+      platforms: ${{ steps.build.outputs.platforms }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
