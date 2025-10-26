@@ -26,6 +26,9 @@ jobs:
         run: |
           set -x
           platforms="$(echo "${{ steps.extract.outputs.platforms}}" | yq 'to_entries | map({"key": .value, "value": {}}) | from_entries' -oj -I0)"
+          for p in $(echo "${platforms}" | yq '. | keys | join(" ")'); do 
+            echo $p
+          done
           #sudo snap install snapcraft --classic
           #export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}"
           #snapcraft whoami
