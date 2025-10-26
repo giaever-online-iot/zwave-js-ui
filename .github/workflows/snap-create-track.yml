@@ -68,8 +68,8 @@ jobs:
           ))' -oj | paste -sd,)]" | yq '.[-1]')
 
           if [ "${nvd}" != "${vd}" ]; then
-            export SNAPCRAFT_STORE_CREDENTIALS="$(echo "${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}" | base64 -d)"
-            snapcraft set-default-track -v zwave-js-ui "${nvd}"
+            export SNAPCRAFT_STORE_CREDENTIALS="$(echo "${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}")"
+            snapcraft set-default-track -v zwave-js-ui "v${nvd}"
             echo "Set new track to ${nvd}"
           else
             echo "NVD is ${nvd}, VD is ${vd}, VC is ${vc}: No new track to set default"
