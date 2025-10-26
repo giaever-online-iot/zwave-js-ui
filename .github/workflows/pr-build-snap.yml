@@ -24,6 +24,7 @@ jobs:
 
       - name: Build form ${{ steps.extract.outputs.platforms }}
         run: |
+          sudo snap install snapcraft --classic
           snapcraft remote-build
 
 #  build:
