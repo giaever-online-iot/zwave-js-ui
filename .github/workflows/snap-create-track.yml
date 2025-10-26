@@ -35,8 +35,6 @@ jobs:
           echo "current=$(V="$(yq '.version' snap/snapcraft.yaml)" && echo "${V#v}")" >> $GITHUB_OUTPUT
 
       - name: Output test
-        env:
-          SESSION_COOKIE: ${{ secrets.SNAPCRAFT_SESSION_COOKIE }}
         run: |
           set -x
           all="${{ steps.tracks.outputs.all }}"
@@ -48,13 +46,13 @@ jobs:
           function create_track {
             curl -s -w "\nHTTP_CODE:%{http_code}\n" \
               -X POST "https://snapcraft.io/${SNAP_NAME}/create-track" \
-              -H "Cookie: session=${SESSION_COOKIE};" \
+              -H "Cookie: session=${{ secrets.SNAPCRAFT_SESSION_COOKIE }};" \
               -H "Content-Type: application/x-www-form-urlencoded" \
               -H "Origin: https://snapcraft.io" \
               -H "Referer: https://snapcraft.io/${SNAP_NAME}/releases" \
               -H "Content-Type: application/x-www-form-urlencoded" \
               -H "Origin: https://snapcraft.io" \
-              -H "Referer: https://snapcraft.io/${SNAP_NAME}/releases"
+              -H "Referer: https://snapcraft.io/${SNAP_NAME}/releases" \
               -d "track-name=${0}"
           }
 
