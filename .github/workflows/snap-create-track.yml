@@ -61,8 +61,8 @@ jobs:
             create_track "${vc}"
           fi
 
-          export major="${vc%.*}"
-          export minor="${vc#*.}"
+          export major="$(echo "${vc} | cut -d'.' -f1)"
+          export minor="$(echo "${vc} | cut -d'.' -f2)"
           nvd=$(echo $jtracks | yq '.versions[] | (select(
             split(".") | .[0] | tonumber <= env(major) and split(".") | .[1] | tonumber < env(minor) or
             split(".") | .[0] | tonumber < env(major)
