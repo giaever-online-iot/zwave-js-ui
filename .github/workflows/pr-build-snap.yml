@@ -25,7 +25,7 @@ jobs:
       - name: Build form ${{ steps.extract.outputs.platforms }}
         run: |
           sudo snap install snapcraft --classic
-          snapcraft remote-build
+          snapcraft remote-build -v --launchpad-accept-public-upload
 
 #  build:
 #    needs: extract
