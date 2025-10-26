@@ -3,8 +3,8 @@ name: Create Snap Track
 on:
   workflow_run:
     workflows: ["PR Build Snap"]
-    #types:
-    #  - completed
+    types:
+      - completed
     workflow_dispatch:  # Add this for manual testing
 
 jobs:
