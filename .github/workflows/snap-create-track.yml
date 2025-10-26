@@ -32,7 +32,7 @@ jobs:
           echo "all=$(echo "${tracks}" | awk 'NR > 1 && $1 ~ /^v/ {print "\""substr($1, 2)"\""}' | paste -sd, - | sed 's/.*/[&]/')" >> $GITHUB_OUTPUT
 
           echo "default=$(V="$(echo "${tracks}" | grep default | cut -d' ' -f1)" && echo "${V#v}")" >> $GITHUB_OUTPUT
-          echo "current=$(V="$(yq '.version' snap/snapcraft.yaml)" && echo "${V#v}")" >> $GITHUB_OUTPUT
+          echo "current=$(V="$(yq '.version' snap/snapcraft.yaml)" && echo "${V#v}" | cut -d'.' -f1,2)" >> $GITHUB_OUTPUT
 
       - name: Output test
         run: |
@@ -61,8 +61,8 @@ jobs:
             create_track "${vc}"
           fi
 
-          export major="$(echo "${vc} | cut -d'.' -f1)"
-          export minor="$(echo "${vc} | cut -d'.' -f2)"
+          export major="${vc%%.*})"
+          export minor="${vc##*.}"
           nvd=$(echo $jtracks | yq '.versions[] | (select(
             split(".") | .[0] | tonumber <= env(major) and split(".") | .[1] | tonumber < env(minor) or
             split(".") | .[0] | tonumber < env(major)
