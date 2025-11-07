@@ -5,7 +5,7 @@ on:
     workflows: ["PR Build Snap"]
     types:
       - completed
-    workflow_dispatch:  # Add this for manual testing
+  workflow_dispatch:  # Add this for manual testing
 
 jobs:
   create-track:
@@ -45,7 +45,7 @@ jobs:
           function create_track {
             curl -s -w "\nHTTP_CODE:%{http_code}\n" \
               -X POST "https://snapcraft.io/${SNAP_NAME}/create-track" \
-              -H "Cookie: session=${{ secrets.SNAPCRAFT_SESSION_COOKIE }};" \
+              -H "Cookie: session=${{ secrets.SNAPCRAFT_SESSION }};" \
               -H "Content-Type: application/x-www-form-urlencoded" \
               -H "Origin: https://snapcraft.io" \
               -H "Referer: https://snapcraft.io/${SNAP_NAME}/releases" \
