@@ -6,30 +6,58 @@ on:
       - main
 
 jobs:
-  extract:
+  build:
     runs-on: ubuntu-latest
     outputs:
-      platforms: ${{ steps.extract.outputs.platforms }}
+      platforms: ${{ steps.build.outputs.platforms }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
         
       - name: Extract platforms from snapcraft.yaml
         id: extract
-        env:
-          LAUNCHPAD_CREDENTIALS: ${{ secrets.LAUNCHPAD_CREDENTIALS }}
         run: |
-          echo "platforms=$(echo "{'platforms': {'amd64': null}}" | yq e '.platforms | keys ' -o=j -I=0)" >> $GITHUB_OUTPUT
-          #echo "platforms=$(yq e '.platforms | keys ' -o=j -I=0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
+          echo "platforms=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
+          #echo "platforms=$(echo "['amd64']" | yq '.' -oj -I0)" >> $GITHUB_OUTPUT
 
-#  build:
-#    needs: extract
-#    runs-on: ubuntu-latest
-#    strategy:
-#      matrix:
-#        platform: ${{ fromJson(needs.extract.outputs.platforms) }}
-#      fail-fast: true
-#    steps:
+      - name: Build for ${{ steps.extract.outputs.platforms }}
+        id: build
+        run: |
+          set -x
+          platforms="$(echo "${{ steps.extract.outputs.platforms}}" | yq 'to_entries | map({"key": .value, "value": {}}) | from_entries' -oj -I0)"
+          sudo snap install snapcraft --classic
+          export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}"
+          snapcraft whoami
+          mkdir -p ~/.local/share/snapcraft
+          echo "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
+          snapcraft remote-build -v --launchpad-accept-public-upload \
+            --build-for=$(yq '. | keys | join(",")' <<< $platforms) #\ --launchpad-timeout=900
+
+          for p in $(yq '. | keys | join(" ")' <<< $platforms); do 
+            platforms=$(path=".${p}.snf" val="$(ls -d "${PWD}"/zwave-js-ui*_${p}.snap)" yq 'eval(strenv(path)) = strenv(val)' <<< $platforms)
+            platforms=$(path=".${p}.lfn" val="$(ls -d "${PWD}"/snapcraft-*_${p}_*.txt)" yq 'eval(strenv(path)) = strenv(val)' <<< $platforms)
+          done
+
+          echo "${platforms}"
+
+          yq '.' -oj <<< $platforms
+
+          echo "platforms=$(yq '.' -oj -I0 <<< $platforms)" >> $GITHUB_OUTPUT
+
+  upload:
+    needs: build 
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: ${{ fromJson(needs.build.outputs.platforms) }}
+      fail-fast: true
+    steps:
+      - name: For build platform
+        run: |
+          echo "${{ matrix.platform }}"
+          ls -al ./
 #      - name: Checkout code
 #        uses: actions/checkout@v5
 #    
