@@ -48,7 +48,7 @@ jobs:
             lfn=$(ls -d "${PWD}"/snapcraft-*_"${p}"_*.txt 2>/dev/null || true)
 
             if [[ -n "$snf" ]]; then
-              platforms_map=$(jq --arg p "$p" --arg sfn "$snf" '.[$p].sfn = $sfn' <<< "$platforms_map")
+              platforms_map=$(jq --arg p "$p" --arg sfn "$sfn" '.[$p].sfn = $sfn' <<< "$platforms_map")
             else
               platforms_map=$(jq --arg p "$p" '.[$p].sfn = ""' <<< "$platforms_map")
             fi
@@ -56,7 +56,7 @@ jobs:
             platforms_map=$(jq --arg p "$p" --arg lfn "$lfn" '.[$p].lfn = $lfn' <<< "$platforms_map")
           done
 
-          # Convert mapping to array of objects: [{arch: "amd64", snf: "...", lfn: "..."}, ...]
+          # Convert mapping to array of objects: [{arch: "amd64", sfn: "...", lfn: "..."}, ...]
           platforms_array=$(jq -c 'to_entries | map({arch:.key} + .value)' <<< "$platforms_map")
 
           echo "$platforms_array"
