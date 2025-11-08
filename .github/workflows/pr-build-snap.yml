@@ -44,13 +44,13 @@ jobs:
 
           # Collect artifacts per arch
           for p in $(jq -r 'keys[]' <<< "$platforms_map"); do
-            snf=$(ls -d "${PWD}"/zwave-js-ui*_"${p}".snap 2>/dev/null || true)
+            sfn=$(ls -d "${PWD}"/zwave-js-ui*_"${p}".snap 2>/dev/null || true)
             lfn=$(ls -d "${PWD}"/snapcraft-*_"${p}"_*.txt 2>/dev/null || true)
 
             if [[ -n "$snf" ]]; then
-              platforms_map=$(jq --arg p "$p" --arg snf "$snf" '.[$p].snf = $snf' <<< "$platforms_map")
+              platforms_map=$(jq --arg p "$p" --arg sfn "$snf" '.[$p].sfn = $sfn' <<< "$platforms_map")
             else
-              platforms_map=$(jq --arg p "$p" '.[$p].snf = ""' <<< "$platforms_map")
+              platforms_map=$(jq --arg p "$p" '.[$p].sfn = ""' <<< "$platforms_map")
             fi
 
             platforms_map=$(jq --arg p "$p" --arg lfn "$lfn" '.[$p].lfn = $lfn' <<< "$platforms_map")
@@ -88,7 +88,7 @@ jobs:
       - name: Upload ${{ matrix.platform.arch }}
         uses: actions/upload-artifact@v5
         id: upload
-        if: ${{ steps.file.outputs.paths != "" }}
+        if: ${{ steps.file.outputs.paths != '' }}
         with:
           name: ${{ matrix.platform.arch }}
           path: ${{ steps.file.outputs.paths }}
