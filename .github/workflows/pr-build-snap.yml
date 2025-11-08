@@ -20,7 +20,7 @@ jobs:
         id: extract
         run: |
           # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
-          platforms_json=$(yq -o=json '.platforms | keys' snap/snapcraft.yaml)
+          platforms_json=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
           echo "platforms=$platforms_json" >> $GITHUB_OUTPUT
 
       - name: Build for ${{ steps.extract.outputs.platforms }}
