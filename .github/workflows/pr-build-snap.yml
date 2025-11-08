@@ -47,7 +47,7 @@ jobs:
             sfn=$(ls -d "${PWD}"/zwave-js-ui*_"${p}".snap 2>/dev/null || true)
             lfn=$(ls -d "${PWD}"/snapcraft-*_"${p}"_*.txt 2>/dev/null || true)
 
-            if [[ -n "$snf" ]]; then
+            if [[ -n "$sfn" ]]; then
               platforms_map=$(jq --arg p "$p" --arg sfn "$sfn" '.[$p].sfn = $sfn' <<< "$platforms_map")
             else
               platforms_map=$(jq --arg p "$p" '.[$p].sfn = ""' <<< "$platforms_map")
