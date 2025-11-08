@@ -28,7 +28,7 @@ jobs:
           set -xuo pipefail
 
           # Read platforms JSON array from previous step
-          platforms="$(echo "${{ steps.extract.outputs.platforms}}" | yq 'to_entries | map({"key": .value, "value": {}}) | from_entries' -oj -I0)"
+          platforms_json="$(echo "${{ steps.extract.outputs.platforms}}" | yq 'to_entries | map({"key": .value, "value": {}}) | from_entries' -oj -I0)"
 
           # Convert array to mapping: {"amd64": {}, "arm64": {}}
           platforms_map=$(jq -c 'reduce .[] as $p ({}; .[$p]={})' <<< "$platforms_json")
