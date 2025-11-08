@@ -50,7 +50,7 @@ jobs:
             if [[ -n "$snf" ]]; then
               platforms_map=$(jq --arg p "$p" --arg snf "$snf" '.[$p].snf = $snf' <<< "$platforms_map")
             else
-              platforms_map=$(jq --arg p "$p" '.[$p].snf = "ERR"' <<< "$platforms_map")
+              platforms_map=$(jq --arg p "$p" '.[$p].snf = ""' <<< "$platforms_map")
             fi
 
             platforms_map=$(jq --arg p "$p" --arg lfn "$lfn" '.[$p].lfn = $lfn' <<< "$platforms_map")
@@ -71,9 +71,29 @@ jobs:
       fail-fast: true
     steps:
       - name: For build platform ${{ matrix.platform.arch }}
+        id: file
         run: |
-          echo "matrix.platform (JSON): ${{ matrix.platform }}"
-          echo "arch: ${{ matrix.platform.arch }}"
-          echo "snf: ${{ matrix.platform.snf }}"
-          echo "lfn: ${{ matrix.platform.lfn }}"
-          ls -al ./
+          set -euo pipefail
+          sfn="${{ matrix.platform.sfn }}"
+          lfn="${{ matrix.platform.lfn }}"
+          echo "paths<<EOF" >> "$GITHUB_OUTPUT"
+          if [ -n "${sfn}" ] && [ -f "${sfn}" ]; then
+            echo "${sfn}" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "${lfn}" ] && [ -f "${lfn}" ]; then
+            echo "${lfn}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Upload ${{ matrix.platform.arch }}
+        uses: actions/upload-artifact@v5
+        id: upload
+        if: ${{ steps.file.outputs.paths != "" }}
+        with:
+          name: ${{ matrix.platform.arch }}
+          path: ${{ steps.file.outputs.paths }}
+        
+
+
+
+          
