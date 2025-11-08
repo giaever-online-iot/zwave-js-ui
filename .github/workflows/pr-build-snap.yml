@@ -15,161 +15,67 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-        
+
       - name: Extract platforms from snapcraft.yaml
         id: extract
         run: |
-          echo "platforms=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
-          #echo "platforms=$(echo "['amd64']" | yq '.' -oj -I0)" >> $GITHUB_OUTPUT
+          # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
+          platforms_json=$(yq -o=json '.platforms | keys' snap/snapcraft.yaml)
+          echo "platforms=$platforms_json" >> $GITHUB_OUTPUT
 
       - name: Build for ${{ steps.extract.outputs.platforms }}
         id: build
         run: |
-          set -x
-          platforms="$(echo "${{ steps.extract.outputs.platforms}}" | yq 'to_entries | map({"key": .value, "value": {}}) | from_entries' -oj -I0)"
+          set -xuo pipefail
+
+          # Read platforms JSON array from previous step
+          platforms_json="${{ steps.extract.outputs.platforms }}"
+
+          # Convert array to mapping: {"amd64": {}, "arm64": {}}
+          platforms_map=$(jq -c 'reduce .[] as $p ({}; .[$p]={})' <<< "$platforms_json")
+
           sudo snap install snapcraft --classic
           export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}"
-          snapcraft whoami
+          snapcraft whoami || true
           mkdir -p ~/.local/share/snapcraft
           echo "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
-          snapcraft remote-build -v --launchpad-accept-public-upload \
-            --build-for=$(yq '. | keys | join(",")' <<< $platforms) #\ --launchpad-timeout=900
 
-          for p in $(yq '. | keys | join(" ")' <<< $platforms); do 
-            snf=$(ls -d "${PWD}"/zwave-js-ui*_${p}.snap)
-            platforms=$(path=".${p}.snf" val="$([[ -n "${snf}" ]] && echo "${snf}" || echo "ERR"]])" yq 'eval(strenv(path)) = strenv(val)' <<< $platforms)
-            platforms=$(path=".${p}.lfn" val="$(ls -d "${PWD}"/snapcraft-*_${p}_*.txt)" yq 'eval(strenv(path)) = strenv(val)' <<< $platforms)
+          # Build for comma-separated list of arches
+          snapcraft remote-build -v --launchpad-accept-public-upload \
+            --build-for=$(jq -r 'keys | join(",")' <<< "$platforms_map")
+
+          # Collect artifacts per arch
+          for p in $(jq -r 'keys[]' <<< "$platforms_map"); do
+            snf=$(ls -d "${PWD}"/zwave-js-ui*_"${p}".snap 2>/dev/null || true)
+            lfn=$(ls -d "${PWD}"/snapcraft-*_"${p}"_*.txt 2>/dev/null || true)
+
+            if [[ -n "$snf" ]]; then
+              platforms_map=$(jq --arg p "$p" --arg snf "$snf" '.[$p].snf = $snf' <<< "$platforms_map")
+            else
+              platforms_map=$(jq --arg p "$p" '.[$p].snf = "ERR"' <<< "$platforms_map")
+            fi
+
+            platforms_map=$(jq --arg p "$p" --arg lfn "$lfn" '.[$p].lfn = $lfn' <<< "$platforms_map")
           done
 
-          echo "${platforms}"
+          # Convert mapping to array of objects: [{arch: "amd64", snf: "...", lfn: "..."}, ...]
+          platforms_array=$(jq -c 'to_entries | map({arch:.key} + .value)' <<< "$platforms_map")
 
-          yq '.' -oj <<< $platforms
-
-          echo "platforms=$(yq '.' -oj -I0 <<< $platforms)" >> $GITHUB_OUTPUT
+          echo "$platforms_array"
+          echo "platforms=$platforms_array" >> $GITHUB_OUTPUT
 
   upload:
     needs: build 
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platforms: ${{ fromJson(needs.build.outputs.platforms) }}
+        platform: ${{ fromJson(needs.build.outputs.platforms) }}
       fail-fast: true
     steps:
-      - name: For build platform
+      - name: For build platform ${{ matrix.platform.arch }}
         run: |
-          echo "${{ matrix.platforms }}"
+          echo "matrix.platform (JSON): ${{ matrix.platform }}"
+          echo "arch: ${{ matrix.platform.arch }}"
+          echo "snf: ${{ matrix.platform.snf }}"
+          echo "lfn: ${{ matrix.platform.lfn }}"
           ls -al ./
-#      - name: Checkout code
-#        uses: actions/checkout@v5
-#    
-#      - name: Setup QEMU
-#        uses: docker/setup-qemu-action@v3
-#        with: 
-#          # see 
-#          # https://github.com/tonistiigi/binfmt/issues/215
-#          # https://bugs.launchpad.net/ubuntu/+source/qemu/+bug/2096782
-#          image: 'tonistiigi/binfmt:master'
-#
-#      - name: Build Snap for ${{ matrix.platform }}
-#        uses: canonical/snapcraft-multiarch-action@v1
-#        id: snapcraft
-#        with:
-#          architecture: ${{ matrix.platform }}
-#
-#      - name: Get basename of snap package
-#        id: build
-#        run: |
-#          mkdir -p pkg/ && mv -f "${{ steps.snapcraft.outputs.snap }}" "pkg/"
-#          echo "filename=$(basename "${{ steps.snapcraft.outputs.snap }}")" >> $GITHUB_OUTPUT
-#
-#      - uses: actions/upload-artifact@v5
-#        id: upload
-#        with:
-#          name: ${{ steps.build.outputs.filename }}
-#          path: ${{ github.workspace }}/pkg
-#
-#      - name: Persist artifact URL to env
-#        id: snap
-#        run: | 
-#          FINFO="$(FN="${{ steps.build.outputs.filename}}" && echo "${FN%.*}").json"
-#          echo "${FINFO}"
-#          echo "{'name': '${{ steps.build.outputs.filename }}', 'url': '${{ steps.upload.outputs.artifact-url }}', 'arch': '${{ matrix.platform }}'}" | yq '.' -oj -I0 > "pkg/${FINFO}"
-#          echo "finfo=${FINFO}" >> $GITHUB_OUTPUT
-#
-#      - run: echo "${{ steps.snap.outputs.finfo }}"
-#
-#      - uses: actions/upload-artifact@v5
-#        with:
-#          name: ${{ steps.snap.outputs.finfo }}
-#          path: ${{ github.workspace }}/pkg
-#          
-#  post_comment_and_notify:
-#    runs-on: ubuntu-latest
-#    needs: build
-#    if: ${{ always() }}
-#    steps:
-#      - name: Download artifacts
-#        if: ${{ success() }}
-#        uses: actions/download-artifact@v6
-#        with:
-#          path: ./pkg
-#      - name: Aggregate artifact infos
-#        if: ${{ success() }}
-#        id: aggregate
-#        run: |
-#          JSONS="$(find ./ -type f -name "*.json")"
-#          echo "${JSONS}"
-#          echo "Packages built successfully!" > filelist.md
-#          for sfi in ${JSONS}; do
-#            echo "- $(cat "${sfi}" | yq '.arch'): [$(cat "${sfi}" | yq '.name')]($(cat "${sfi}" | yq '.url'))" >> filelist.md
-#          done
-#
-#          echo "filelist<<EOF" >> $GITHUB_OUTPUT
-#          cat filelist.md >> $GITHUB_OUTPUT
-#          echo "EOF" >> $GITHUB_OUTPUT
-#
-#      - name: Post success comment
-#        if: ${{ success() }}
-#        uses: peter-evans/create-or-update-comment@v5
-#        with:
-#          issue-number: ${{ github.event.pull_request.number }}
-#          body: ${{ steps.aggregate.outputs.filelist }}
-#
-#      - name: Post failure comment
-#        if: ${{ failure() }}
-#        uses: peter-evans/create-or-update-comment@v5
-#        with:
-#          issue-number: ${{ github.event.pull_request.number }}
-#          body: |
-#            Hey @${{ github.event.pull_request.user.login }}, the build has failed.  
-#            Please check the build logs and update your PR accordingly.
-#
-#
-#      - name: Get repo collaborators with write or higher access
-#        if: ${{ success() }}
-#        id: get_collaborators
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#        run: |
-#          coll=$(curl -s \
-#            -H "Authorization: Bearer $GITHUB_TOKEN" \
-#            -H "Accept: application/vnd.github+json" \
-#            "https://api.github.com/repos/${{ github.repository }}/collaborators?per_page=10")
-#          echo "${coll}"
-#          rev=$(echo "$coll" | jq -r '.[] | select(.permissions.push == true or .permissions.admin == true or .permissions.maintain == true) | .login' | paste -sd "," -)
-#          echo "${rev}"
-#          echo "reviewers=$rev" >> $GITHUB_OUTPUT
-#
-#      - name: Assign reviewers on PR
-#        if: ${{ success() }}
-#        uses: hkusu/review-assign-action@v1
-#        with:
-#          reviewers: ${{ steps.get_collaborators.outputs.reviewers }}
-#          github-token: ${{ secrets.GITHUB_TOKEN }}
-#
-#      - name: Assign reviewers on PR
-#        if: ${{ failure() }}
-#        uses: hkusu/review-assign-action@v1
-#        with:
-#          reviewers: ""
-#          github-token: ${{ secrets.GITHUB_TOKEN }}
