@@ -20,8 +20,7 @@ jobs:
         id: extract
         run: |
           # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
-          platforms_json=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
-          echo "platforms=$platforms_json" >> $GITHUB_OUTPUT
+          echo "platforms=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
 
       - name: Build for ${{ steps.extract.outputs.platforms }}
         id: build
@@ -29,7 +28,7 @@ jobs:
           set -xuo pipefail
 
           # Read platforms JSON array from previous step
-          platforms_json="${{ steps.extract.outputs.platforms }}"
+          platforms="$(echo "${{ steps.extract.outputs.platforms}}" | yq 'to_entries | map({"key": .value, "value": {}}) | from_entries' -oj -I0)"
 
           # Convert array to mapping: {"amd64": {}, "arm64": {}}
           platforms_map=$(jq -c 'reduce .[] as $p ({}; .[$p]={})' <<< "$platforms_json")
