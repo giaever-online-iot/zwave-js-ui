@@ -45,14 +45,14 @@ jobs:
 
           yq '.' -oj <<< $platforms
 
-          echo "pltforms=$(yq '.' -oj -I0 <<< $platforms)" >> $GITHUB_OUTPUT
+          echo "platforms=$(yq '.' -oj -I0 <<< $platforms)" >> $GITHUB_OUTPUT
 
   upload:
     needs: build 
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platforms: ${{ needs.build.outputs.platforms }}
+        platforms: ${{ fromJson(needs.build.outputs.platforms) }}
       fail-fast: true
     steps:
       - name: For build platform
