@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform: ${{ fromJson(needs.build.outputs.platforms) }}
+        platforms: ${{ fromJson(needs.build.outputs.platforms) }}
       fail-fast: true
     steps:
       - name: For build platform ${{ matrix.platform.arch }}
