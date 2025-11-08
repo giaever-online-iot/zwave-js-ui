@@ -36,7 +36,8 @@ jobs:
             --build-for=$(yq '. | keys | join(",")' <<< $platforms) #\ --launchpad-timeout=900
 
           for p in $(yq '. | keys | join(" ")' <<< $platforms); do 
-            platforms=$(path=".${p}.snf" val="$(ls -d "${PWD}"/zwave-js-ui*_${p}.snap)" yq 'eval(strenv(path)) = strenv(val)' <<< $platforms)
+            snf=$(ls -d "${PWD}"/zwave-js-ui*_${p}.snap)
+            platforms=$(path=".${p}.snf" val="$([[ -n "${snf}" ]] && echo "${snf}" || echo "ERR"]])" yq 'eval(strenv(path)) = strenv(val)' <<< $platforms)
             platforms=$(path=".${p}.lfn" val="$(ls -d "${PWD}"/snapcraft-*_${p}_*.txt)" yq 'eval(strenv(path)) = strenv(val)' <<< $platforms)
           done
 
@@ -51,12 +52,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform: ${{ fromJson(needs.build.outputs.platforms) }}
+        platforms: ${{ fromJson(needs.build.outputs.platforms) }}
       fail-fast: true
     steps:
       - name: For build platform
         run: |
-          echo "${{ matrix.platform }}"
+          echo "${{ matrix.platforms }}"
           ls -al ./
 #      - name: Checkout code
 #        uses: actions/checkout@v5
