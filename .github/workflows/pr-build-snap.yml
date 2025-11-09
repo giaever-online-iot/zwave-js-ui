@@ -24,6 +24,7 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
+      actions: write
     outputs:
       platforms: ${{ steps.build.outputs.platforms }}
     steps:
