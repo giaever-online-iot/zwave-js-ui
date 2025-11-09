@@ -1,7 +1,7 @@
 ---
 name: Delete all branches except main
 
-'on':
+on:
   workflow_dispatch:  # Manual trigger only for safety
     inputs:
       protected_branch:
@@ -23,7 +23,7 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const protectedBranch =
-              '${{ inputs.protected_branch }}' || 'main';
+              '${{ inputs.protected_branch || 'main' }}';
 
             core.info(
               `Protected branch: ${protectedBranch}`
