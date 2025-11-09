@@ -85,7 +85,7 @@ jobs:
               ext="${file##*.}"
               base="$(basename "${file}" ".${ext}")"
               dir="$(dirname "$file")"
-              mv "$file" "$dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
+              mv -f "$file" "$dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
             done
           done
           ls -al ./
