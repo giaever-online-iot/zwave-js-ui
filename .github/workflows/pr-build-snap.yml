@@ -96,7 +96,7 @@ jobs:
           name: snap-build-artifacts
           path: .
 
-      - name: For logging URLs: ${{ matrix.platform }}
+      - name: For logging URLs ${{ matrix.platform }}
         run: |
           echo "${{ toJson(steps.download-artifacts.outputs) }}"
           echo "Files in workspace (downloaded artifact contents):"
