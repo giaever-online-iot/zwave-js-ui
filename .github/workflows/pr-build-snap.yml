@@ -39,8 +39,8 @@ jobs:
         id: extract
         run: |
           # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
-          # (Using a fixed example here; replace with real extraction as needed)
-          printf 'platforms=%s\n' '["amd64"]' >> "$GITHUB_OUTPUT"
+          archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml) 
+          printf 'platforms=%s\n' "$(echo "${archs:-"['amd64']"}" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
       - name: Build for ${{ steps.extract.outputs.platforms }}
         id: build
