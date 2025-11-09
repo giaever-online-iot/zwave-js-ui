@@ -73,12 +73,13 @@ jobs:
           sn=$(yq '.name' snap/snapcraft.yaml)
           sv=$(yq '.version' snap/snapcraft.yaml)
 
-          for p in "${{ steps.build.output.platforms }}"; then
-            find ./ -type f \( -name "${sn}*_${p}.snap" -o -name "${sn}*_${p}_*.txt" \) | while read file; do
+          # Parse platforms JSON array and iterate
+          echo '${{ steps.build.outputs.platforms }}' | jq -r '.[]' | while read p; do
+            find ./ -type f \( -name "${sn}*_${p}.snap" -o -name "*_${p}_*.txt" \) | while read file; do
               ext="${file##*.}"
               base="$(basename "${file}" ".${ext}")"
               dir="$(dirname "$file")"
-              mv "$file" "$dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")")"
+              mv "$file" "$dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
             done
           done
           ls -al ./
