@@ -69,6 +69,27 @@ jobs:
           # Safely write the platforms step output (avoid nested-quote issues)
           printf 'platforms=%s\n' "$(echo "$platforms" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
+      - name: Normalize .snap/.txt artifact names
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ls -al ./
+          sn=$(yq '.name' snap/snapcraft.yaml)
+          sv=$(yq '.version' snap/snapcraft.yaml)
+
+          # Parse platforms JSON array and iterate
+          echo '${{ steps.build.outputs.platforms }}' | jq -r '.[]' | while read p; do
+            find ./ -type f \( -name "${sn}*_${p}.snap" -o -name "*_${p}_*.txt" \) | while read file; do
+              ext="${file##*.}"
+              base="$(basename "${file}" ".${ext}")"
+              dir="$(dirname "$file")"
+              mv "$file" "$dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
+            done
+          done
+          ls -al ./
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         id: upload-artifacts
@@ -77,7 +98,7 @@ jobs:
           name: snap-build-artifacts
           path: |
             zwave-js-ui*.snap
-            snapcraft-*.txt
+            zwave-js-ui*.log
           retention-days: 7
           
       - name: Uploaded artifacts URL
