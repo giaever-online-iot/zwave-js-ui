@@ -3,6 +3,11 @@ name: Delete all branches except main
 
 'on':
   workflow_dispatch:  # Manual trigger only for safety
+    inputs:
+      protected_branch:
+        description: 'Branch to keep (default: main)'
+        required: false
+        default: 'main'
 
 permissions:
   contents: write
@@ -11,17 +16,18 @@ jobs:
   delete-branches:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch all branches
-
-      - name: Delete all branches except main
+      - name: Delete all branches except protected branch
         uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
+            const protectedBranch =
+              '${{ inputs.protected_branch }}' || 'main';
+
+            core.info(
+              `Protected branch: ${protectedBranch}`
+            );
 
             // Get all branches with pagination
             const branches = await github.paginate(
@@ -35,16 +41,20 @@ jobs:
 
             core.info(`Found ${branches.length} branches total`);
 
-            // Filter out main branch
+            // Filter out protected branch
             const branchesToDelete = branches.filter(
-              branch => branch.name !== 'main'
+              branch => branch.name !== protectedBranch
             );
 
             core.info(
               `Will delete ${branchesToDelete.length} branches`
             );
 
+            let successCount = 0;
+            let failCount = 0;
+
             // Delete each branch
+            // Note: Protected branches cannot be deleted via API
             for (const branch of branchesToDelete) {
               try {
                 core.info(`Deleting branch: ${branch.name}`);
@@ -56,11 +66,16 @@ jobs:
                 core.info(
                   `✓ Successfully deleted: ${branch.name}`
                 );
+                successCount++;
               } catch (error) {
                 core.warning(
                   `✗ Failed to delete ${branch.name}: ${error.message}`
                 );
+                failCount++;
               }
             }
 
-            core.info('Branch deletion complete!');
+            core.info(
+              `Deletion complete! Success: ${successCount}, ` +
+              `Failed: ${failCount}`
+            );
