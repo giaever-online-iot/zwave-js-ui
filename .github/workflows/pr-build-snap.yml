@@ -78,6 +78,7 @@ jobs:
           set -euo pipefail
           sfn="${{ matrix.platform.sfn }}"
           lfn="${{ matrix.platform.lfn }}"
+          echo "${sfn}, $lfn"
           echo "paths<<EOF" >> "$GITHUB_OUTPUT"
           if [ -n "${sfn}" ] && [ -f "${sfn}" ]; then
             echo "${sfn}" >> "$GITHUB_OUTPUT"
