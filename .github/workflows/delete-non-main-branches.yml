@@ -22,8 +22,8 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             
-            // Get all branches
-            const { data: branches } = await github.rest.repos.listBranches({
+            // Get all branches with pagination
+            const branches = await github.paginate(github.rest.repos.listBranches, {
               owner,
               repo,
               per_page: 100
