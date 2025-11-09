@@ -4,12 +4,13 @@ on:
   pull_request:
     branches:
       - main
-  # workflow_run:
-  #   branches:
-  #     - main
-  #   workflows: ["Block non-conforming PRs (auto-close + label)"]
-  #   types:
-  #     - completed
+  workflow_run:
+    branches:
+      - main
+    workflows: 
+      - "Block non-conforming PRs (auto-close + label)"
+    types:
+      - completed
   workflow_dispatch:  # Add this for manual testing
 
 permissions:
@@ -20,9 +21,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    # permissions:
-    #   contents: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: read
     outputs:
       platforms: ${{ steps.build.outputs.platforms }}
     steps:
@@ -80,6 +81,7 @@ jobs:
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
+        id: upload-artifacts
         if: always()
         with:
           name: snap-build-artifacts
@@ -87,6 +89,11 @@ jobs:
             zwave-js-ui*.snap
             snapcraft-*.txt
           retention-days: 7
+
+      - name: Uploaded URLs
+        run: |
+          echo "${{ steps.upload.outputs }}" | yq '.' -oj
+        
 
   upload:
     needs: build 
