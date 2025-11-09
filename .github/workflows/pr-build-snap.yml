@@ -27,6 +27,7 @@ jobs:
       actions: write
     outputs:
       platforms: ${{ steps.build.outputs.platforms }}
+      artifacts-url: ${{ steps.upload-artifacts.outputs.archive_download_url }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -38,8 +39,8 @@ jobs:
         id: extract
         run: |
           # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
-          # echo "platforms=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)" >> $GITHUB_OUTPUT
-          echo "platforms=$(echo "['amd64']" | yq '.' -oj -I0)" >> $GITHUB_OUTPUT
+          # (Using a fixed example here; replace with real extraction as needed)
+          printf 'platforms=%s\n' '["amd64"]' >> "$GITHUB_OUTPUT"
 
       - name: Build for ${{ steps.extract.outputs.platforms }}
         id: build
@@ -47,8 +48,7 @@ jobs:
           set -xuo pipefail
 
           # Read platforms JSON array from previous step
-          # Convert array to mapping: {"amd64": {}, "arm64": {}}
-          platforms_map="$(echo "${{ steps.extract.outputs.platforms}}" | yq 'to_entries | map({"key": .value, "value": {}}) | from_entries' -oj -I0)"
+          platforms="$(echo "${{ steps.extract.outputs.platforms }}" | yq '.' -oj -I0)"
 
           sudo snap install snapcraft --classic
           export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}"
@@ -58,27 +58,10 @@ jobs:
 
           # Build for comma-separated list of arches
           snapcraft remote-build -v --launchpad-accept-public-upload \
-            --build-for=$(jq -r 'keys | join(",")' <<< "$platforms_map")
+            --build-for=$(yq '. | join(",")' <<< "$platforms")
 
-          # Collect artifacts per arch
-          for p in $(jq -r 'keys[]' <<< "$platforms_map"); do
-            sfn=$(ls -d "${PWD}"/zwave-js-ui*_"${p}".snap 2>/dev/null || true)
-            lfn=$(ls -d "${PWD}"/snapcraft-*_"${p}"_*.txt 2>/dev/null || true)
-
-            if [[ -n "$sfn" ]]; then
-              platforms_map=$(jq --arg p "$p" --arg sfn "$sfn" '.[$p].sfn = $sfn' <<< "$platforms_map")
-            else
-              platforms_map=$(jq --arg p "$p" '.[$p].sfn = ""' <<< "$platforms_map")
-            fi
-
-            platforms_map=$(jq --arg p "$p" --arg lfn "$lfn" '.[$p].lfn = $lfn' <<< "$platforms_map")
-          done
-
-          # Convert mapping to array of objects: [{arch: "amd64", sfn: "...", lfn: "..."}, ...]
-          platforms_array=$(jq -c 'to_entries | map({arch:.key} + .value)' <<< "$platforms_map")
-
-          echo "$platforms_array"
-          echo "platforms=$platforms_array" >> $GITHUB_OUTPUT
+          # Safely write the platforms step output (avoid nested-quote issues)
+          printf 'platforms=%s\n' "$(echo "$platforms" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
@@ -90,60 +73,33 @@ jobs:
             zwave-js-ui*.snap
             snapcraft-*.txt
           retention-days: 7
-
-      - name: Uploaded URLs
+          
+      - name: Uploaded artifacts URL
         run: |
-          echo "${{ steps.upload.outputs }}" | yq '.' -oj
-        
+          echo "Upload action outputs: ${{ toJson(steps.upload-artifacts.outputs) }}"
+          echo "Archive download URL: ${{ steps.upload-artifacts.outputs.archive_download_url }}"
 
   upload:
     needs: build 
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     strategy:
       matrix:
         platform: ${{ fromJson(needs.build.outputs.platforms) }}
       fail-fast: true
     steps:
-      - name: Download build artifacts
+      - name: Download build artifacts ${{ matrix.platform }}
         uses: actions/download-artifact@v6
+        id: download-artifacts
         with:
           name: snap-build-artifacts
           path: .
 
-      - name: For build platform ${{ matrix.platform.arch }}
-        id: file
+      - name: For logging URLs: ${{ matrix.platform }}
         run: |
-          set -euo pipefail
-          arch="${{ matrix.platform.arch }}"
-          
-          # Find files for this architecture in the downloaded artifacts
-          sfn=$(ls -1 zwave-js-ui*_"${arch}".snap 2>/dev/null | head -1 || echo "")
-          lfn=$(ls -1 snapcraft-*_"${arch}"_*.txt 2>/dev/null | head -1 || echo "")
-          
-          echo "Found snap file: ${sfn}"
-          echo "Found log file: ${lfn}"
-          
-          echo "paths<<EOF" >> "$GITHUB_OUTPUT"
-          if [[ -n "$sfn" ]]; then
-            echo "${sfn}" >> "$GITHUB_OUTPUT"
-          fi
-          if [[ -n "$lfn" ]]; then
-            echo "${lfn}" >> "$GITHUB_OUTPUT"
-          fi
-          echo "EOF" >> "$GITHUB_OUTPUT"
-      - name: Outputs from ${{ matrix.platform.arch }}
-        run: |
-          echo "${{ steps.file.outputs.paths }}"
+          echo "${{ toJson(steps.download-artifacts.outputs) }}"
+          echo "Files in workspace (downloaded artifact contents):"
+          ls -la
+          echo "Artifact archive URL from build job: ${{ needs.build.outputs.artifacts-url }}"
 
-      - name: Upload ${{ matrix.platform.arch }}
-        uses: actions/upload-artifact@v5
-        id: upload
-        if: ${{ steps.file.outputs.paths != '' }} 
-        with:
-          name: ${{ matrix.platform.arch }}
-          path: ${{ steps.file.outputs.paths }}
-        
-
-
-
-          
