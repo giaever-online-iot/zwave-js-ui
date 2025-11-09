@@ -1,0 +1,54 @@
+name: Delete all branches except main
+
+on:
+  workflow_dispatch:  # Manual trigger only for safety
+
+permissions:
+  contents: write
+
+jobs:
+  delete-branches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all branches
+          
+      - name: Delete all branches except main
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            
+            // Get all branches
+            const { data: branches } = await github.rest.repos.listBranches({
+              owner,
+              repo,
+              per_page: 100
+            });
+            
+            core.info(`Found ${branches.length} branches total`);
+            
+            // Filter out main branch
+            const branchesToDelete = branches.filter(branch => branch.name !== 'main');
+            
+            core.info(`Will delete ${branchesToDelete.length} branches`);
+            
+            // Delete each branch
+            for (const branch of branchesToDelete) {
+              try {
+                core.info(`Deleting branch: ${branch.name}`);
+                await github.rest.git.deleteRef({
+                  owner,
+                  repo,
+                  ref: `heads/${branch.name}`
+                });
+                core.info(`✓ Successfully deleted: ${branch.name}`);
+              } catch (error) {
+                core.warning(`✗ Failed to delete ${branch.name}: ${error.message}`);
+              }
+            }
+            
+            core.info('Branch deletion complete!');
