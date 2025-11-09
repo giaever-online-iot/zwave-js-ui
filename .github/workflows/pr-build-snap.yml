@@ -63,6 +63,58 @@ jobs:
           # Safely write the platforms step output (avoid nested-quote issues)
           printf 'platforms=%s\n' "$(echo "$platforms" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
+      - name: Normalize .snap/.txt artifact names
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob || true
+
+          # install yq if missing
+          if ! command -v yq >/dev/null 2>&1; then
+            echo "Installing yq..."
+            sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+            sudo chmod +x /usr/local/bin/yq
+          fi
+
+          name=$(yq -r '.name' snap/snapcraft.yaml)
+          version=$(yq -r '.version' snap/snapcraft.yaml)
+          echo "snap name=${name}, version=${version}"
+
+          files=(**/*.{snap,txt})
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No .snap or .txt files found"
+            exit 0
+          fi
+
+          for f in "${files[@]}"; do
+            base=$(basename -- "$f")
+            dir=$(dirname -- "$f")
+            ext=${base##*.}
+            if [ "${ext}" = "txt" ]; then
+              # txt: expect ..._<platform>_TIMESTAMP.txt
+              platform=$(echo "$base" | sed -E 's/.*_([A-Za-z0-9-]+)_[0-9T:._-]+\.txt$/\1/')
+              newext=log
+            else
+              # snap: expect ..._<platform>.snap
+              platform=$(echo "$base" | sed -E 's/.*_([A-Za-z0-9-]+)\.snap$/\1/')
+              newext=snap
+            fi
+            if [ -z "$platform" ] || [ "$platform" = "$base" ]; then
+              echo "Could not detect platform for '$f', skipping"
+              continue
+            fi
+            newbase="${name}_${version}_${platform}"
+            candidate="${dir}/${newbase}.${newext}"
+            i=0
+            while [ -e "$candidate" ]; do
+              i=$((i+1))
+              candidate="${dir}/${newbase}_${i}.${newext}"
+            done
+            echo "Renaming '$f' -> '$candidate'"
+            mv -v -- "$f" "$candidate"
+          done
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         id: upload-artifacts
@@ -71,7 +123,7 @@ jobs:
           name: snap-build-artifacts
           path: |
             zwave-js-ui*.snap
-            snapcraft-*.txt
+            zwave-js-ui*.log
           retention-days: 7
           
       - name: Uploaded artifacts URL
