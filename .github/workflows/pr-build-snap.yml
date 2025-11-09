@@ -70,6 +70,15 @@ jobs:
           echo "$platforms_array"
           echo "platforms=$platforms_array" >> $GITHUB_OUTPUT
 
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: snap-build-artifacts
+          path: |
+            zwave-js-ui*.snap
+            snapcraft-*.txt
+          if-no-files-found: ignore
+
   upload:
     needs: build 
     runs-on: ubuntu-latest
@@ -78,6 +87,11 @@ jobs:
         platform: ${{ fromJson(needs.build.outputs.platforms) }}
       fail-fast: true
     steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: snap-build-artifacts
+
       - name: For build platform ${{ matrix.platform.arch }}
         id: file
         run: |
