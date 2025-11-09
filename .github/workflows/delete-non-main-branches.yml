@@ -1,6 +1,7 @@
+---
 name: Delete all branches except main
 
-on:
+'on':
   workflow_dispatch:  # Manual trigger only for safety
 
 permissions:
@@ -14,28 +15,35 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Fetch all branches
-          
+
       - name: Delete all branches except main
         uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
-            
+
             // Get all branches with pagination
-            const branches = await github.paginate(github.rest.repos.listBranches, {
-              owner,
-              repo,
-              per_page: 100
-            });
-            
+            const branches = await github.paginate(
+              github.rest.repos.listBranches,
+              {
+                owner,
+                repo,
+                per_page: 100
+              }
+            );
+
             core.info(`Found ${branches.length} branches total`);
-            
+
             // Filter out main branch
-            const branchesToDelete = branches.filter(branch => branch.name !== 'main');
-            
-            core.info(`Will delete ${branchesToDelete.length} branches`);
-            
+            const branchesToDelete = branches.filter(
+              branch => branch.name !== 'main'
+            );
+
+            core.info(
+              `Will delete ${branchesToDelete.length} branches`
+            );
+
             // Delete each branch
             for (const branch of branchesToDelete) {
               try {
@@ -45,10 +53,14 @@ jobs:
                   repo,
                   ref: `heads/${branch.name}`
                 });
-                core.info(`✓ Successfully deleted: ${branch.name}`);
+                core.info(
+                  `✓ Successfully deleted: ${branch.name}`
+                );
               } catch (error) {
-                core.warning(`✗ Failed to delete ${branch.name}: ${error.message}`);
+                core.warning(
+                  `✗ Failed to delete ${branch.name}: ${error.message}`
+                );
               }
             }
-            
+
             core.info('Branch deletion complete!');
