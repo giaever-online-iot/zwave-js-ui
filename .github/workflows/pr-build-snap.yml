@@ -20,9 +20,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    permissions:
-      contents: read
+    # if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # permissions:
+    #   contents: read
     outputs:
       platforms: ${{ steps.build.outputs.platforms }}
     steps:
