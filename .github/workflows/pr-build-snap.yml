@@ -4,12 +4,12 @@ on:
   pull_request:
     branches:
       - main
-  workflow_run:
-    branches:
-      - main
-    workflows: ["Block non-conforming PRs (auto-close + label)"]
-    types:
-      - completed
+  # workflow_run:
+  #   branches:
+  #     - main
+  #   workflows: ["Block non-conforming PRs (auto-close + label)"]
+  #   types:
+  #     - completed
   workflow_dispatch:  # Add this for manual testing
 
 permissions:
