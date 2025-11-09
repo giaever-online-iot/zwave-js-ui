@@ -84,13 +84,11 @@ jobs:
           set -euo pipefail
           sfn="${{ matrix.platform.sfn }}"
           lfn="${{ matrix.platform.lfn }}"
+          #if [ -n "${sfn}" ] && [ -f "${sfn}" ]; then
+          #if [ -n "${lfn}" ] && [ -f "${lfn}" ]; then
           echo "paths<<EOF" >> "$GITHUB_OUTPUT"
-          if [ -n "${sfn}" ] && [ -f "${sfn}" ]; then
-            echo "${sfn}" >> "$GITHUB_OUTPUT"
-          fi
-          if [ -n "${lfn}" ] && [ -f "${lfn}" ]; then
-            echo "${lfn}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "${sfn}" >> "$GITHUB_OUTPUT"
+          echo "${lfn}" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Upload ${{ matrix.platform.arch }}
