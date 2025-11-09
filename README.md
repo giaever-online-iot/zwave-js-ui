@@ -1,71 +1,78 @@
-# Zwave JS UI
+# Z-Wave JS UI
 
-Fully configurable Zwave to MQTT Gateway and Control Panel.
+Full-featured Z-Wave Control Panel and MQTT Gateway compatible with all known 500 and 700 series Z-Wave controller hardware adapters. Z-Wave JS runs on almost anything with a little bit of computing power and a serial port.
 
 [![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-black.svg)](https://snapcraft.io/zwave-js-ui)
 [![Donate with PayPal](https://giaever.online/ppd.png)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=69NA8SXXFBDBN&source=https://snapcraft.io/zwave-js-ui)
 
-**If you're happy with this snap package, please consider to**
-- contribute with PR's,
-- make a donation (any contribution will help keep these projects alive!) to the
-  * Snap package [maintainer](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=69NA8SXXFBDBN&source=https://snapcraft.io/zwave-js-ui)
-  * ZUI [developer](https://github.com/sponsors/robertsLando)
-  * Zwave JS [developer](https://github.com/sponsors/AlCalzone)
-- starring this repository
+## About This Package
 
-Full featured Z-Wave Control Panel and MQTT Gateway compatible with all known 500 and 
-700 series Z-Wave controller hardware adapters, Z-Wave JS runs on almost anything with 
-a little bit of computing power and a serial port.
+This is a snap package for Z-Wave JS UI, providing easy installation and automatic updates through the Snap Store.
 
-# Main features
-- Control Panel UI: Directly control your nodes and their values from the UI, including:
-  - Nodes management: Add, remove, and configure all nodes in your Z-Wave network
-  - Firmware updates: Update device firmware using manufacturer-supplied firmware files
-  - Groups associations: Add, edit, and remove direct node associations
-  - Z-Wave JS Exposed: Provides full-access to Z-Wave JS's APIs
-- Full-Featured Z-Wave to MQTT Gateway: Expose Z-Wave devices to an MQTT broker in a 
-  fully configurable manner
-- Secured: Supports HTTPS and user authentication
-- Scene Management: Create scenes and trigger them by using MQTT apis (with timeout 
-  support)
-- Debug Logs in the UI: See debug logs directly from the UI
-- Access Store Files in the UI: Access the files are stored in the persistent store 
-  folder directly from the UI
-- Network Graph: Provides a beautiful map showing how nodes are communicating with the 
-  controller
-- Supports the Official Home Assistant Integration: Can act as the backend driver for 
-  the official Home Assistant integration, using the same driver and socket server as 
-  the official addon
-- Supports Home Assistant Discovery via MQTT: In lieu of the official integation, can 
-  be used to expose Z-Wave devices to Home Assistant via MQTT discovery.
-- Supported by Domoticz (beta 2021.1): Using MQTT Autodiscovery.
-- Automatic/Scheduled backups: Scheduled backup of NVM and store directory. It's also 
-  possible to enable automatic backups of NVM before every node inclusion/exclusion/
-  replace, this ensures to create a safe restore point before any operation that can 
-  cause a network corruption.
+**If you find this snap package helpful, please consider:**
+- Contributing with pull requests
+- Making a donation to support ongoing development:
+  - [Snap package maintainer](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=69NA8SXXFBDBN&source=https://snapcraft.io/zwave-js-ui)
+  - [Z-Wave JS UI developer](https://github.com/sponsors/robertsLando)
+  - [Z-Wave JS driver developer](https://github.com/sponsors/AlCalzone)
+- Starring this repository
 
-## Additions with the snap
-- Command to read the log from the terminal independent of if you're logging to file 
-  or not
-- Plugs for the `code-server` snap, if you want a full-fledge editor experience for 
-  the «store-folder»
+## Main Features
 
-# Auto-connections (only if installed from the Snap store)
-- `raw-usb`: To access USB devices, such as Z-wave controller dongles
-- `hardware-observe`: To observe your system for devices, to easily find them in the UI
+### Control Panel UI
+Directly control your nodes and their values from the user interface:
+- **Nodes Management**: Add, remove, and configure all nodes in your Z-Wave network
+- **Firmware Updates**: Update device firmware using manufacturer-supplied firmware files
+- **Group Associations**: Add, edit, and remove direct node associations
+- **Z-Wave JS Exposed**: Provides full access to Z-Wave JS's APIs
 
-**Note:** None of these connections are necessary to run the app, so you can disconnect 
-them as you like, but please note that it might change the experience within the software.
+### Gateway & Integration
+- **Full-Featured Z-Wave to MQTT Gateway**: Expose Z-Wave devices to an MQTT broker in a fully configurable manner
+- **Home Assistant Integration**: Acts as the backend driver for the official Home Assistant integration, using the same driver and socket server as the official add-on
+- **Home Assistant MQTT Discovery**: Alternatively, expose Z-Wave devices to Home Assistant via MQTT discovery
+- **Domoticz Support**: Compatible with Domoticz (beta 2021.1) using MQTT Autodiscovery
 
-# Issues
-If your issue is with 
-- the UI/front-end, report them with [Zwave JS UI](https://github.com/zwave-js/zwave-js-ui/issues)
-- the driver, report them with the driver [Zwave JS](https://github.com/zwave-js/node-zwave-js/issues).
+### Security & Management
+- **Secured**: Supports HTTPS and user authentication
+- **Scene Management**: Create scenes and trigger them using MQTT APIs with timeout support
+- **Automatic/Scheduled Backups**: Scheduled backup of NVM and store directory with optional automatic backups before node inclusion/exclusion/replacement operations
 
-Make sure you have set the log level to `DEBUG` for the respective unit and that you are
-logging to file, and attach it with your issue.
+### Monitoring & Debugging
+- **Debug Logs in UI**: View debug logs directly from the user interface
+- **Access Store Files**: Access files stored in the persistent store folder directly from the UI
+- **Network Graph**: Visual map showing how nodes communicate with the controller
 
-If you're not sure, just report it witin any of the above, but attach logs for both 
-packages. It will be transferred if you reported it within the wrong tracker.
-## Issues with the snap package
-Report it with the [github repository](https://github.com/giaever-online-iot/zwave-js-ui/issues).
+## Snap-Specific Features
+
+This snap package includes additional features:
+- **Log Reading Command**: Read logs from the terminal regardless of whether you're logging to file
+- **Code Server Integration**: Plugs for the `code-server` snap for a full-fledged editor experience with the store folder
+
+## Auto-Connections
+
+When installed from the Snap Store, the following interfaces are automatically connected:
+- **`raw-usb`**: Access USB devices, such as Z-Wave controller dongles
+- **`hardware-observe`**: Observe your system for devices to easily find them in the UI
+
+> **Note:** These connections are not strictly necessary to run the application. You can disconnect them if desired, though this may affect functionality.
+
+## Reporting Issues
+
+### Z-Wave JS UI Issues
+For issues related to the UI or front-end:
+- Report at [Z-Wave JS UI GitHub Issues](https://github.com/zwave-js/zwave-js-ui/issues)
+
+### Z-Wave JS Driver Issues
+For issues related to the Z-Wave JS driver:
+- Report at [Z-Wave JS GitHub Issues](https://github.com/zwave-js/node-zwave-js/issues)
+
+**Before reporting:**
+1. Set the log level to `DEBUG` for the respective component
+2. Enable logging to file
+3. Attach the log file with your issue
+
+If you're unsure where to report, choose either repository and attach logs for both packages. The issue will be transferred to the correct tracker if needed.
+
+### Snap Package Issues
+For issues specific to this snap package:
+- Report at [giaever-online-iot/zwave-js-ui GitHub Issues](https://github.com/giaever-online-iot/zwave-js-ui/issues)
