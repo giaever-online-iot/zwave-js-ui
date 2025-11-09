@@ -1,21 +1,31 @@
 name: PR Build Snap
 
 on:
-  pull_request:
+  workflow_run:
+    workflows: ["Block non-conforming PRs (auto-close + label)"]
+    #types:
+    #  - completed
     branches:
       - main
-    paths-ignore:
-      - '.github/**'
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: read
     outputs:
       platforms: ${{ steps.build.outputs.platforms }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
       - name: Extract platforms from snapcraft.yaml
@@ -80,12 +90,8 @@ jobs:
           lfn="${{ matrix.platform.lfn }}"
           echo "${sfn}, $lfn"
           echo "paths<<EOF" >> "$GITHUB_OUTPUT"
-          if [ -n "${sfn}" ] && [ -f "${sfn}" ]; then
-            echo "${sfn}" >> "$GITHUB_OUTPUT"
-          fi
-          if [ -n "${lfn}" ] && [ -f "${lfn}" ]; then
-            echo "${lfn}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "${sfn}" >> "$GITHUB_OUTPUT"
+          echo "${lfn}" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Upload ${{ matrix.platform.arch }}
