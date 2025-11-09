@@ -7,9 +7,16 @@ on:
     paths-ignore:
       - '.github/**'
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   wait-for-policy-check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Wait for PR policy enforcement
         uses: actions/github-script@v8
@@ -72,6 +79,8 @@ jobs:
   build:
     needs: wait-for-policy-check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       platforms: ${{ steps.build.outputs.platforms }}
     steps:
