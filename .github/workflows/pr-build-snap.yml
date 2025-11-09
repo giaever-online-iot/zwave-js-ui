@@ -2,7 +2,7 @@ name: PR Build Snap
 
 on:
   workflow_run:
-    workflows: ["Block non-conforming PRs (auto-close + label)"]
+    #workflows: ["Block non-conforming PRs (auto-close + label)"]
     #types:
     #  - completed
     branches:
