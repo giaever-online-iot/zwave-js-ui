@@ -63,6 +63,35 @@ jobs:
           # Safely write the platforms step output (avoid nested-quote issues)
           printf 'platforms=%s\n' "$(echo "$platforms" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
+      - name: Rename .txt artifacts to numeric timestamps
+        if: always()
+        run: |
+          set -euo pipefail
+          # allow empty globs
+          shopt -s globstar nullglob || true
+
+          # find .txt files in the workspace recursively
+          files=(**/*.txt)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No .txt files found"
+            exit 0
+          fi
+
+          i=0
+          for f in "${files[@]}"; do
+            dir=$(dirname "${f}")
+            # Use millisecond timestamp if supported, fallback to seconds
+            if ts=$(date +%s%3N 2>/dev/null); then :; else ts=$(date +%s); fi
+            new_base="${dir}/${ts}"
+            # Ensure uniqueness if multiple files produced in same ms
+            while [ -e "${new_base}.txt" ]; do
+              i=$((i+1))
+              new_base="${dir}/${ts}_${i}"
+            done
+            echo "Renaming '${f}' -> '${new_base}.txt'"
+            mv -v -- "${f}" "${new_base}.txt"
+          done
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         id: upload-artifacts
