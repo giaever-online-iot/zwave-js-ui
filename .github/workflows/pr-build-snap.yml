@@ -97,11 +97,14 @@ jobs:
           echo "${sfn}" >> "$GITHUB_OUTPUT"
           echo "${lfn}" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
+      - name: Outputs from ${{ matrix.platform.arch }}
+        run: |
+          echo "${{ steps.file.outputs.paths }}"
 
       - name: Upload ${{ matrix.platform.arch }}
         uses: actions/upload-artifact@v5
         id: upload
-        if: ${{ steps.file.outputs.paths != '' }}
+        if: ${{ steps.file.outputs.paths != '' }} 
         with:
           name: ${{ matrix.platform.arch }}
           path: ${{ steps.file.outputs.paths }}
