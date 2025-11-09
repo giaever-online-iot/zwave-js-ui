@@ -4,6 +4,12 @@ on:
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - '.github/**'
+      - '.git/**'
+      - '.vscode/**'
+      - '**/*.md'
+      - '**/*.txt'
   workflow_run:
     branches:
       - main
