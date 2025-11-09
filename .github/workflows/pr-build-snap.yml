@@ -12,72 +12,7 @@ permissions:
   actions: read
 
 jobs:
-  wait-for-policy-check:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - name: Wait for PR policy enforcement
-        uses: actions/github-script@v8
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const maxWaitTime = 10 * 60 * 1000; // 10 minutes
-            const pollInterval = 10 * 1000; // 10 seconds
-            const startTime = Date.now();
-            
-            // Get the current PR number
-            const prNumber = context.payload.pull_request?.number;
-            if (!prNumber) {
-              core.setFailed('No PR number found in context');
-              return;
-            }
-            
-            core.info(`Waiting for Block non-conforming PRs workflow to complete for PR #${prNumber}...`);
-            
-            while (Date.now() - startTime < maxWaitTime) {
-              // Get workflow runs for the PR
-              const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                event: 'pull_request_target',
-                per_page: 100
-              });
-              
-              // Find the most recent workflow run for this PR from the block-fork-prs workflow
-              const relevantRun = workflowRuns.workflow_runs.find(run => {
-                // Check if this run is associated with our PR
-                return run.pull_requests?.some(pr => pr.number === prNumber) &&
-                       run.name === 'Block non-conforming PRs (auto-close + label)';
-              });
-              
-              if (relevantRun) {
-                core.info(`Found workflow run: ${relevantRun.html_url} with status: ${relevantRun.status}, conclusion: ${relevantRun.conclusion}`);
-                
-                if (relevantRun.status === 'completed') {
-                  if (relevantRun.conclusion === 'success') {
-                    core.info('✓ PR policy check passed!');
-                    return;
-                  } else {
-                    core.setFailed(`PR policy check failed with conclusion: ${relevantRun.conclusion}`);
-                    return;
-                  }
-                }
-                
-                core.info('Policy check still running, waiting...');
-              } else {
-                core.info('Policy check workflow not found yet, waiting...');
-              }
-              
-              // Wait before polling again
-              await new Promise(resolve => setTimeout(resolve, pollInterval));
-            }
-            
-            core.setFailed('Timeout waiting for PR policy check to complete');
-
   build:
-    needs: wait-for-policy-check
     runs-on: ubuntu-latest
     permissions:
       contents: read
