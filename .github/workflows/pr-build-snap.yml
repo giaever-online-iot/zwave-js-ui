@@ -134,7 +134,7 @@ jobs:
       - name: "Check for arch dir/files (${{ matrix.platform }})"
         if: files
         run: |
-          echo "${{ PLATFORM }}"
+          echo "${{ env.PLATFORM }}"
           arch="${{ matrix.platform }}"
           echo "${{ toJson(steps.download-artifacts.outputs) }}"
           echo "Artifact archive URL from build job: ${{ needs.build.outputs.artifacts-url }}"
