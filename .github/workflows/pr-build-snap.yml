@@ -148,6 +148,7 @@ jobs:
       - name: "Upload snap (${{ matrix.platform }}"
         id: upload-snap-artifact
         if: ${{ steps.files.outputs.sfn != "" }}
+        uses: actions/upload-artifact@v4
         with:
           name: snap-${{ matrix.platform }}
           path: ${{ steps.files.outputs.sfn }}
