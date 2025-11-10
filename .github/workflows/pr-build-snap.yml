@@ -131,7 +131,7 @@ jobs:
           name: snap-build-artifacts
           path: .
 
-      - name: "Check for arch dir/files (${{ matrix.platform }})"
+      - name: "Check for platform dir/files (${{ matrix.platform }})"
         id: files
         run: |
           echo "${{ env.PLATFORM }}"
