@@ -76,15 +76,7 @@ jobs:
               }
             }
 
-            const commentBody = `Hi! This repository requires pull requests to:
-- target the \`${target}\` branch, and
-- be opened from branches inside this repository (no forks).
-
-This PR ${reasons.join(' and ')}.
-
-I have applied the \`${labelName}\` label and ${closePr ? 'closed the PR' : 'left it open'}.
-
-If you believe this is a mistake, please open a new PR that targets the \`${target}\` branch and is created from a branch in this repository.`;
+            const commentBody = `Hi! This repository requires pull requests to: target the \`${target}\` branch, and be opened from branches inside this repository (no forks). This PR ${reasons.join(' and ')}. I have applied the \`${labelName}\` label and ${closePr ? 'closed the PR' : 'left it open'}. If you believe this is a mistake, please open a new PR that targets the \`${target}\` branch and is created from a branch in this repository.`;
 
             // Post a comment
             await issuesApi.createComment({
