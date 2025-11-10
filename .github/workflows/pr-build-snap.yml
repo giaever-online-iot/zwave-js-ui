@@ -402,7 +402,7 @@ jobs:
 
       - name: "Post or update comment and set PR labels (only update labels when changed)"
         id: post-comment
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
