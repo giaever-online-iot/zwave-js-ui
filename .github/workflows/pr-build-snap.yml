@@ -164,6 +164,7 @@ jobs:
           echo "url=${URL}" >> $GITHUB_OUTPUT
 
       - name: "Upload log (${{ matrix.platform }}"
+        uses: actions/upload-artifact@v4
         id: upload-log-artifact
         if: ${{ steps.files.outputs.lfn != "" }}
         with:
