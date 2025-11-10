@@ -79,13 +79,20 @@ jobs:
           sn=$(yq '.name' snap/snapcraft.yaml)
           sv=$(yq '.version' snap/snapcraft.yaml)
 
+          # Create build root directory
+          dst_root="$(pwd)/build"
+          mkdir -p "$dst_root"
+
           # Parse platforms JSON array and iterate
           echo '${{ steps.build.outputs.platforms }}' | jq -r '.[]' | while read p; do
+            # Create per-platform directory under dst_root
+            platform_dir="$dst_root/$p"
+            mkdir -p "$platform_dir"
+            
             find ./ -type f \( -name "${sn}*_${p}.snap" -o -name "*_${p}_*.txt" \) | while read src; do
               ext="${src##*.}"
-              dir="$(dirname "$src")"
-              # guard mv so the workflow doesn't fail if source and destination are the same
-              dst="$dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
+              # Move files into dst_root with normalized names
+              dst="$platform_dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
               if [ "$(readlink -f "$src")" = "$(readlink -f "$dst")" ]; then
                 echo "Source and destination are the same (skipping mv)."
               else
@@ -93,7 +100,8 @@ jobs:
               fi
             done
           done
-          ls -al ./
+          ls -al "$dst_root"
+          find "$dst_root" -type f
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
@@ -101,9 +109,7 @@ jobs:
         if: always()
         with:
           name: snap-build-artifacts
-          path: |
-            zwave-js-ui*.snap
-            zwave-js-ui*.log
+          path: build/
           retention-days: 7
           
   upload:
