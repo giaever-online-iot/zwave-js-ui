@@ -124,16 +124,15 @@ jobs:
     env:
       PLATFORM: ${{ matrix.platform }}
     steps:
-      - name: "Download build artifacts (${{ matrix.platform }})"
+      - name: "Download build artifacts for all platforms"
         uses: actions/download-artifact@v6
         id: download-artifacts
         with:
           name: snap-build-artifacts
           path: .
 
-      - name: "Check for arch dir/files (${{ matrix.platform }})"
+      - name: "Check dir/files for platform (${{ matrix.platform }})"
         id: files
-        if: files
         run: |
           echo "${{ env.PLATFORM }}"
           arch="${{ matrix.platform }}"
@@ -146,38 +145,36 @@ jobs:
           echo "sfn=$(find "./${arch}" -name "*.snap" -print -quit)" >> $GITHUB_OUTPUT
           echo "lfn=$(find "./${arch}" -name "*.log" -print -quit)" >> $GITHUB_OUTPUT
 
-      - name: "Upload snap (${{ matrix.platform }}"
+      - name: "Upload snap for platform (${{ matrix.platform }})"
         id: upload-snap-artifact
-        if: ${{ steps.files.outputs.sfn != "" }}
+        if: ${{ steps.files.outputs.sfn != '' }}
         uses: actions/upload-artifact@v5
         with:
           name: snap-${{ matrix.platform }}
           path: ${{ steps.files.outputs.sfn }}
 
-      - name: "Download URL snap"
+      - name: "Download URL snap for platform (${{ matrix.platform }})"
         if: ${{ steps.upload-snap-artifact.outputs.artifact-url }}
         id: snap-artifact
         env:
           URL: ${{ steps.upload-snap-artifact.outputs.artifact-url }}
         run: |
-          echo "URL: ${URL}"
+          echo "URL: ${URL}, ${{ steps.upload-snap-artifact.outputs.artifact-url }}"
           echo "url=${URL}" >> $GITHUB_OUTPUT
 
-      - name: "Upload log (${{ matrix.platform }}"
+      - name: "Upload log for platform (${{ matrix.platform }})"
         uses: actions/upload-artifact@v5
         id: upload-log-artifact
-        if: ${{ steps.files.outputs.lfn != "" }}
+        if: ${{ steps.files.outputs.lfn != '' }}
         with:
           name: log-${{ matrix.platform }}
           path: ${{ steps.files.outputs.lfn }}
 
-      - name: "Download URL log"
+      - name: "Download URL log for platform (${{ matrix.platform }})"
         if: ${{ steps.upload-log-artifact.outputs.artifact-url }}
         id: log-artifact
         env:
           URL: ${{ steps.upload-log-artifact.outputs.artifact-url }}
         run: |
-          echo "URL: ${URL}"
+          echo "URL: ${URL}, ${{ steps.upload-log-artifact.outputs.artifact-url }}"
           echo "url=${URL}" >> $GITHUB_OUTPUT
-
-      
