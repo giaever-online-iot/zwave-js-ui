@@ -85,7 +85,14 @@ jobs:
               ext="${file##*.}"
               base="$(basename "${file}" ".${ext}")"
               dir="$(dirname "$file")"
-              mv -f "$file" "$dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
+              # guard mv so the workflow doesn't fail if source and destination are the same
+              src="$file"
+              dst="$dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
+              if [ "$(readlink -f "$src")" = "$(readlink -f "$dst")" ]; then
+                echo "Source and destination are the same (skipping mv)."
+              else
+                mv "$src" "$dst"
+              fi
             done
           done
           ls -al ./
