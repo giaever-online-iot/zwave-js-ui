@@ -165,7 +165,7 @@ jobs:
         id: upload-log-artifact
         if: ${{ steps.files.outputs.lfn != "" }}
         with:
-          name: snap-${{ matrix.platform }}
+          name: log-${{ matrix.platform }}
           path: ${{ steps.files.outputs.lfn }}
 
       - name: "Download URL log"
