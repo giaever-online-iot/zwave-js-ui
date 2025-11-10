@@ -33,7 +33,7 @@ jobs:
       actions: write
     outputs:
       platforms: ${{ steps.build.outputs.platforms }}
-      artifacts-url: ${{ steps.upload-artifacts.outputs.archive_download_url }}
+      artifacts-url: ${{ steps.upload-artifacts.outputs.artifact-url }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -106,11 +106,6 @@ jobs:
             zwave-js-ui*.log
           retention-days: 7
           
-      - name: Uploaded artifacts URL
-        run: |
-          echo "Upload action outputs: ${{ toJson(steps.upload-artifacts.outputs) }}"
-          echo "Archive download URL: ${{ steps.upload-artifacts.outputs.archive_download_url }}"
-
   upload:
     needs: build 
     runs-on: ubuntu-latest
