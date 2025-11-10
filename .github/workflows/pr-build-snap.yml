@@ -83,7 +83,6 @@ jobs:
           echo '${{ steps.build.outputs.platforms }}' | jq -r '.[]' | while read p; do
             find ./ -type f \( -name "${sn}*_${p}.snap" -o -name "*_${p}_*.txt" \) | while read src; do
               ext="${src##*.}"
-              base="$(basename "${src}" ".${ext}")"
               dir="$(dirname "$src")"
               # guard mv so the workflow doesn't fail if source and destination are the same
               dst="$dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
