@@ -81,12 +81,11 @@ jobs:
 
           # Parse platforms JSON array and iterate
           echo '${{ steps.build.outputs.platforms }}' | jq -r '.[]' | while read p; do
-            find ./ -type f \( -name "${sn}*_${p}.snap" -o -name "*_${p}_*.txt" \) | while read file; do
-              ext="${file##*.}"
-              base="$(basename "${file}" ".${ext}")"
-              dir="$(dirname "$file")"
+            find ./ -type f \( -name "${sn}*_${p}.snap" -o -name "*_${p}_*.txt" \) | while read src; do
+              ext="${src##*.}"
+              base="$(basename "${src}" ".${src}")"
+              dir="$(dirname "$src")"
               # guard mv so the workflow doesn't fail if source and destination are the same
-              src="$file"
               dst="$dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
               if [ "$(readlink -f "$src")" = "$(readlink -f "$dst")" ]; then
                 echo "Source and destination are the same (skipping mv)."
