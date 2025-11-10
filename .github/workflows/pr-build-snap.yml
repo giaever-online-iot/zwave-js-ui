@@ -13,7 +13,7 @@ on:
   workflow_run:
     branches:
       - main
-    workflows: 
+    workflows:
       - "Block non-conforming PRs (auto-close + label)"
     types:
       - completed
@@ -45,7 +45,7 @@ jobs:
         id: extract
         run: |
           # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
-          # archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml) 
+          # archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
           printf 'platforms=%s\n' "$(echo "${archs:-"['amd64']"}" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
       - name: Build for ${{ steps.extract.outputs.platforms }}
@@ -88,7 +88,7 @@ jobs:
             # Create per-platform directory under dst_root
             platform_dir="$dst_root/$p"
             mkdir -p "$platform_dir"
-            
+
             find ./ -type f \( -name "${sn}*_${p}.snap" -o -name "*_${p}_*.txt" \) | while read src; do
               ext="${src##*.}"
               # Move files into dst_root with normalized names
@@ -111,9 +111,9 @@ jobs:
           name: snap-build-artifacts
           path: build/
           retention-days: 7
-          
+
   upload:
-    needs: build 
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -123,10 +123,6 @@ jobs:
       fail-fast: true
     env:
       PLATFORM: ${{ matrix.platform }}
-    outputs:
-      snap-url: ${{ steps.snap-artifact.outputs.url }}
-      log-url: ${{ steps.log-artifact.outputs.url }}
-      log-content: ${{ steps.files.outputs.log }}
     steps:
       - name: "Download build artifacts for all platforms"
         uses: actions/download-artifact@v6
@@ -144,14 +140,10 @@ jobs:
           echo "Artifact archive URL from build job: ${{ needs.build.outputs.artifacts-url }}"
           echo "Files in workspace (downloaded artifact contents):"
           ls -al ./
-          ls -al "./${arch}"
+          ls -al "./${arch}" || true
           echo "dir=${arch}" >> $GITHUB_OUTPUT
-          echo "sfn=$(find "./${arch}" -name "*.snap" -print -quit)" >> $GITHUB_OUTPUT
-          lfn=$(find "./${arch}" -name "*.log" -print -quit)
-          echo "lfn=${lfn}" >> $GITHUB_OUTPUT
-          echo "log<<EOF" >> $GITHUB_OUTPUT
-          cat ${lfn} >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "sfn=$(find "./${arch}" -name "*.snap" -print -quit || true)" >> $GITHUB_OUTPUT
+          echo "lfn=$(find "./${arch}" -name "*.log" -print -quit || true)" >> $GITHUB_OUTPUT
 
       - name: "Upload snap for platform (${{ matrix.platform }})"
         id: upload-snap-artifact
@@ -186,3 +178,438 @@ jobs:
         run: |
           echo "URL: ${URL}, ${{ steps.upload-log-artifact.outputs.artifact-url }}"
           echo "url=${URL}" >> $GITHUB_OUTPUT
+
+      - name: "Write result metadata for platform (${{ matrix.platform }})"
+        id: write-result
+        env:
+          SFN_URL: ${{ steps.snap-artifact.outputs.url || '' }}
+          LFN_URL: ${{ steps.log-artifact.outputs.url || '' }}
+          LFN_PATH: ${{ steps.files.outputs.lfn || '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p result
+          outfile="result/${{ matrix.platform }}.json"
+          # If we have a local log file path (from earlier find) include its content in the JSON.
+          if [ -n "$LFN_PATH" ] && [ -f "$LFN_PATH" ]; then
+            # Read the log file as a raw string into JSON using jq -Rs (reads entire stdin as string)
+            jq -Rs --arg platform "${{ matrix.platform }}" --arg snap_url "$SFN_URL" --arg log_url "$LFN_URL" \
+              '{platform:$platform, snap_url:$snap_url, log_url:$log_url, log:.}' < "$LFN_PATH" > "$outfile"
+          else
+            jq -n --arg platform "${{ matrix.platform }}" --arg snap_url "$SFN_URL" --arg log_url "$LFN_URL" \
+              '{platform:$platform, snap_url:$snap_url, log_url:$log_url, log:""}' > "$outfile"
+          fi
+          ls -al result
+          cat "$outfile"
+
+      - name: "Upload result metadata (per-platform)"
+        uses: actions/upload-artifact@v5
+        with:
+          name: result-${{ matrix.platform }}
+          path: result/${{ matrix.platform }}.json
+
+  comment:
+    needs: upload
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - name: "Download all artifacts"
+        uses: actions/download-artifact@v6
+        with:
+          # omit 'name' to download ALL artifacts produced by this workflow run
+          path: results
+
+      - name: "Install jq"
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+
+      - name: "Compose badge row"
+        id: compose-badges
+        env:
+          PLATFORMS_JSON: '${{ needs.build.outputs.platforms }}'
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          OUT=tmp_comment.md
+          echo "## Snap build results" > "$OUT"
+          echo "" >> "$OUT"
+
+          PLATFORMS="${PLATFORMS_JSON:-[]}"
+          if [ -z "$PLATFORMS" ] || [ "$PLATFORMS" = "null" ]; then
+            echo "_No platforms reported from build job._" >> "$OUT"
+            echo "comment_file=${OUT}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          BADGES=""
+          for p in $(echo "$PLATFORMS" | jq -r '.[]'); do
+            meta="results/result-${p}.json"
+            snap_url=""
+            log_url=""
+            log_embedded=""
+            if [ -f "$meta" ]; then
+              snap_url=$(jq -r '.snap_url // ""' "$meta")
+              log_url=$(jq -r '.log_url // ""' "$meta")
+              log_embedded=$(jq -r '.log // ""' "$meta")
+            fi
+
+            if [ -z "$snap_url" ]; then
+              label="failed"
+              color="red"
+              link="${log_url:-https://github.com/${REPO}/actions}"
+            elif [ -z "$log_url" ] && [ -z "$log_embedded" ]; then
+              label="unknown"
+              color="orange"
+              link="${snap_url}"
+            else
+              label="passing"
+              color="brightgreen"
+              link="${snap_url}"
+            fi
+
+            plat_label=$(printf "%s" "$p" | sed 's/ /%20/g')
+            BADGES="${BADGES}[![${plat_label}](https://img.shields.io/badge/${plat_label}-${label}-${color}?style=flat-square)](${link}) "
+          done
+
+          if [ -n "$BADGES" ]; then
+            echo "${BADGES}" >> "$OUT"
+            echo "" >> "$OUT"
+          fi
+
+          echo "comment_file=${OUT}" >> $GITHUB_OUTPUT
+
+      - name: "Append per-platform details (alerts, links, inline logs)"
+        id: compose-details
+        env:
+          PLATFORMS_JSON: '${{ needs.build.outputs.platforms }}'
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          OUT=tmp_comment.md
+          # ensure OUT exists (badge step should already have created it)
+          if [ ! -f "$OUT" ]; then
+            echo "## Snap build results" > "$OUT"
+            echo "" >> "$OUT"
+          fi
+
+          PLATFORMS="${PLATFORMS_JSON:-[]}"
+          if [ -z "$PLATFORMS" ] || [ "$PLATFORMS" = "null" ]; then
+            echo "_No platforms reported from build job._" >> "$OUT"
+            echo "comment_file=${OUT}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # For each platform, append a section
+          for p in $(echo "$PLATFORMS" | jq -r '.[]'); do
+            meta="results/result-${p}.json"
+            snap_url=""
+            log_url=""
+            log_embedded=""
+
+            if [ -f "$meta" ]; then
+              snap_url=$(jq -r '.snap_url // ""' "$meta")
+              log_url=$(jq -r '.log_url // ""' "$meta")
+              log_embedded=$(jq -r '.log // ""' "$meta")
+            fi
+
+            # Determine status
+            if [ -z "$snap_url" ]; then
+              STATUS="failed"
+            elif [ -z "$log_url" ] && [ -z "$log_embedded" ]; then
+              STATUS="unknown"
+            else
+              STATUS="passed"
+            fi
+
+            # Header and alert block
+            echo "" >> "$OUT"
+            echo "---" >> "$OUT"
+            echo "" >> "$OUT"
+            echo "### ${p}" >> "$OUT"
+            case "$STATUS" in
+              passed)
+                echo "> [!NOTE]  " >> "$OUT"
+                echo "> ✔️ Build passed for ${p} — test the build!" >> "$OUT"
+                echo "" >> "$OUT"
+                ;;
+              unknown)
+                echo "> [!WARNING]  " >> "$OUT"
+                echo "> ❔ Build for ${p} — log missing" >> "$OUT"
+                echo "" >> "$OUT"
+                ;;
+              failed)
+                echo "> [!WARNING]  " >> "$OUT"
+                echo "> ❌ Build failed for ${p} — check the logs!" >> "$OUT"
+                echo "" >> "$OUT"
+                ;;
+            esac
+
+            # Links line (prefer snap, then log)
+            LINKS=""
+            if [ -n "$snap_url" ]; then
+              LINKS="Download: [snap package](${snap_url})"
+              if [ -n "$log_url" ]; then
+                LINKS="${LINKS} | [log-file](${log_url})"
+              elif [ -n "$log_embedded" ]; then
+                LINKS="${LINKS} | [log-file (inlined below)](javascript:void(0))"
+              fi
+            else
+              if [ -n "$log_url" ]; then
+                LINKS="Download: [log-file](${log_url})"
+              else
+                LINKS="No artifacts available — check Actions run"
+              fi
+            fi
+            echo "${LINKS}" >> "$OUT"
+            echo "" >> "$OUT"
+
+            # Inline embedded log (if present). Put into collapsed details and truncate to 20000 bytes.
+            if [ -n "$log_embedded" ]; then
+              echo "<details><summary>View log for ${p}</summary>" >> "$OUT"
+              echo "" >> "$OUT"
+              echo '```text' >> "$OUT"
+              # print up to 20000 bytes of the embedded log
+              printf '%s' "$log_embedded" | head -c 20000 >> "$OUT" || true
+              if [ "$(printf '%s' "$log_embedded" | wc -c)" -gt 20000 ]; then
+                echo "" >> "$OUT"
+                echo "[truncated]" >> "$OUT"
+              fi
+              echo '```' >> "$OUT"
+              echo "" >> "$OUT"
+              echo "</details>" >> "$OUT"
+              echo "" >> "$OUT"
+            else
+              # no embedded log: if log_url missing, inform reviewer
+              if [ -z "$log_url" ]; then
+                echo "[No collapsed log available for ${p} - please download artifacts to inspect]" >> "$OUT"
+                echo "" >> "$OUT"
+              fi
+            fi
+          done
+
+          # ensure final separator and expose path
+          echo "---" >> "$OUT"
+          echo "" >> "$OUT"
+          echo "comment_file=${OUT}" >> $GITHUB_OUTPUT
+
+      - name: "List results"
+        run: |
+          ls -al results || true
+          echo "Found result JSONs (if any):"
+          find results -type f -name "result*.json" -print -exec jq -r . {} \; || true
+
+      - name: "Post or update comment and set PR labels (only update labels when changed)"
+        id: post-comment
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+
+            const MARKER = '<!-- snap-build-comment -->';
+
+            // get the path to the composed comment file
+            const outPath = '${{ steps.compose-details.outputs.comment_file }}' || 'tmp_comment.md';
+
+            if (!fs.existsSync(outPath)) {
+              core.info(`Comment file ${outPath} not found; nothing to post.`);
+              return;
+            }
+
+            // read composed body and ensure marker present
+            let body = fs.readFileSync(outPath, 'utf8').trim();
+            const bodyWithMarker = `${MARKER}\n\n${body}`;
+
+            // determine PR number
+            const prNumber = context.issue.number || (context.payload.pull_request && context.payload.pull_request.number);
+            if (!prNumber) {
+              core.info('No pull request number found in context; skipping comment creation.');
+              return;
+            }
+
+            // find existing comment containing our marker
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            let existing = comments.find(c => c.body && c.body.includes(MARKER));
+
+            if (existing) {
+              // normalize whitespace and newlines for comparison
+              const normalize = s => (s || '').replace(/\r\n/g, '\n').trim();
+              const existingNorm = normalize(existing.body);
+              const newNorm = normalize(bodyWithMarker);
+
+              if (existingNorm === newNorm) {
+                core.info('Comment body unchanged; skipping update.');
+              } else {
+                // update existing comment because it changed
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body: bodyWithMarker,
+                });
+                core.info(`Updated existing comment id=${existing.id} on PR #${prNumber}`);
+              }
+            } else {
+              // create new comment
+              const created = await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: bodyWithMarker,
+              });
+              core.info(`Created new comment id=${created.data.id} on PR #${prNumber}`);
+            }
+
+            // Aggregate build status from result JSONs
+            const resultsDir = 'results';
+            let failed = 0, unknown = 0, passed = 0;
+
+            try {
+              const files = fs.readdirSync(resultsDir);
+              for (const fname of files) {
+                if (!/^result.*\.json$/.test(fname)) continue;
+                const fpath = `${resultsDir}/${fname}`;
+                try {
+                  const json = JSON.parse(fs.readFileSync(fpath, 'utf8'));
+                  const snap_url = (json.snap_url || '').trim();
+                  const log_url = (json.log_url || '').trim();
+                  const log_embedded = (json.log || '').trim();
+
+                  if (!snap_url) {
+                    failed++;
+                  } else if (!log_url && !log_embedded) {
+                    unknown++;
+                  } else {
+                    passed++;
+                  }
+                } catch (e) {
+                  core.info(`Skipping invalid JSON ${fpath}: ${e}`);
+                }
+              }
+            } catch (e) {
+              core.info(`No results directory found or could not read it: ${e}`);
+            }
+
+            let desiredLabel = null;
+            if (failed > 0) desiredLabel = 'build/failed';
+            else if (unknown > 0) desiredLabel = 'build/unknown';
+            else desiredLabel = 'build/passed';
+
+            const labelMeta = {
+              'build/passed': { color: '0e8a16', description: 'All builds passed' },
+              'build/failed': { color: 'b60205', description: 'One or more builds failed' },
+              'build/unknown': { color: 'f9c513', description: 'One or more builds unknown' },
+            };
+
+            async function ensureLabelExists(name) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name,
+                });
+                return true;
+              } catch (err) {
+                if (err.status === 404) {
+                  const meta = labelMeta[name] || { color: 'cccccc', description: '' };
+                  try {
+                    await github.rest.issues.createLabel({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      name,
+                      color: meta.color,
+                      description: meta.description,
+                    });
+                    core.info(`Created label ${name}`);
+                    return true;
+                  } catch (createErr) {
+                    core.warning(`Failed creating label ${name}: ${createErr}`);
+                    return false;
+                  }
+                } else {
+                  core.warning(`Error checking label ${name}: ${err}`);
+                  return false;
+                }
+              }
+            }
+
+            // Fetch current labels on the PR once
+            let currentLabels = [];
+            try {
+              const { data: issueLabels } = await github.rest.issues.listLabelsOnIssue({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+              });
+              currentLabels = (issueLabels || []).map(l => l.name);
+            } catch (e) {
+              core.warning(`Failed to list labels on PR #${prNumber}: ${e}`);
+            }
+
+            // Determine the current build/* label on the PR (if any)
+            const allBuildLabels = ['build/passed', 'build/failed', 'build/unknown'];
+            let currentBuildLabel = null;
+            for (const lbl of allBuildLabels) {
+              if (currentLabels.includes(lbl)) {
+                currentBuildLabel = lbl;
+                break;
+              }
+            }
+
+            // If the desired label differs from what the PR currently has, change labels;
+            // otherwise skip label modifications.
+            if (currentBuildLabel === desiredLabel) {
+              core.info(`PR labels already reflect desired state (${desiredLabel}); skipping label changes.`);
+            } else {
+              core.info(`PR label change needed: current=${currentBuildLabel || '<none>'} -> desired=${desiredLabel}`);
+
+              // Ensure desired label exists before trying to add it
+              await ensureLabelExists(desiredLabel);
+
+              // Add desired label if not present
+              if (!currentLabels.includes(desiredLabel)) {
+                try {
+                  await github.rest.issues.addLabels({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: prNumber,
+                    labels: [desiredLabel],
+                  });
+                  core.info(`Added label ${desiredLabel} to PR #${prNumber}`);
+                  // update currentLabels to reflect change
+                  currentLabels.push(desiredLabel);
+                } catch (err) {
+                  core.warning(`Failed to add label ${desiredLabel}: ${err}`);
+                }
+              }
+
+              // Remove other build/* labels if present
+              for (const lbl of allBuildLabels) {
+                if (lbl === desiredLabel) continue;
+                if (currentLabels.includes(lbl)) {
+                  try {
+                    await github.rest.issues.removeLabel({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: prNumber,
+                      name: lbl,
+                    });
+                    core.info(`Removed label ${lbl} from PR #${prNumber}`);
+                  } catch (e) {
+                    // ignore "label not found on issue" errors and log others
+                    if (e.status && e.status === 404) {
+                      core.info(`Label ${lbl} not present on PR #${prNumber}`);
+                    } else {
+                      core.warning(`Failed to remove label ${lbl}: ${e}`);
+                    }
+                  }
+                }
+              }
+            }
