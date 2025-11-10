@@ -4,6 +4,7 @@ Full-featured Z-Wave Control Panel and MQTT Gateway compatible with all known 50
 
 [![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-black.svg)](https://snapcraft.io/zwave-js-ui)
 [![Donate with PayPal](https://giaever.online/ppd.png)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=69NA8SXXFBDBN&source=https://snapcraft.io/zwave-js-ui)
+[![PR Build Snap](https://github.com/giaever-online-iot/zwave-js-ui/actions/workflows/pr-build-snap.yml/badge.svg)](https://github.com/giaever-online-iot/zwave-js-ui/actions/workflows/pr-build-snap.yml)
 
 ## About This Package
 

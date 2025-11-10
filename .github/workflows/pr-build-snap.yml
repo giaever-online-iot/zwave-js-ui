@@ -23,6 +23,7 @@ permissions:
   contents: read
   actions: read
   pull-requests: read
+  issues: write
 
 jobs:
   build:
@@ -186,3 +187,132 @@ jobs:
         run: |
           echo "URL: ${URL}, ${{ steps.upload-log-artifact.outputs.artifact-url }}"
           echo "url=${URL}" >> $GITHUB_OUTPUT
+
+  alert:
+    needs: [build, upload]
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      issues: write
+    steps:
+      - name: "Download all platform artifacts"
+        uses: actions/download-artifact@v6
+        continue-on-error: true
+        with:
+          pattern: "{snap,log}-*"
+          path: artifacts/
+
+      - name: "Create or update alert issue"
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Get platforms from build job output
+            const platforms = JSON.parse('${{ needs.build.outputs.platforms }}' || '[]');
+            
+            // Check which platforms have artifacts
+            const platformStatuses = [];
+            let hasFailures = false;
+            
+            for (const platform of platforms) {
+              const snapPath = `artifacts/snap-${platform}`;
+              const logPath = `artifacts/log-${platform}`;
+              
+              const hasSnap = fs.existsSync(snapPath) && fs.readdirSync(snapPath).some(f => f.endsWith('.snap'));
+              const hasLog = fs.existsSync(logPath) && fs.readdirSync(logPath).some(f => f.endsWith('.log'));
+              
+              if (!hasSnap || !hasLog) {
+                hasFailures = true;
+              }
+              
+              platformStatuses.push({
+                platform,
+                snapStatus: hasSnap ? '✅' : '❌ MISSING',
+                logStatus: hasLog ? '✅' : '❌ MISSING',
+                snapUrl: hasSnap ? `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts` : 'N/A',
+                logUrl: hasLog ? `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts` : 'N/A'
+              });
+            }
+            
+            const issueTitle = '[Alert] Snap build failures';
+            const issueLabel = 'build-alert';
+            
+            // Find existing open alert issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: issueLabel
+            });
+            
+            const existingIssue = issues.data.find(issue => issue.title === issueTitle);
+            
+            if (hasFailures) {
+              // Build issue body
+              const prLink = context.payload.pull_request 
+                ? `[PR #${context.payload.pull_request.number}](${context.payload.pull_request.html_url})`
+                : 'N/A';
+              
+              const runLink = `[Workflow Run #${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+              
+              let issueBody = `## Snap Build Failures Detected\n\n`;
+              issueBody += `**Workflow Run:** ${runLink}\n`;
+              issueBody += `**Pull Request:** ${prLink}\n`;
+              issueBody += `**Triggered by:** ${{ github.event_name }}\n\n`;
+              issueBody += `### Platform Status\n\n`;
+              issueBody += `| Platform | Snap | Log |\n`;
+              issueBody += `|----------|------|-----|\n`;
+              
+              for (const status of platformStatuses) {
+                issueBody += `| ${status.platform} | ${status.snapStatus} | ${status.logStatus} |\n`;
+              }
+              
+              issueBody += `\n**Note:** Missing artifacts indicate build failures for those platforms.\n`;
+              issueBody += `\nView artifacts and logs at: ${runLink}`;
+              
+              if (existingIssue) {
+                // Update existing issue
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existingIssue.number,
+                  body: issueBody
+                });
+                console.log(`Updated existing alert issue #${existingIssue.number}`);
+              } else {
+                // Create new issue
+                const newIssue = await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: issueTitle,
+                  body: issueBody,
+                  labels: [issueLabel]
+                });
+                console.log(`Created new alert issue #${newIssue.data.number}`);
+              }
+            } else {
+              // All platforms succeeded
+              if (existingIssue) {
+                // Close the existing issue
+                const closeComment = `✅ All snap builds are now successful!\n\nWorkflow Run: [#${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+                
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existingIssue.number,
+                  body: closeComment
+                });
+                
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existingIssue.number,
+                  state: 'closed'
+                });
+                console.log(`Closed alert issue #${existingIssue.number} - all builds successful`);
+              } else {
+                console.log('No failures detected and no open alert issue exists.');
+              }
+            }
