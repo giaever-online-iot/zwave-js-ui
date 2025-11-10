@@ -163,10 +163,10 @@ jobs:
 
       - name: "Upload log (${{ matrix.platform }}"
         id: upload-log-artifact
-        if: ${{ steps.files.outputs.sfn != "" }}
+        if: ${{ steps.files.outputs.lfn != "" }}
         with:
           name: snap-${{ matrix.platform }}
-          path: ${{ steps.files.outputs.sfn }}
+          path: ${{ steps.files.outputs.lfn }}
 
       - name: "Download URL log"
         if: ${{ steps.upload-log-artifact.outputs.artifact-url }}
