@@ -22,7 +22,7 @@ on:
 permissions:
   contents: read
   actions: read
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   build:
@@ -69,7 +69,7 @@ jobs:
           # Safely write the platforms step output (avoid nested-quote issues)
           printf 'platforms=%s\n' "$(echo "$platforms" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
-      - name: Normalize .snap/.txt artifact names
+      - name: Normalize .snap/.txt artifact names and create result metadata
         if: always()
         shell: bash
         run: |
@@ -79,15 +79,21 @@ jobs:
           sn=$(yq '.name' snap/snapcraft.yaml)
           sv=$(yq '.version' snap/snapcraft.yaml)
 
-          # Create build root directory
+          # Create build and result directories
           dst_root="$(pwd)/build"
-          mkdir -p "$dst_root"
+          result_root="$(pwd)/result"
+          mkdir -p "$dst_root" "$result_root"
 
           # Parse platforms JSON array and iterate
           echo '${{ steps.build.outputs.platforms }}' | jq -r '.[]' | while read p; do
             # Create per-platform directory under dst_root
             platform_dir="$dst_root/$p"
             mkdir -p "$platform_dir"
+            
+            # Initialize result metadata
+            snap_file=""
+            log_file=""
+            build_status="success"
             
             find ./ -type f \( -name "${sn}*_${p}.snap" -o -name "*_${p}_*.txt" \) | while read src; do
               ext="${src##*.}"
@@ -99,9 +105,31 @@ jobs:
                 mv "$src" "$dst"
               fi
             done
+            
+            # Find snap and log files
+            snap_file=$(find "$platform_dir" -name "*.snap" -print -quit || echo "")
+            log_file=$(find "$platform_dir" -name "*.log" -print -quit || echo "")
+            
+            # Determine build status
+            if [ -z "$snap_file" ]; then
+              build_status="failed"
+            fi
+            
+            # Create result JSON for this platform
+            cat > "$result_root/${p}.json" <<EOF
+          {
+            "platform": "$p",
+            "status": "$build_status",
+            "snap_file": "$(basename "$snap_file" 2>/dev/null || echo "")",
+            "log_file": "$(basename "$log_file" 2>/dev/null || echo "")",
+            "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          }
+          EOF
           done
           ls -al "$dst_root"
           find "$dst_root" -type f
+          ls -al "$result_root"
+          find "$result_root" -type f
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
@@ -109,7 +137,9 @@ jobs:
         if: always()
         with:
           name: snap-build-artifacts
-          path: build/
+          path: |
+            build/
+            result/
           retention-days: 7
           
   upload:
@@ -186,3 +216,348 @@ jobs:
         run: |
           echo "URL: ${URL}, ${{ steps.upload-log-artifact.outputs.artifact-url }}"
           echo "url=${URL}" >> $GITHUB_OUTPUT
+      
+      - name: "Create result metadata for platform (${{ matrix.platform }})"
+        if: always()
+        run: |
+          mkdir -p result
+          cat > "result/${{ matrix.platform }}.json" <<EOF
+          {
+            "platform": "${{ matrix.platform }}",
+            "status": "${{ steps.files.outputs.sfn != '' && 'success' || 'failed' }}",
+            "snap_url": "${{ steps.snap-artifact.outputs.url || '' }}",
+            "log_url": "${{ steps.log-artifact.outputs.url || '' }}",
+            "snap_file": "$(basename "${{ steps.files.outputs.sfn }}" 2>/dev/null || echo "")",
+            "log_file": "$(basename "${{ steps.files.outputs.lfn }}" 2>/dev/null || echo "")",
+            "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          }
+          EOF
+          cat "result/${{ matrix.platform }}.json"
+      
+      - name: "Upload result metadata for platform (${{ matrix.platform }})"
+        uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: result-${{ matrix.platform }}
+          path: result/${{ matrix.platform }}.json
+          retention-days: 7
+
+  compose-metadata:
+    needs: upload
+    runs-on: ubuntu-latest
+    if: always()
+    outputs:
+      overall-status: ${{ steps.compose.outputs.overall-status }}
+      platforms: ${{ steps.compose.outputs.platforms }}
+      results-json: ${{ steps.compose.outputs.results-json }}
+    steps:
+      - name: "Download all result metadata"
+        uses: actions/download-artifact@v6
+        with:
+          pattern: result-*
+          path: results
+          merge-multiple: true
+      
+      - name: "Compose overall metadata"
+        id: compose
+        run: |
+          set -euo pipefail
+          
+          echo "Downloaded result files:"
+          ls -la results/
+          
+          # Combine all platform results into a single JSON array
+          results_json="[]"
+          overall_status="success"
+          platforms="[]"
+          
+          for result_file in results/*.json; do
+            if [ -f "$result_file" ]; then
+              platform=$(jq -r '.platform' "$result_file")
+              status=$(jq -r '.status' "$result_file")
+              
+              # Add to platforms array
+              platforms=$(echo "$platforms" | jq --arg p "$platform" '. + [$p]')
+              
+              # Add to results array
+              results_json=$(echo "$results_json" | jq --argjson r "$(cat "$result_file")" '. + [$r]')
+              
+              # Update overall status
+              if [ "$status" = "failed" ]; then
+                overall_status="failed"
+              fi
+            fi
+          done
+          
+          echo "overall-status=$overall_status" >> $GITHUB_OUTPUT
+          echo "platforms=$platforms" >> $GITHUB_OUTPUT
+          echo "results-json<<EOF" >> $GITHUB_OUTPUT
+          echo "$results_json" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "Overall Status: $overall_status"
+          echo "Platforms: $platforms"
+          echo "Results JSON: $results_json"
+
+  create-badges:
+    needs: compose-metadata
+    runs-on: ubuntu-latest
+    if: always()
+    outputs:
+      badge-json: ${{ steps.badges.outputs.badge-json }}
+    steps:
+      - name: "Create badges from results"
+        id: badges
+        env:
+          RESULTS: ${{ needs.compose-metadata.outputs.results-json }}
+          OVERALL_STATUS: ${{ needs.compose-metadata.outputs.overall-status }}
+        run: |
+          set -euo pipefail
+          
+          # Create badge for overall status
+          if [ "$OVERALL_STATUS" = "success" ]; then
+            overall_badge='{"schemaVersion":1,"label":"build","message":"passing","color":"brightgreen"}'
+          else
+            overall_badge='{"schemaVersion":1,"label":"build","message":"failing","color":"red"}'
+          fi
+          
+          # Create per-platform badges
+          badge_json="[]"
+          badge_json=$(echo "$badge_json" | jq --argjson b "$overall_badge" '. + [{"name":"overall","badge":$b}]')
+          
+          echo "$RESULTS" | jq -c '.[]' | while read result; do
+            platform=$(echo "$result" | jq -r '.platform')
+            status=$(echo "$result" | jq -r '.status')
+            
+            if [ "$status" = "success" ]; then
+              badge='{"schemaVersion":1,"label":"'"$platform"'","message":"passing","color":"brightgreen"}'
+            else
+              badge='{"schemaVersion":1,"label":"'"$platform"'","message":"failing","color":"red"}'
+            fi
+            
+            badge_json=$(echo "$badge_json" | jq --arg n "$platform" --argjson b "$badge" '. + [{"name":$n,"badge":$b}]')
+          done
+          
+          echo "badge-json<<EOF" >> $GITHUB_OUTPUT
+          echo "$badge_json" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "Badge JSON: $badge_json"
+
+  compose-comment:
+    needs: [compose-metadata, create-badges, upload]
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      actions: read
+    outputs:
+      comment-body: ${{ steps.comment.outputs.comment-body }}
+    steps:
+      - name: "Download all result metadata"
+        uses: actions/download-artifact@v6
+        with:
+          pattern: result-*
+          path: results
+          merge-multiple: true
+      
+      - name: "Download all log artifacts"
+        uses: actions/download-artifact@v6
+        with:
+          pattern: log-*
+          path: logs
+          merge-multiple: true
+        continue-on-error: true
+      
+      - name: "Compose PR comment with collapsed logs"
+        id: comment
+        env:
+          RESULTS: ${{ needs.compose-metadata.outputs.results-json }}
+          OVERALL_STATUS: ${{ needs.compose-metadata.outputs.overall-status }}
+          BADGES: ${{ needs.create-badges.outputs.badge-json }}
+        run: |
+          set -euo pipefail
+          
+          # Start comment body
+          comment_body="## 📦 Snap Build Results\n\n"
+          
+          # Add overall status badge
+          if [ "$OVERALL_STATUS" = "success" ]; then
+            comment_body="${comment_body}![Build Status](https://img.shields.io/badge/build-passing-brightgreen)\n\n"
+          else
+            comment_body="${comment_body}![Build Status](https://img.shields.io/badge/build-failing-red)\n\n"
+          fi
+          
+          # Add results table
+          comment_body="${comment_body}### Build Status by Platform\n\n"
+          comment_body="${comment_body}| Platform | Status | Snap | Log |\n"
+          comment_body="${comment_body}|----------|--------|------|-----|\n"
+          
+          echo "$RESULTS" | jq -c '.[]' | while IFS= read -r result; do
+            platform=$(echo "$result" | jq -r '.platform')
+            status=$(echo "$result" | jq -r '.status')
+            snap_url=$(echo "$result" | jq -r '.snap_url // ""')
+            log_url=$(echo "$result" | jq -r '.log_url // ""')
+            
+            status_icon="✅"
+            if [ "$status" != "success" ]; then
+              status_icon="❌"
+            fi
+            
+            snap_link="N/A"
+            if [ -n "$snap_url" ] && [ "$snap_url" != "null" ]; then
+              snap_link="[📥 Download]($snap_url)"
+            fi
+            
+            log_link="N/A"
+            if [ -n "$log_url" ] && [ "$log_url" != "null" ]; then
+              log_link="[📄 View]($log_url)"
+            fi
+            
+            comment_body="${comment_body}| $platform | $status_icon $status | $snap_link | $log_link |\n"
+          done
+          
+          # Add collapsed logs section
+          comment_body="${comment_body}\n### 📋 Build Logs\n\n"
+          
+          if [ -d "logs" ] && [ "$(ls -A logs 2>/dev/null)" ]; then
+            for log_file in logs/*.log; do
+              if [ -f "$log_file" ]; then
+                platform=$(basename "$log_file" .log | sed 's/.*_//')
+                comment_body="${comment_body}<details>\n<summary>🔍 View $platform build log</summary>\n\n\`\`\`\n"
+                
+                # Add log content (limit to last 500 lines)
+                tail -n 500 "$log_file" >> /tmp/log_content.txt || echo "Unable to read log file" >> /tmp/log_content.txt
+                
+                comment_body="${comment_body}$(cat /tmp/log_content.txt)\n\`\`\`\n\n</details>\n\n"
+                rm -f /tmp/log_content.txt
+              fi
+            done
+          else
+            comment_body="${comment_body}_No build logs available._\n"
+          fi
+          
+          comment_body="${comment_body}\n---\n"
+          comment_body="${comment_body}_Built from commit \`${{ github.event.pull_request.head.sha || github.sha }}\`_\n"
+          
+          # Output comment body
+          echo "comment-body<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$comment_body" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  update-pr:
+    needs: [compose-metadata, compose-comment]
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+    steps:
+      - name: "Find existing comment"
+        uses: actions/github-script@v8
+        id: find-comment
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.data.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('📦 Snap Build Results')
+            );
+            
+            return botComment ? botComment.id : null;
+      
+      - name: "Create or update PR comment"
+        uses: actions/github-script@v8
+        env:
+          COMMENT_BODY: ${{ needs.compose-comment.outputs.comment-body }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const commentBody = process.env.COMMENT_BODY;
+            const existingCommentId = ${{ steps.find-comment.outputs.result }};
+            
+            if (existingCommentId) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingCommentId,
+                body: commentBody
+              });
+              console.log('Updated existing comment:', existingCommentId);
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody
+              });
+              console.log('Created new comment');
+            }
+      
+      - name: "Update PR labels based on build status"
+        uses: actions/github-script@v8
+        env:
+          OVERALL_STATUS: ${{ needs.compose-metadata.outputs.overall-status }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const overallStatus = process.env.OVERALL_STATUS;
+            const successLabel = 'snap-build:passing';
+            const failLabel = 'snap-build:failing';
+            
+            // Get current labels
+            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const hasSuccessLabel = currentLabels.some(label => label.name === successLabel);
+            const hasFailLabel = currentLabels.some(label => label.name === failLabel);
+            
+            // Update labels based on status
+            if (overallStatus === 'success') {
+              if (!hasSuccessLabel) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  labels: [successLabel]
+                });
+                console.log('Added success label');
+              }
+              if (hasFailLabel) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  name: failLabel
+                }).catch(() => console.log('Fail label already removed'));
+                console.log('Removed fail label');
+              }
+            } else {
+              if (!hasFailLabel) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  labels: [failLabel]
+                });
+                console.log('Added fail label');
+              }
+              if (hasSuccessLabel) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  name: successLabel
+                }).catch(() => console.log('Success label already removed'));
+                console.log('Removed success label');
+              }
+            }
