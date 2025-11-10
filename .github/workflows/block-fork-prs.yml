@@ -39,7 +39,6 @@ jobs:
             const headRepo = pr.head && pr.head.repo;
             const baseRepoFull = `${context.repo.owner}/${context.repo.repo}`;
             const headRepoFull = headRepo ? headRepo.full_name : null;
-            // Consider it a fork if the head repo is different from the base repo OR the head repo has `fork: true`.
             const isFork = !!(headRepo && (headRepo.fork || headRepoFull !== baseRepoFull));
 
             const reasons = [];
@@ -51,17 +50,21 @@ jobs:
               return;
             }
 
+            // Compatibility: some runtimes provide github.rest, others expose github.issues/github.pulls directly
+            const issuesApi = (github.rest && github.rest.issues) ? github.rest.issues : github.issues;
+            const pullsApi = (github.rest && github.rest.pulls) ? github.rest.pulls : github.pulls;
+
             // Ensure label exists; create if missing
             try {
-              await github.rest.issues.getLabel({
+              await issuesApi.getLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 name: labelName
               });
             } catch (err) {
-              if (err.status === 404) {
+              if (err && err.status === 404) {
                 core.info(`Label '${labelName}' not found — creating it.`);
-                await github.rest.issues.createLabel({
+                await issuesApi.createLabel({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   name: labelName,
@@ -82,8 +85,9 @@ This PR ${reasons.join(' and ')}.
 I have applied the \`${labelName}\` label and ${closePr ? 'closed the PR' : 'left it open'}.
 
 If you believe this is a mistake, please open a new PR that targets the \`${target}\` branch and is created from a branch in this repository.`;
+
             // Post a comment
-            await github.rest.issues.createComment({
+            await issuesApi.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
@@ -91,7 +95,7 @@ If you believe this is a mistake, please open a new PR that targets the \`${targ
             });
 
             // Add label to the PR (issues API treats PRs as issues)
-            await github.rest.issues.addLabels({
+            await issuesApi.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
@@ -100,7 +104,7 @@ If you believe this is a mistake, please open a new PR that targets the \`${targ
 
             // Optionally close the PR
             if (closePr) {
-              await github.rest.pulls.update({
+              await pullsApi.update({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: prNumber,
