@@ -156,7 +156,7 @@ jobs:
         if: ${{ steps.upload-snap-artifact.outputs.artifact-url }}
         id: snap-artifact
         env:
-          URL: ${{ steps.upload-snap-artifacts.outputs.artifact-url }}
+          URL: ${{ steps.upload-snap-artifact.outputs.artifact-url }}
         run: |
           echo "URL: ${URL}"
           echo "url=${URL}" >> $GITHUB_OUTPUT
