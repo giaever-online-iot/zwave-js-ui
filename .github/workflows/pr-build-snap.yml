@@ -132,7 +132,7 @@ jobs:
           path: .
 
       - name: "Check for arch dir/files (${{ matrix.platform }})"
-        if: files
+        id: files
         run: |
           echo "${{ PLATFORM }}"
           arch="${{ matrix.platform }}"
