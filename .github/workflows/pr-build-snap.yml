@@ -123,6 +123,10 @@ jobs:
       fail-fast: true
     env:
       PLATFORM: ${{ matrix.platform }}
+    outputs:
+      snap-url: ${{ steps.snap-artifact.outputs.url }}
+      log-url: ${{ steps.log-artifact.outputs.url }}
+      log-content: ${{ steps.files.outputs.log }}
     steps:
       - name: "Download build artifacts for all platforms"
         uses: actions/download-artifact@v6
@@ -143,7 +147,11 @@ jobs:
           ls -al "./${arch}"
           echo "dir=${arch}" >> $GITHUB_OUTPUT
           echo "sfn=$(find "./${arch}" -name "*.snap" -print -quit)" >> $GITHUB_OUTPUT
-          echo "lfn=$(find "./${arch}" -name "*.log" -print -quit)" >> $GITHUB_OUTPUT
+          lfn=$(find "./${arch}" -name "*.log" -print -quit)
+          echo "lfn=${lfn}" >> $GITHUB_OUTPUT
+          echo "log<<EOF" >> $GITHUB_OUTPUT
+          cat ${lfn} >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: "Upload snap for platform (${{ matrix.platform }})"
         id: upload-snap-artifact
