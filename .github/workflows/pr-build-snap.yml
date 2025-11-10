@@ -121,18 +121,60 @@ jobs:
       matrix:
         platform: ${{ fromJson(needs.build.outputs.platforms) }}
       fail-fast: true
+    env:
+      PLATFORM: ${{ matrix.platform }}
     steps:
-      - name: Download build artifacts ${{ matrix.platform }}
+      - name: "Download build artifacts (${{ matrix.platform }})"
         uses: actions/download-artifact@v6
         id: download-artifacts
         with:
           name: snap-build-artifacts
           path: .
 
-      - name: "For logging URLs: ${{ matrix.platform }}"
+      - name: "Check for arch dir/files (${{ matrix.platform }})"
+        if: files
         run: |
+          echo "${{ PLATFORM }}"
+          arch="${{ matrix.platform }}"
           echo "${{ toJson(steps.download-artifacts.outputs) }}"
-          echo "Files in workspace (downloaded artifact contents):"
-          ls -la
           echo "Artifact archive URL from build job: ${{ needs.build.outputs.artifacts-url }}"
+          echo "Files in workspace (downloaded artifact contents):"
+          ls -al ./
+          ls -al "./${arch}"
+          echo "dir=${arch}" >> $GITHUB_OUTPUT
+          echo "sfn=$(find "./${arch}" -name "*.snap" -print -quit)" >> $GITHUB_OUTPUT
+          echo "lfn=$(find "./${arch}" -name "*.log" -print -quit)" >> $GITHUB_OUTPUT
 
+      - name: "Upload snap (${{ matrix.platform }}"
+        id: upload-snap-artifact
+        if: ${{ steps.files.outputs.sfn != "" }}
+        with:
+          name: snap-${{ matrix.platform }}
+          path: ${{ steps.files.outputs.sfn }}
+
+      - name: "Download URL snap"
+        if: ${{ steps.upload-snap-artifact.outputs.artifact-url }}
+        id: snap-artifact
+        env:
+          URL: ${{ steps.upload-snap-artifacts.outputs.artifact-url }}
+        run: |
+          echo "URL: ${URL}"
+          echo "url=${URL}" >> $GITHUB_OUTPUT
+
+      - name: "Upload log (${{ matrix.platform }}"
+        id: upload-log-artifact
+        if: ${{ steps.files.outputs.sfn != "" }}
+        with:
+          name: snap-${{ matrix.platform }}
+          path: ${{ steps.files.outputs.sfn }}
+
+      - name: "Download URL log"
+        if: ${{ steps.upload-log-artifact.outputs.artifact-url }}
+        id: log-artifact
+        env:
+          URL: ${{ steps.upload-log-artifacts.outputs.artifact-url }}
+        run: |
+          echo "URL: ${URL}"
+          echo "url=${URL}" >> $GITHUB_OUTPUT
+
+      
