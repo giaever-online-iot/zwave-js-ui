@@ -29,6 +29,11 @@ The snap uses different channels in the `latest` track to give you control over 
 
 For users who want full control and prefer not to receive automatic updates between major and minor releases, use a specific version track (for example, `v9.11`). This allows you to stay on a particular major.minor version and only receive patch updates.
 
+To see all available tracks and channels:
+```bash
+snap info zwave-js-ui
+```
+
 To install from a specific channel:
 ```bash
 sudo snap install zwave-js-ui --channel=latest/candidate
