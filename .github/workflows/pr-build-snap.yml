@@ -1,5 +1,8 @@
 name: PR Build Snap
 
+env:
+  DEV: ${{ true }}
+
 on:
   pull_request:
     branches:
@@ -48,8 +51,22 @@ jobs:
           # archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
           printf 'platforms=%s\n' "$(echo "${archs:-"['amd64']"}" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
+      - name: "Download build artifacts for all platforms"
+        uses: actions/download-artifact@v6
+        id: download-artifacts
+        if: ${{ env.DEV }}
+        with:
+          name: snap-build-artifacts
+          path: .
+
+      - name: "Do we have a build?"
+        env:
+          NEED_BUILD: ${{ !env.DEV || (env.DEV && failure()) }}
+
       - name: Build for ${{ steps.extract.outputs.platforms }}
         id: build
+        # if not DEV, or if DEV but download failed (possibly missing a build?)
+        if: ${{ env.NEED_BUILD }} 
         run: |
           set -xuo pipefail
 
@@ -70,7 +87,8 @@ jobs:
           printf 'platforms=%s\n' "$(echo "$platforms" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
       - name: Normalize .snap/.txt artifact names
-        if: always()
+        # If downloaded the files alread has this structure?
+        if: ${{ env.NEED_BUILD && success() }} 
         shell: bash
         run: |
           set -euo pipefail
@@ -106,7 +124,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         id: upload-artifacts
-        if: always()
+        if: ${{ env.NEED_BUILD && success() }} 
         with:
           name: snap-build-artifacts
           path: build/
