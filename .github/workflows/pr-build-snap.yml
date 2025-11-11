@@ -75,7 +75,7 @@ jobs:
       - name: Build for ${{ steps.extract.outputs.platforms }}
         id: build
         # if not DEV, or if DEV but download did not succeed
-        if: ${{ !env.DEV || env.DEV && failure() }}
+        if: ${{ env.DEV != 'true' || (env.DEV == 'true' && failure()) }}
         run: |
           set -xuo pipefail
           echo "Run-id: ${{ github.run_id }}"
