@@ -288,6 +288,7 @@ jobs:
           status="{}"
           for urls_file in $(find ~+/urls -type f -name "*.json"); do
             key="$(basename "${urls_file}" .json)"
+            echo $urls_file
             build=$(jq '.["snap-url"] // ""' "${urls_file}" && echo true || echo false)
             logged=$(jq '.["log-url"] // ""' "${urls_file}" && echo true || echo false)
             status=$(echo "${status}" | jq --arg key "$key" --argjson build $build --argjson logged $logged \
