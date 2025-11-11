@@ -4,7 +4,7 @@ env:
   # DEV can be overridden when manually running this workflow via workflow_dispatch inputs.
   # Default is 'true' to preserve previous behavior.
   DEV: ${{ github.event.inputs.dev || 'true' }}
-  RUN_ID: ${{ github.event.inputs.dev || github.run_id }}
+  RUN_ID: ${{ github.event.inputs.run_id }}
 
 on:
   pull_request:
