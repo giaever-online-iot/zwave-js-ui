@@ -191,11 +191,11 @@ jobs:
           echo "${{ toJson(steps.download-artifacts.outputs) }}"
           echo "Artifact archive URL from build job: ${{ needs.build.outputs.artifacts-url }}"
           echo "Files in workspace (downloaded artifact contents):"
-          ls -al ./
-          ls -al "./${arch}" || true
+          ls -al ~+/
+          ls -al "~+/${arch}" || true
           echo "dir=${arch}" >> $GITHUB_OUTPUT
-          echo "sfn=$(find "./${arch}" -name "*.snap" -print -quit || true)" >> $GITHUB_OUTPUT
-          echo "lfn=$(find "./${arch}" -name "*.log" -print -quit || true)" >> $GITHUB_OUTPUT
+          echo "sfn=$(find "~+/${arch}" -name "*.snap" -print -quit || true)" >> $GITHUB_OUTPUT
+          echo "lfn=$(find "~+/${arch}" -name "*.log" -print -quit || true)" >> $GITHUB_OUTPUT
 
       - name: "Upload snap for platform (${{ matrix.platform }})"
         id: upload-snap-artifact
@@ -203,7 +203,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: snap-${{ matrix.platform }}
-          path: snap/${{ steps.files.outputs.sfn }}
+          path: ${{ steps.files.outputs.sfn }}
 
       - name: "Download URL snap for platform (${{ matrix.platform }})"
         if: ${{ steps.upload-snap-artifact.outputs.artifact-url }}
@@ -220,7 +220,7 @@ jobs:
         if: ${{ steps.files.outputs.lfn != '' }}
         with:
           name: log-${{ matrix.platform }}
-          path: log/${{ steps.files.outputs.lfn }}
+          path: ${{ steps.files.outputs.lfn }}
 
       - name: "Download URL log for platform (${{ matrix.platform }})"
         if: ${{ steps.upload-log-artifact.outputs.artifact-url }}
@@ -233,15 +233,11 @@ jobs:
 
       - name: "Write result metadata for platform (${{ matrix.platform }})"
         id: write-result
-        env:
-          SFN_URL: ${{ steps.snap-artifact.outputs.url || '' }}
-          LFN_URL: ${{ steps.log-artifact.outputs.url || '' }}
-          LFN_PATH: ${{ steps.files.outputs.lfn || '' }}
         run: |
           cat > "${{ matrix.platform }}.json" <<EOF
           {
-            "snap-url": "${{ steps.snap-artifact.outputs.url }}",
-            "log-url": "${{ steps.log-artifact.outputs.url }}"
+            "snap-url": "${{ steps.snap-artifact.outputs.url || '' }}",
+            "log-url": "${{ steps.log-artifact.outputs.url || '' }}"
           }
           EOF
 
