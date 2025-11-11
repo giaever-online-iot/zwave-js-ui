@@ -44,7 +44,7 @@ jobs:
       contents: read
       actions: write
     outputs:
-      platforms: ${{ steps.build.outputs.platforms }}
+      platforms: ${{ steps.extract.outputs.platforms }}
       artifacts-url: ${{ steps.upload-artifacts.outputs.artifact-url }}
     steps:
       - name: Checkout code
@@ -71,30 +71,11 @@ jobs:
           run-id: ${{ env.RUN_ID || github.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: .
-
-      - name: "Decide whether we need to run snapcraft build"
-        id: decide
-        # This step sets a step output `need_build` to "true" or "false"
-        run: |
-          set -euo pipefail
-          need_build=true # True if otherwise
-
-          ls -al ./
-
-          if [ "${{ env.DEV }}" = "true" ]; then
-            # steps.download-artifacts.outcome will be e.g. 'success', 'failure', 'skipped'
-            dl_outcome="${{ steps.download-artifacts.outcome }}"
-            if [ "$dl_outcome" = "success" ]; then
-              need_build=false
-            fi
-          fi
-
-          echo "need_build=$need_build" >> "$GITHUB_OUTPUT"
           
       - name: Build for ${{ steps.extract.outputs.platforms }}
         id: build
         # if not DEV, or if DEV but download did not succeed
-        if: ${{ steps.decide.outputs.need_build == 'true' }}
+        if: ${{ !env.DEV || env.DEV && failure() }}
         run: |
           set -xuo pipefail
           echo "Run-id: ${{ github.run_id }}"
@@ -112,12 +93,9 @@ jobs:
           snapcraft remote-build -v --launchpad-accept-public-upload \
             --build-for=$(yq '. | join(",")' <<< "$platforms")
 
-          # Safely write the platforms step output (avoid nested-quote issues)
-          printf 'platforms=%s\n' "$(echo "$platforms" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
-
       - name: Normalize .snap/.txt artifact names
         # Run if we actually built in this run
-        if: ${{ steps.decide.outputs.need_build == 'true' && success() }} 
+        if: ${{ success() }} 
         shell: bash
         run: |
           set -euo pipefail
@@ -131,7 +109,7 @@ jobs:
           mkdir -p "$dst_root"
 
           # Parse platforms JSON array and iterate
-          echo '${{ steps.build.outputs.platforms }}' | jq -r '.[]' | while read p; do
+          echo '${{ steps.extract.outputs.platforms }}' | jq -r '.[]' | while read p; do
             # Create per-platform directory under dst_root
             platform_dir="$dst_root/$p"
             mkdir -p "$platform_dir"
@@ -153,7 +131,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         id: upload-artifacts
-        if: ${{ steps.decide.outputs.need_build == 'true' && success() }} 
+        if: ${{ success() }} 
         with:
           name: snap-build-artifacts
           path: build/
