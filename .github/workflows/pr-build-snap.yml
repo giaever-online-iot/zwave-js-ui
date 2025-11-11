@@ -281,3 +281,21 @@ jobs:
           pattern: log-*
           merge-multiple: true
           path: logs
+
+      - name: Return build statuses
+        run: |
+          set -exuo pipefail
+          status="{}"
+          for urls in $(find ~+/urls -type f -name "*.json"); do
+            export key=$(basename $urls) 
+            status=$(echo "${status}" | yq 'strenv(key) = {"build": false, "logged": false}')
+            if [ -n "$(cat "${urls_file}" | yq '.snap-url')" ]; then
+              status=$(echo "${status}" | yq '.build = true')
+            fi
+
+            if [ -n "$(cat "${urls_file}" | yq '.log-url')" ]; then
+              status=$(echo "${status}" | yq '.logged = true')
+            fi
+          done
+
+          echo ${status}
