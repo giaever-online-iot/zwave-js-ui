@@ -4,7 +4,7 @@ env:
   # DEV can be overridden when manually running this workflow via workflow_dispatch inputs.
   # Default is 'true' to preserve previous behavior.
   DEV: ${{ github.event.inputs.dev || 'true' }}
-  RUN_ID: ${{ github.event.inputs.run_id }}
+  RUN_ID: ${{ github.event.inputs.run_id || github.run_id }}
 
 on:
   pull_request:
@@ -32,7 +32,7 @@ on:
       run_id: 
         description: "The id of the workflow run where the desired download artifact was uploaded from."
         required: true
-        default: ${{ github.run_id }}
+        default: ""
       
 
 permissions:
