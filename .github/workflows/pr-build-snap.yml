@@ -175,6 +175,8 @@ jobs:
         uses: actions/download-artifact@v6
         id: download-artifacts
         with:
+          run-id: ${{ env.RUN_ID || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           name: snap-build-artifacts
           path: .
 
