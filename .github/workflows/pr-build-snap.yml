@@ -71,7 +71,7 @@ jobs:
         if: ${{ env.DEV == 'true' }}
         with:
           name: snap-build-artifacts
-          run-id: ${{ env.RUN_ID }}
+          run-id: ${{ env.RUN_ID || github.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: .
 
