@@ -92,7 +92,7 @@ jobs:
       - name: Extract platforms from snapcraft.yaml
         id: extract
         run: |
-          set -exuo pipefail
+          set -euo pipefail
           archs="$(echo "${{ github.event.inputs.platforms }}" | yq '. | split(" ")' -oj -I0)"
 
           if [[ "${archs}" == *'artifact'* ]]; then
