@@ -79,7 +79,7 @@ jobs:
         run: |
           archs="$(echo "${{ github.event.inputs.platforms }}" | yq '. | split(" ")' -oj -I0)"
 
-          if [[ -z "${archs}" ]] || [[ "${archs}" == "all" ]]; then
+          if [[ -z "${archs}" ]] || [[ "${archs}" == *'all'* ]]; then
             # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
             archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
           fi
