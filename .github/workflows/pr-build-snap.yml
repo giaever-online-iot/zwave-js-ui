@@ -279,14 +279,14 @@ jobs:
 
       - name: "List downloads"
         run: |
-          ${GITHUB_WORKSPACE}:
-          ls -al ./
+          echo ${GITHUB_WORKSPACE}:
+          ls -al ~+/
 
-          ${GITHUB_WORKSPACE}/urls:
-          ls -al ./urls
+          echo ${GITHUB_WORKSPACE}/urls:
+          ls -al ~+/urls
 
           ${GITHUB_WORKSPACE}/logs:
-          ls -al ./logs
+          ls -al ~+/logs
 
   #     - name: "Install jq"
   #       run: |
