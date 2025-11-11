@@ -267,7 +267,11 @@ jobs:
     permissions:
       contents: write
       issues: write
+      pull-requests: write
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
       - name: "Download all URLS for"
         uses: actions/download-artifact@v6
         with:
@@ -281,3 +285,47 @@ jobs:
           pattern: log-*
           merge-multiple: true
           path: logs
+
+      - name: "Download all snaps"
+        uses: actions/download-artifact@v6
+        with:
+          pattern: snap-*
+          merge-multiple: true
+          path: snaps
+
+      - name: "Get PR number"
+        id: get-pr
+        uses: actions/github-script@v8
+        with:
+          script: |
+            let prNumber = null;
+            
+            // For pull_request events
+            if (context.payload.pull_request) {
+              prNumber = context.payload.pull_request.number;
+            }
+            // For workflow_run events
+            else if (context.payload.workflow_run) {
+              const workflowRun = context.payload.workflow_run;
+              // Get associated pull requests
+              if (workflowRun.pull_requests && workflowRun.pull_requests.length > 0) {
+                prNumber = workflowRun.pull_requests[0].number;
+              }
+            }
+            
+            if (prNumber) {
+              core.info(`PR number: ${prNumber}`);
+              core.setOutput('pr-number', prNumber);
+            } else {
+              core.info('No PR number found - skipping PR labeling');
+            }
+            
+            return prNumber;
+
+      - name: "Label PR based on build status"
+        if: steps.get-pr.outputs.pr-number
+        uses: ./.github/actions/label-pr-build-status
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ steps.get-pr.outputs.pr-number }}
+          artifacts-path: .

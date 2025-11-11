@@ -1,0 +1,16 @@
+name: 'Label PR Build Status'
+description: 'Label PR based on build artifact presence (snap and log files)'
+inputs:
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+  pr-number:
+    description: 'Pull request number'
+    required: true
+  artifacts-path:
+    description: 'Path to downloaded artifacts'
+    required: true
+    default: '.'
+runs:
+  using: 'node20'
+  main: 'index.js'

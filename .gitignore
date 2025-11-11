@@ -7,3 +7,6 @@ Session.vim
 *~
 *.snap
 actionlint
+
+# Node modules
+node_modules/
