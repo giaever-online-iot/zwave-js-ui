@@ -5,6 +5,7 @@ env:
   # Default is 'true' to preserve previous behavior.
   DEV: ${{ github.event.inputs.run_id != '' }}
   RUN_ID: ${{ github.event.inputs.run_id }}
+  RETENTION_ALL_ARTS: ${{ (github.event.inputs.run_id != '' || 7) || (github.event.inputs.run_id == '' || 30) }}
 
 on:
   pull_request:
@@ -173,7 +174,7 @@ jobs:
         with:
           name: snap-build-artifacts
           path: build/
-          retention-days: 7
+          retention-days: ${{ env.RETENTION_ALL_ARTS }}
 
   upload:
     needs: build
