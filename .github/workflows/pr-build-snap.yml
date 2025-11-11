@@ -289,8 +289,8 @@ jobs:
           for urls_file in $(find ~+/urls -type f -name "*.json"); do
             key="$(basename "${urls_file}" .json)"
             cat $urls_file
-            build=$(jq '.snap-url' "${urls_file}" && echo true || echo false)
-            logged=$(jq '.log-url' "${urls_file}" && echo true || echo false)
+            build=$(yq '.snap-url' "${urls_file}" && echo true || echo false)
+            logged=$(yq '.log-url' "${urls_file}" && echo true || echo false)
             echo "BUILD: ${build}"
             echo "LOGGED: ${logged}"
           done
