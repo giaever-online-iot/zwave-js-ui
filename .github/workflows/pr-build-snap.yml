@@ -4,6 +4,7 @@ env:
   # DEV can be overridden when manually running this workflow via workflow_dispatch inputs.
   # Default is 'true' to preserve previous behavior.
   DEV: ${{ github.event.inputs.dev || 'true' }}
+  RUN_ID: ${{ github.event.inputs.dev || github.run_id }}
 
 on:
   pull_request:
@@ -28,6 +29,11 @@ on:
         description: "If 'true', try to download prebuilt artifacts instead of running snapcraft build. Set to 'false' to force a build."
         required: false
         default: 'true'
+      run_id: 
+        description: "The id of the workflow run where the desired download artifact was uploaded from."
+        required: true
+        default: ${{ github.run_id }}
+      
 
 permissions:
   contents: read
@@ -65,6 +71,8 @@ jobs:
         if: ${{ env.DEV == 'true' }}
         with:
           name: snap-build-artifacts
+          run-id: ${{ env.RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           path: .
 
       - name: "Decide whether we need to run snapcraft build"
@@ -90,7 +98,7 @@ jobs:
         if: ${{ steps.decide.outputs.need_build == 'true' }}
         run: |
           set -xuo pipefail
-
+          echo "Run-id: ${{ github.run_id }}
           # Read platforms JSON array from previous step
           platforms="$(echo "${{ steps.extract.outputs.platforms }}" | yq '.' -oj -I0)"
 
