@@ -1,5 +1,11 @@
 name: PR Build Snap
 
+env:
+  # DEV can be overridden when manually running this workflow via workflow_dispatch inputs.
+  # Default is 'true' to preserve previous behavior.
+  DEV: ${{ github.event.inputs.dev || 'false' }}
+  RUN_ID: ${{ github.event.inputs.run_id }}
+
 on:
   pull_request:
     branches:
@@ -17,7 +23,17 @@ on:
       - "Block non-conforming PRs (auto-close + label)"
     types:
       - completed
-  workflow_dispatch:  # Add this for manual testing
+  workflow_dispatch:
+    inputs:
+      dev:
+        description: "If 'true', try to download prebuilt artifacts instead of running snapcraft build. Set to 'false' to force a build."
+        required: false
+        default: 'true'
+      run_id: 
+        description: "The id of the workflow run where the desired download artifact was uploaded from."
+        required: true
+        default: ""
+      
 
 permissions:
   contents: read
@@ -48,20 +64,52 @@ jobs:
           # archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
           printf 'platforms=%s\n' "$(echo "${archs:-"['amd64']"}" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
+      - name: "Download build artifacts for all platforms"
+        uses: actions/download-artifact@v6
+        continue-on-error: true
+        id: download-artifacts
+        # explicit comparison is clearer and avoids edge-cases
+        if: ${{ env.DEV == 'true' }}
+        with:
+          name: snap-build-artifacts
+          run-id: ${{ env.RUN_ID || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: .
+
+      - name: "Decide whether we need to run snapcraft build"
+        id: decide
+        # This step sets a step output `need_build` to "true" or "false"
+        run: |
+          set -euo pipefail
+          need_build=true # True if otherwise
+
+          if [ "${{ env.DEV }}" = "true" ]; then
+            # steps.download-artifacts.outcome will be e.g. 'success', 'failure', 'skipped'
+            dl_outcome="${{ steps.download-artifacts.outcome }}"
+            if [ "$dl_outcome" = "success" ]; then
+              need_build=false
+            fi
+          fi
+
+          echo "need_build=$need_build" >> "$GITHUB_OUTPUT"
+          
       - name: Build for ${{ steps.extract.outputs.platforms }}
         id: build
+        # if not DEV, or if DEV but download did not succeed
+        if: ${{ steps.decide.outputs.need_build == 'true' }}
         run: |
           set -xuo pipefail
-
+          echo "Run-id: ${{ github.run_id }}"
           # Read platforms JSON array from previous step
           platforms="$(echo "${{ steps.extract.outputs.platforms }}" | yq '.' -oj -I0)"
 
           sudo snap install snapcraft --classic
           export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}"
           snapcraft whoami || true
+          
           mkdir -p ~/.local/share/snapcraft
           echo "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
-
+          
           # Build for comma-separated list of arches
           snapcraft remote-build -v --launchpad-accept-public-upload \
             --build-for=$(yq '. | join(",")' <<< "$platforms")
@@ -70,7 +118,8 @@ jobs:
           printf 'platforms=%s\n' "$(echo "$platforms" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
       - name: Normalize .snap/.txt artifact names
-        if: always()
+        # Run if we actually built in this run
+        if: ${{ steps.decide.outputs.need_build == 'true' && success() }} 
         shell: bash
         run: |
           set -euo pipefail
@@ -106,7 +155,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         id: upload-artifacts
-        if: always()
+        if: ${{ steps.decide.outputs.need_build == 'true' && success() }} 
         with:
           name: snap-build-artifacts
           path: build/
