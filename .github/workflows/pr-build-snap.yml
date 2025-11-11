@@ -273,7 +273,7 @@ jobs:
 
       - name: "List downloads"
         run: |
-          ${{GITHUB_WORKSPACE}}:
+          ${GITHUB_WORKSPACE}:
           ls -al ./
 
           ${GITHUB_WORKSPACE}/urls:
