@@ -155,7 +155,7 @@ jobs:
             mkdir -p "$platform_dir"
 
             find ./ -type f \( -name "${sn}*_${p}.snap" -o -name "*_${p}_*.txt" \) | while read src; do
-              ext="${src%.*}"
+              ext="${src##*.}"
               # Move files into dst_root with normalized names
               dst="$platform_dir/$([[ $ext == "snap" ]] && echo "snap" || echo "log")/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
               if [ "$(readlink -f "$src")" = "$(readlink -f "$dst")" ]; then
@@ -288,8 +288,9 @@ jobs:
           status="{}"
           for urls_file in $(find ~+/urls -type f -name "*.json"); do
             key="$(basename "${urls_file}")"
-            build=$(yq '.snap-url' "${urls_file}")
-            logged=$(yq '.log-url' "${urls_file}")
+            key="${key##*.}"
+            build=$(yq '.snap-url' "${urls_file}" && echo true || echo false)
+            logged=$(yq '.log-url' "${urls_file}" && echo true || echo false)
             status=$(echo "${status}" | jq --arg key "$key" --argjson build "$build" --argjson logged "$logged" \
               '.[$key] = {"build": $build, "logged": $logged}')
           done
