@@ -31,7 +31,12 @@ For users who want full control and prefer not to receive automatic updates betw
 
 To see all available tracks and channels:
 ```bash
-snap info zwave-js-ui
+snap info zwave-js-ui | awk '/channels:/,/^$/' | grep -v '\^' | awk 'NR==1 {h=$0; next} BEGIN{p=""; n=0} {split($1,a,"/"); c=a[1]; if(p!="" && c!=p) lines[n++]="---------------------------"; p=c; lines[n++]=$0} END {print h; for(i=n-1;i>=0;i--) print lines[i]}'
+```
+
+To find the default channel:
+```bash
+snap info zwave-js-ui | awk '/channels:/,/^$/' | grep -v '\^' | awk 'NR==2 {print $1}'
 ```
 
 To install from a specific channel:
