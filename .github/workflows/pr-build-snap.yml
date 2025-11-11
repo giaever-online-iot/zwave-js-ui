@@ -75,10 +75,13 @@ jobs:
       - name: Extract platforms from snapcraft.yaml
         id: extract
         run: |
-          # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
-          # archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
-          echo "Platforms: ${{ github.event.inputs.platforms }}"
-          printf 'platforms=%s\n' "$(echo "${archs:-"['amd64']"}" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
+          archs="$(echo "${{ github.event.inputs.platforms }}" | yq '. | split(" ")' -oj -I0)"
+
+          if [ -z "${archs}" ]; then
+            # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
+            archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
+          fi
+          printf 'platforms=%s\n' "$(echo "${archs}" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
       - name: "Download build artifacts for all platforms"
         uses: actions/download-artifact@v6
