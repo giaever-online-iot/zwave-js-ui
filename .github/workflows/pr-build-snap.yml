@@ -216,7 +216,7 @@ jobs:
         with:
           name: snap-${{ matrix.platform }}
           path: ${{ steps.files.outputs.sfn }}
-          retention-days: ${{ RETENTION_PER_ARTS }}
+          retention-days: ${{ env.RETENTION_PER_ARTS }}
 
       - name: "Download URL snap for platform (${{ matrix.platform }})"
         if: ${{ steps.upload-snap-artifact.outputs.artifact-url }}
@@ -234,7 +234,7 @@ jobs:
         with:
           name: log-${{ matrix.platform }}
           path: ${{ steps.files.outputs.lfn }}
-          retention-days: ${{ RETENTION_PER_ARTS }}
+          retention-days: ${{ env.RETENTION_PER_ARTS }}
 
       - name: "Download URL log for platform (${{ matrix.platform }})"
         if: ${{ steps.upload-log-artifact.outputs.artifact-url }}
