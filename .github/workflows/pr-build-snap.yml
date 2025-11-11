@@ -270,6 +270,7 @@ jobs:
           pattern: urls-*
           merge-multiple: true
           path: urls
+          
       - name: "Download all logs"
         uses: actions/download-artifact@v6
         with:
@@ -285,7 +286,7 @@ jobs:
           echo ${GITHUB_WORKSPACE}/urls:
           ls -al ~+/urls
 
-          ${GITHUB_WORKSPACE}/logs:
+          echo ${GITHUB_WORKSPACE}/logs:
           ls -al ~+/logs
 
   #     - name: "Install jq"
