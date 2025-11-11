@@ -102,7 +102,7 @@ jobs:
         # if not DEV, or if DEV but download did not succeed
         if: ${{ env.DEV != 'true' || (env.DEV == 'true' && failure()) }}
         run: |
-          set -xuo pipefail
+          set -euo pipefail
           echo "Run-id: ${{ github.run_id }}"
           # Read platforms JSON array from previous step
           platforms="$(echo "${{ steps.extract.outputs.platforms }}" | yq '.' -oj -I0)"
@@ -162,115 +162,125 @@ jobs:
           path: build/
           retention-days: 7
 
-  # upload:
-  #   needs: build
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     actions: write
-  #   strategy:
-  #     matrix:
-  #       platform: ${{ fromJson(needs.build.outputs.platforms) }}
-  #     fail-fast: true
-  #   env:
-  #     PLATFORM: ${{ matrix.platform }}
-  #   steps:
-  #     - name: "Download build artifacts for all platforms"
-  #       uses: actions/download-artifact@v6
-  #       id: download-artifacts
-  #       with:
-  #         run-id: ${{ env.RUN_ID || github.run_id }}
-  #         github-token: ${{ secrets.GITHUB_TOKEN }}
-  #         name: snap-build-artifacts
-  #         path: .
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    strategy:
+      matrix:
+        platform: ${{ fromJson(needs.build.outputs.platforms) }}
+      fail-fast: true
+    env:
+      PLATFORM: ${{ matrix.platform }}
+    steps:
+      - name: "Download build artifacts for all platforms"
+        uses: actions/download-artifact@v6
+        id: download-artifacts
+        with:
+          run-id: ${{ env.RUN_ID || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: snap-build-artifacts
+          path: .
 
-  #     - name: "Check dir/files for platform (${{ matrix.platform }})"
-  #       id: files
-  #       run: |
-  #         echo "${{ env.PLATFORM }}"
-  #         arch="${{ matrix.platform }}"
-  #         echo "${{ toJson(steps.download-artifacts.outputs) }}"
-  #         echo "Artifact archive URL from build job: ${{ needs.build.outputs.artifacts-url }}"
-  #         echo "Files in workspace (downloaded artifact contents):"
-  #         ls -al ./
-  #         ls -al "./${arch}" || true
-  #         echo "dir=${arch}" >> $GITHUB_OUTPUT
-  #         echo "sfn=$(find "./${arch}" -name "*.snap" -print -quit || true)" >> $GITHUB_OUTPUT
-  #         echo "lfn=$(find "./${arch}" -name "*.log" -print -quit || true)" >> $GITHUB_OUTPUT
+      - name: "Check dir/files for platform (${{ matrix.platform }})"
+        id: files
+        run: |
+          echo "${{ env.PLATFORM }}"
+          arch="${{ matrix.platform }}"
+          echo "${{ toJson(steps.download-artifacts.outputs) }}"
+          echo "Artifact archive URL from build job: ${{ needs.build.outputs.artifacts-url }}"
+          echo "Files in workspace (downloaded artifact contents):"
+          ls -al ./
+          ls -al "./${arch}" || true
+          echo "dir=${arch}" >> $GITHUB_OUTPUT
+          echo "sfn=$(find "./${arch}" -name "*.snap" -print -quit || true)" >> $GITHUB_OUTPUT
+          echo "lfn=$(find "./${arch}" -name "*.log" -print -quit || true)" >> $GITHUB_OUTPUT
 
-  #     - name: "Upload snap for platform (${{ matrix.platform }})"
-  #       id: upload-snap-artifact
-  #       if: ${{ steps.files.outputs.sfn != '' }}
-  #       uses: actions/upload-artifact@v5
-  #       with:
-  #         name: snap-${{ matrix.platform }}
-  #         path: ${{ steps.files.outputs.sfn }}
+      - name: "Upload snap for platform (${{ matrix.platform }})"
+        id: upload-snap-artifact
+        if: ${{ steps.files.outputs.sfn != '' }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: snap-${{ matrix.platform }}
+          path: snap/${{ steps.files.outputs.sfn }}
 
-  #     - name: "Download URL snap for platform (${{ matrix.platform }})"
-  #       if: ${{ steps.upload-snap-artifact.outputs.artifact-url }}
-  #       id: snap-artifact
-  #       env:
-  #         URL: ${{ steps.upload-snap-artifact.outputs.artifact-url }}
-  #       run: |
-  #         echo "URL: ${URL}, ${{ steps.upload-snap-artifact.outputs.artifact-url }}"
-  #         echo "url=${URL}" >> $GITHUB_OUTPUT
+      - name: "Download URL snap for platform (${{ matrix.platform }})"
+        if: ${{ steps.upload-snap-artifact.outputs.artifact-url }}
+        id: snap-artifact
+        env:
+          URL: ${{ steps.upload-snap-artifact.outputs.artifact-url }}
+        run: |
+          echo "URL: ${URL}, ${{ steps.upload-snap-artifact.outputs.artifact-url }}"
+          echo "url=${URL}" >> $GITHUB_OUTPUT
 
-  #     - name: "Upload log for platform (${{ matrix.platform }})"
-  #       uses: actions/upload-artifact@v5
-  #       id: upload-log-artifact
-  #       if: ${{ steps.files.outputs.lfn != '' }}
-  #       with:
-  #         name: log-${{ matrix.platform }}
-  #         path: ${{ steps.files.outputs.lfn }}
+      - name: "Upload log for platform (${{ matrix.platform }})"
+        uses: actions/upload-artifact@v5
+        id: upload-log-artifact
+        if: ${{ steps.files.outputs.lfn != '' }}
+        with:
+          name: log-${{ matrix.platform }}
+          path: log/${{ steps.files.outputs.lfn }}
 
-  #     - name: "Download URL log for platform (${{ matrix.platform }})"
-  #       if: ${{ steps.upload-log-artifact.outputs.artifact-url }}
-  #       id: log-artifact
-  #       env:
-  #         URL: ${{ steps.upload-log-artifact.outputs.artifact-url }}
-  #       run: |
-  #         echo "URL: ${URL}, ${{ steps.upload-log-artifact.outputs.artifact-url }}"
-  #         echo "url=${URL}" >> $GITHUB_OUTPUT
+      - name: "Download URL log for platform (${{ matrix.platform }})"
+        if: ${{ steps.upload-log-artifact.outputs.artifact-url }}
+        id: log-artifact
+        env:
+          URL: ${{ steps.upload-log-artifact.outputs.artifact-url }}
+        run: |
+          echo "URL: ${URL}, ${{ steps.upload-log-artifact.outputs.artifact-url }}"
+          echo "url=${URL}" >> $GITHUB_OUTPUT
 
-  #     - name: "Write result metadata for platform (${{ matrix.platform }})"
-  #       id: write-result
-  #       env:
-  #         SFN_URL: ${{ steps.snap-artifact.outputs.url || '' }}
-  #         LFN_URL: ${{ steps.log-artifact.outputs.url || '' }}
-  #         LFN_PATH: ${{ steps.files.outputs.lfn || '' }}
-  #       run: |
-  #         set -euo pipefail
-  #         mkdir -p result
-  #         outfile="result/${{ matrix.platform }}.json"
-  #         # If we have a local log file path (from earlier find) include its content in the JSON.
-  #         if [ -n "$LFN_PATH" ] && [ -f "$LFN_PATH" ]; then
-  #           # Read the log file as a raw string into JSON using jq -Rs (reads entire stdin as string)
-  #           jq -Rs --arg platform "${{ matrix.platform }}" --arg snap_url "$SFN_URL" --arg log_url "$LFN_URL" \
-  #             '{platform:$platform, snap_url:$snap_url, log_url:$log_url, log:.}' < "$LFN_PATH" > "$outfile"
-  #         else
-  #           jq -n --arg platform "${{ matrix.platform }}" --arg snap_url "$SFN_URL" --arg log_url "$LFN_URL" \
-  #             '{platform:$platform, snap_url:$snap_url, log_url:$log_url, log:""}' > "$outfile"
-  #         fi
-  #         ls -al result
-  #         cat "$outfile"
+      - name: "Write result metadata for platform (${{ matrix.platform }})"
+        id: write-result
+        env:
+          SFN_URL: ${{ steps.snap-artifact.outputs.url || '' }}
+          LFN_URL: ${{ steps.log-artifact.outputs.url || '' }}
+          LFN_PATH: ${{ steps.files.outputs.lfn || '' }}
+        run: |
+          cat > "${{ matrix.platform }}.json" <<EOF
+          {
+            "snap-url": "${{ steps.snap-artifact.outputs.url }}",
+            "log-url": "${{ steps.log-artifact.outputs.url }}"
+          }
+          EOF
 
-  #     - name: "Upload result metadata (per-platform)"
-  #       uses: actions/upload-artifact@v5
-  #       with:
-  #         name: result-${{ matrix.platform }}
-  #         path: result/${{ matrix.platform }}.json
+      - name: "Upload result metadata for platform (${{ matrix.platform }})"
+        uses: actions/upload-artifact@v5
+        with:
+          name: urls-${{ matrix.platform }}
+          path: ${{ matrix.platform }}.json
 
-  # comment:
-  #   needs: upload
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: write
-  #     issues: write
-  #   steps:
-  #     - name: "Download all artifacts"
-  #       uses: actions/download-artifact@v6
-  #       with:
-  #         # omit 'name' to download ALL artifacts produced by this workflow run
-  #         path: results
+  comment:
+    needs: [build, upload]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - name: "Download all URLS for"
+        uses: actions/download-artifact@v6
+        with:
+          pattern: urls-*
+          merge-multiple: true
+          path: urls
+      - name: "Download all logs"
+        uses: actions/download-artifact@v6
+        with:
+          pattern: log-*
+          merge-multiple: true
+          path: logs
+
+      - name: "List downloads"
+        run: |
+          ${{GITHUB_WORKSPACE}}:
+          ls -al ./
+
+          ${GITHUB_WORKSPACE}/urls:
+          ls -al ./urls
+
+          ${GITHUB_WORKSPACE}/logs:
+          ls -al ./logs
 
   #     - name: "Install jq"
   #       run: |
