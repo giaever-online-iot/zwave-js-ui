@@ -215,6 +215,7 @@ jobs:
         with:
           name: snap-${{ matrix.platform }}
           path: ${{ steps.files.outputs.sfn }}
+          retention-days: ${{ env.RETENTION_ALL_ARTS }}
 
       - name: "Download URL snap for platform (${{ matrix.platform }})"
         if: ${{ steps.upload-snap-artifact.outputs.artifact-url }}
