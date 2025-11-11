@@ -3,7 +3,7 @@ name: PR Build Snap
 env:
   # DEV can be overridden when manually running this workflow via workflow_dispatch inputs.
   # Default is 'true' to preserve previous behavior.
-  DEV: ${{ github.event.inputs.dev || 'true' }}
+  DEV: ${{ github.event.inputs.dev || 'false' }}
   RUN_ID: ${{ github.event.inputs.run_id }}
 
 on:
@@ -66,6 +66,7 @@ jobs:
 
       - name: "Download build artifacts for all platforms"
         uses: actions/download-artifact@v6
+        continue-on-error: true
         id: download-artifacts
         # explicit comparison is clearer and avoids edge-cases
         if: ${{ env.DEV == 'true' }}
