@@ -286,15 +286,15 @@ jobs:
         run: |
           set -exuo pipefail
           status="{}"
-          for urls in $(find ~+/urls -type f -name "*.json"); do
-            export key=$(basename $urls) 
+          for urls_file in $(find ~+/urls -type f -name "*.json"); do
+            export key=$(basename $urls)
             status=$(echo "${status}" | yq 'strenv(key) = {"build": false, "logged": false}')
-            if [ -n "$(cat "${urls_file}" | yq '.snap-url')" ]; then
-              status=$(echo "${status}" | yq '.build = true')
+            if [ -n "$(cat "${urls}" | yq '.snap-url')" ]; then
+              status=$(echo "${status}" | yq '.strenv(key).build = true')
             fi
 
-            if [ -n "$(cat "${urls_file}" | yq '.log-url')" ]; then
-              status=$(echo "${status}" | yq '.logged = true')
+            if [ -n "$(cat "${urls}" | yq '.log-url')" ]; then
+              status=$(echo "${status}" | yq '.strenv(key).logged = true')
             fi
           done
 
