@@ -1,7 +1,9 @@
 name: PR Build Snap
 
 env:
-  DEV: ${{ true }}
+  # DEV can be overridden when manually running this workflow via workflow_dispatch inputs.
+  # Default is 'true' to preserve previous behavior.
+  DEV: ${{ github.event.inputs.dev || 'true' }}
 
 on:
   pull_request:
@@ -20,7 +22,12 @@ on:
       - "Block non-conforming PRs (auto-close + label)"
     types:
       - completed
-  workflow_dispatch:  # Add this for manual testing
+  workflow_dispatch:
+    inputs:
+      dev:
+        description: "If 'true', try to download prebuilt artifacts instead of running snapcraft build. Set to 'false' to force a build."
+        required: false
+        default: 'true'
 
 permissions:
   contents: read
@@ -54,19 +61,33 @@ jobs:
       - name: "Download build artifacts for all platforms"
         uses: actions/download-artifact@v6
         id: download-artifacts
-        if: ${{ env.DEV }}
+        # explicit comparison is clearer and avoids edge-cases
+        if: ${{ env.DEV == 'true' }}
         with:
           name: snap-build-artifacts
           path: .
 
-      - name: "Do we have a build?"
-        env:
-          NEED_BUILD: ${{ !env.DEV || (env.DEV && failure()) }}
+      - name: "Decide whether we need to run snapcraft build"
+        id: decide
+        # This step sets a step output `need_build` to "true" or "false"
+        run: |
+          set -euo pipefail
+          need_build=true # True if otherwise
 
+          if [ "${{ env.DEV }}" = "true" ]; then
+            # steps.download-artifacts.outcome will be e.g. 'success', 'failure', 'skipped'
+            dl_outcome="${{ steps.download-artifacts.outcome }}"
+            if [ "$dl_outcome" = "success" ]; then
+              need_build=false
+            fi
+          fi
+
+          echo "need_build=$need_build" >> "$GITHUB_OUTPUT"
+          
       - name: Build for ${{ steps.extract.outputs.platforms }}
         id: build
-        # if not DEV, or if DEV but download failed (possibly missing a build?)
-        if: ${{ env.NEED_BUILD }} 
+        # if not DEV, or if DEV but download did not succeed
+        if: ${{ steps.decide.outputs.need_build == 'true' }}
         run: |
           set -xuo pipefail
 
@@ -87,8 +108,8 @@ jobs:
           printf 'platforms=%s\n' "$(echo "$platforms" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
       - name: Normalize .snap/.txt artifact names
-        # If downloaded the files alread has this structure?
-        if: ${{ env.NEED_BUILD && success() }} 
+        # Run if we actually built in this run
+        if: ${{ steps.decide.outputs.need_build == 'true' && success() }} 
         shell: bash
         run: |
           set -euo pipefail
@@ -124,7 +145,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         id: upload-artifacts
-        if: ${{ env.NEED_BUILD && success() }} 
+        if: ${{ steps.decide.outputs.need_build == 'true' && success() }} 
         with:
           name: snap-build-artifacts
           path: build/
