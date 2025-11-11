@@ -93,11 +93,20 @@ jobs:
           set -euo pipefail
           archs="$(echo "${{ github.event.inputs.platforms }}" | yq '. | split(" ")' -oj -I0)"
 
-          if [[ -z "${archs}" ]] || \
-            [[ "${archs}" == *'all'* ]] || \
-            [[ "${archs}" == *'artifact'* ]] && [[ "${{ steps.download-artifacts.outcome }}" != "success" ]]; then
+          if [[ "${archs}" == *'artifact'* ]]; then
+            if [ "${{ steps.download-artifacts.outcome }}" != "success" ]; then
+              archs=
+            else
+              archs="$(find . -type d \( -name 'arm*' -o -name 'amd*' \) -exec basename {} \; | xargs | yq '.' -oj -I0)"
+            fi
+          fi
+
+          if [[ -z "${archs}" ]] || [[ "${archs}" == *'all'* ]]; then
             # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
             archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
+          elif  then
+            if [ "${{ steps.download-artifacts.outcome }}" != "success" ]; then
+              
           fi
           printf 'platforms=%s\n' "$(echo "${archs}" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
           
@@ -116,6 +125,7 @@ jobs:
           sudo snap install snapcraft --classic
           # export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}" 
           # snapcraft whoami || true
+          exit 1
           
           mkdir -p ~/.local/share/snapcraft
           echo "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
