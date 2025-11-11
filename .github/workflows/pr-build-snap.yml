@@ -32,8 +32,9 @@ on:
       platforms:
         type: choice
         required: false
-        default: "amd64"
+        default: ""
         options:
+          -
           - amd64
           - amd64 arm64
           - amd64 armhf
