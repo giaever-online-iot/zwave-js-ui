@@ -30,6 +30,7 @@ on:
         required: false
         default: ""
       platforms:
+        type: choice
         required: false
         default: "amd64"
         options:
@@ -43,10 +44,10 @@ on:
           - armhf
           - armhf arm64
           - armhf arm64 amd64
-      environment:
-        description: 'Environment to run tests against'
-        type: environment
-        required: true
+      # environment:
+      #   description: 'Environment to run tests against'
+      #   type: environment
+      #   required: true
       
 
 permissions:
@@ -76,7 +77,7 @@ jobs:
         run: |
           # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
           # archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
-          echo "Platforms: ${{ github.even.inputs.platforms }}"
+          echo "Platforms: ${{ github.event.inputs.platforms }}"
           printf 'platforms=%s\n' "$(echo "${archs:-"['amd64']"}" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
       - name: "Download build artifacts for all platforms"
