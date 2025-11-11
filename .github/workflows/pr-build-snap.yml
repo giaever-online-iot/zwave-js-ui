@@ -30,12 +30,13 @@ on:
         required: false
         default: ""
       platforms:
-        description: "Platforms to build for. If «all», platforms will be defined by snapcraft.yaml"
+        description: "Platforms to build for. If «all», platforms will be defined by snapcraft.yaml. If «from artifact» is selected but run_id is not specified, it will use «all»."
         type: choice
         required: false
         default: "all"
         options:
           - all
+          - artifact
           - amd64
           - amd64 arm64
           - amd64 armhf
@@ -74,18 +75,6 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
-      - name: Extract platforms from snapcraft.yaml
-        id: extract
-        run: |
-          set -euo pipefail
-          archs="$(echo "${{ github.event.inputs.platforms }}" | yq '. | split(" ")' -oj -I0)"
-
-          if [[ -z "${archs}" ]] || [[ "${archs}" == *'all'* ]]; then
-            # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
-            archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
-          fi
-          printf 'platforms=%s\n' "$(echo "${archs}" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
-
       - name: "Download build artifacts for all platforms"
         uses: actions/download-artifact@v6
         continue-on-error: true
@@ -97,6 +86,20 @@ jobs:
           run-id: ${{ env.RUN_ID || github.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: .
+
+      - name: Extract platforms from snapcraft.yaml
+        id: extract
+        run: |
+          set -euo pipefail
+          archs="$(echo "${{ github.event.inputs.platforms }}" | yq '. | split(" ")' -oj -I0)"
+
+          if [[ -z "${archs}" ]] || \
+            [[ "${archs}" == *'all'* ]] || \
+            [[ "${archs}" == *'artifact'* ]] && [[ "${{ steps.download-artifacts.outcome }}" != "success" ]]; then
+            # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
+            archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
+          fi
+          printf 'platforms=%s\n' "$(echo "${archs}" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
           
       - name: Build for ${{ steps.extract.outputs.platforms }}
         id: build
