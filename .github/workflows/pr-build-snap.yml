@@ -5,8 +5,8 @@ env:
   # Default is 'true' to preserve previous behavior.
   DEV: ${{ github.event.inputs.run_id != '' }}
   RUN_ID: ${{ github.event.inputs.run_id }}
-  RETENTION_ALL_ARTS: ${{ github.event.inputs.run_id == '' && 1 || 7 }}
-  RETENTION_PER_ARTS: ${{ github.event.inputs.run_id == '' && 90 || 7 }}
+  RETENTION_ALL_ARTS: ${{ github.event.inputs.run_id == '' && 1 || 30 }}
+  RETENTION_PER_ARTS: ${{ github.event.inputs.run_id == '' && 90 || 1 }}
 
 on:
   pull_request:
