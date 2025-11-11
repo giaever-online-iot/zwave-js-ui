@@ -25,14 +25,21 @@ The snap uses different channels in the `latest` track to give you control over 
 
 - **`latest/candidate`** — Latest minor or patch release of the current major version. Updates when version `a.b.c` changes to `a.b.d` (patch) or `a.c.0` (minor). This is a rolling release channel for users who want regular updates without major version changes.
 
-- **`latest/edge`** and **`latest/edge/dev`** — Development builds. Every build, including experimental and test versions, may be pushed to these channels. Use only if you want to test the very latest changes.
+- **`latest/edge`** and **`latest/edge/dev`** — Development builds. Every build, including experimental and test versions, may be pushed to these channels. These channels are intended for maintainers and testers only.
+
+For users who want full control and prefer not to receive automatic updates between major and minor releases, use a specific version track (for example, `v9.11`). This allows you to stay on a particular major.minor version and only receive patch updates.
 
 To install from a specific channel:
 ```bash
 sudo snap install zwave-js-ui --channel=latest/candidate
 ```
 
-To switch channels after installation:
+To switch to a specific version track:
+```bash
+sudo snap refresh zwave-js-ui --channel=v9.11
+```
+
+To switch between channels within a track:
 ```bash
 sudo snap refresh zwave-js-ui --channel=latest/stable
 ```
