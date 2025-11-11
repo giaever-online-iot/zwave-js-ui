@@ -104,16 +104,13 @@ jobs:
           if [[ -z "${archs}" ]] || [[ "${archs}" == *'all'* ]]; then
             # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
             archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
-          elif  then
-            if [ "${{ steps.download-artifacts.outcome }}" != "success" ]; then
-              
           fi
           printf 'platforms=%s\n' "$(echo "${archs}" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
           
       - name: Build for ${{ steps.extract.outputs.platforms }}
         id: build
         # if not DEV, or if DEV but download did not succeed
-        if: ${{ env.DEV != 'true' || (env.DEV == 'true' && failure()) }}
+        if: ${{ success() && (env.DEV != 'true' || (env.DEV == 'true' && steps.download-artifacts.outcome != "success")) }}
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
