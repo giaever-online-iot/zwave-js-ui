@@ -3,7 +3,7 @@ name: PR Build Snap
 env:
   # DEV can be overridden when manually running this workflow via workflow_dispatch inputs.
   # Default is 'true' to preserve previous behavior.
-  DEV: ${{ github.event.inputs.run_id || 'false' }}
+  DEV: ${{ github.event.inputs.run_id != '' }}
   RUN_ID: ${{ github.event.inputs.run_id }}
 
 on:
