@@ -77,6 +77,7 @@ jobs:
       - name: Extract platforms from snapcraft.yaml
         id: extract
         run: |
+          set -euo pipefail
           archs="$(echo "${{ github.event.inputs.platforms }}" | yq '. | split(" ")' -oj -I0)"
 
           if [[ -z "${archs}" ]] || [[ "${archs}" == *'all'* ]]; then
@@ -101,6 +102,8 @@ jobs:
         id: build
         # if not DEV, or if DEV but download did not succeed
         if: ${{ env.DEV != 'true' || (env.DEV == 'true' && failure()) }}
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
           set -euo pipefail
           echo "Run-id: ${{ github.run_id }}"
@@ -108,8 +111,9 @@ jobs:
           platforms="$(echo "${{ steps.extract.outputs.platforms }}" | yq '.' -oj -I0)"
 
           sudo snap install snapcraft --classic
-          export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}"
+          # export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}" 
           snapcraft whoami || true
+          exit 1
           
           mkdir -p ~/.local/share/snapcraft
           echo "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
@@ -186,17 +190,13 @@ jobs:
       - name: "Check dir/files for platform (${{ matrix.platform }})"
         id: files
         run: |
-          echo "${{ env.PLATFORM }}"
           arch="${{ matrix.platform }}"
-          echo "${{ toJson(steps.download-artifacts.outputs) }}"
-          echo "Artifact archive URL from build job: ${{ needs.build.outputs.artifacts-url }}"
           echo "Files in workspace (downloaded artifact contents):"
           ls -al ~+/
-          ls -al "/${arch}" || true
+          ls -al ~+/"${arch}" || true
           echo "dir=${arch}" >> $GITHUB_OUTPUT
-          #find "~+/${arch}" -name "snap" -exec mv {} ./
-          echo "sfn=$(find "./${arch}" -name "*.snap" -print -quit || true)" >> $GITHUB_OUTPUT
-          echo "lfn=$(find "./${arch}" -name "*.log" -print -quit || true)" >> $GITHUB_OUTPUT
+          echo "sfn=$(find ~+/"${arch}" -name "*.snap" -print -quit || true)" >> $GITHUB_OUTPUT
+          echo "lfn=$(find ~+/"${arch}" -name "*.log" -print -quit || true)" >> $GITHUB_OUTPUT
 
       - name: "Upload snap for platform (${{ matrix.platform }})"
         id: upload-snap-artifact
