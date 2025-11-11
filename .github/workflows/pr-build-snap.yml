@@ -3,7 +3,7 @@ name: PR Build Snap
 env:
   # DEV can be overridden when manually running this workflow via workflow_dispatch inputs.
   # Default is 'true' to preserve previous behavior.
-  DEV: ${{ github.event.inputs.dev || 'false' }}
+  DEV: ${{ github.event.inputs.run_id || 'false' }}
   RUN_ID: ${{ github.event.inputs.run_id }}
 
 on:
@@ -25,13 +25,9 @@ on:
       - completed
   workflow_dispatch:
     inputs:
-      dev:
-        description: "If 'true', try to download prebuilt artifacts instead of running snapcraft build. Set to 'false' to force a build."
-        required: false
-        default: 'true'
       run_id: 
         description: "The id of the workflow run where the desired download artifact was uploaded from."
-        required: true
+        required: false
         default: ""
       
 
@@ -82,6 +78,8 @@ jobs:
         run: |
           set -euo pipefail
           need_build=true # True if otherwise
+
+          ls -al ./
 
           if [ "${{ env.DEV }}" = "true" ]; then
             # steps.download-artifacts.outcome will be e.g. 'success', 'failure', 'skipped'
