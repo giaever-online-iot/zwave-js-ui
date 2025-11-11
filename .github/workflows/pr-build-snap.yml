@@ -142,7 +142,7 @@ jobs:
             find ./ -type f \( -name "${sn}*_${p}.snap" -o -name "*_${p}_*.txt" \) | while read src; do
               ext="${src##*.}"
               # Move files into dst_root with normalized names
-              dst="$platform_dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
+              dst="$platform_dir/$([[ $ext == "snap" ]] && echo "snap" || echo "log")/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
               if [ "$(readlink -f "$src")" = "$(readlink -f "$dst")" ]; then
                 echo "Source and destination are the same (skipping mv)."
               else
@@ -192,10 +192,11 @@ jobs:
           echo "Artifact archive URL from build job: ${{ needs.build.outputs.artifacts-url }}"
           echo "Files in workspace (downloaded artifact contents):"
           ls -al ~+/
-          ls -al "~+/${arch}" || true
+          ls -al "/${arch}" || true
           echo "dir=${arch}" >> $GITHUB_OUTPUT
-          echo "sfn=$(find "~+/${arch}" -name "*.snap" -print -quit || true)" >> $GITHUB_OUTPUT
-          echo "lfn=$(find "~+/${arch}" -name "*.log" -print -quit || true)" >> $GITHUB_OUTPUT
+          #find "~+/${arch}" -name "snap" -exec mv {} ./
+          echo "sfn=$(find "./${arch}" -name "*.snap" -print -quit || true)" >> $GITHUB_OUTPUT
+          echo "lfn=$(find "./${arch}" -name "*.log" -print -quit || true)" >> $GITHUB_OUTPUT
 
       - name: "Upload snap for platform (${{ matrix.platform }})"
         id: upload-snap-artifact
