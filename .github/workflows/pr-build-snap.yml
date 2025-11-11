@@ -287,15 +287,11 @@ jobs:
           set -exuo pipefail
           status="{}"
           for urls_file in $(find ~+/urls -type f -name "*.json"); do
-            export key=".$(basename "${urls_file}")"
-            status=$(echo "${status}" | yq 'env(key) = {"build": false, "logged": false}')
-            if [ -n "$(cat "${urls_file}" | yq '.snap-url')" ]; then
-              status="$(echo "${status}" | yq 'env(key).build = true')"
-            fi
-
-            if [ -n "$(cat "${urls_file}" | yq '.log-url')" ]; then
-              status=$(echo "${status}" | yq 'env(key).logged = true')
-            fi
+            key="$(basename "${urls_file}")"
+            build=$(jq -e '.snap-url' "${urls_file}" > /dev/null && echo true || echo false)
+            logged=$(jq -e '.log-url' "${urls_file}" > /dev/null && echo true || echo false)
+            status=$(echo "${status}" | jq --arg key "$key" --argjson build "$build" --argjson logged "$logged" \
+              '.[$key] = {"build": $build, "logged": $logged}')
           done
 
           echo "${status} | yq '.' -oj"
