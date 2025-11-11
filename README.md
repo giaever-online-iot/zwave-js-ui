@@ -17,6 +17,26 @@ If you find this snap package useful, please consider:
   - Z-Wave JS driver developer: https://github.com/sponsors/AlCalzone
 - Starring this repository
 
+## Release Channels
+
+The snap uses different channels in the `latest` track to give you control over update frequency:
+
+- **`latest/stable`** — Latest version of the previous major release. Updates only once per major release cycle, typically near the end. For example, when version `b.0.0` is released, version `a.x.y` (the last release of the previous major version) becomes available in stable.
+
+- **`latest/candidate`** — Latest minor or patch release of the current major version. Updates when version `a.b.c` changes to `a.b.d` (patch) or `a.c.0` (minor). This is a rolling release channel for users who want regular updates without major version changes.
+
+- **`latest/edge`** and **`latest/edge/dev`** — Development builds. Every build, including experimental and test versions, may be pushed to these channels. Use only if you want to test the very latest changes.
+
+To install from a specific channel:
+```bash
+sudo snap install zwave-js-ui --channel=latest/candidate
+```
+
+To switch channels after installation:
+```bash
+sudo snap refresh zwave-js-ui --channel=latest/stable
+```
+
 ## Main Features
 
 ### Control Panel UI
