@@ -97,7 +97,7 @@ jobs:
             if [ "${{ steps.download-artifacts.outcome }}" != "success" ]; then
               archs=
             else
-              archs="$(find . -type d \( -name 'arm*' -o -name 'amd*' \) -exec basename {} \; | xargs | yq '.' -oj -I0)"
+              archs="$(find . -type d \( -name 'arm*' -o -name 'amd*' \) -exec basename {} \; | xargs | yq '. | split(" ")' -oj -I0)"
             fi
           fi
 
