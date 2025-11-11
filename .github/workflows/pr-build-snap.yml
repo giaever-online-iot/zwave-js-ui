@@ -29,6 +29,24 @@ on:
         description: "The id of the workflow run where the desired download artifact was uploaded from."
         required: false
         default: ""
+      platforms:
+        required: false
+        default: "amd64"
+        options:
+          - amd64
+          - amd64 arm64
+          - amd64 armhf
+          - amd64 arm64 armhf
+          - arm64
+          - arm64 amd64
+          - arm64 amd64 armhf
+          - armhf
+          - armhf arm64
+          - armhf arm64 amd64
+      environment:
+        description: 'Environment to run tests against'
+        type: environment
+        required: true
       
 
 permissions:
@@ -58,6 +76,7 @@ jobs:
         run: |
           # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
           # archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
+          echo "Platforms: ${{ github.even.inputs.platforms }}"
           printf 'platforms=%s\n' "$(echo "${archs:-"['amd64']"}" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
 
       - name: "Download build artifacts for all platforms"
