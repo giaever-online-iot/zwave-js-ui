@@ -70,7 +70,7 @@ jobs:
     outputs:
       platforms: ${{ steps.extract.outputs.platforms }}
       artifacts-url: ${{ steps.upload-artifacts.outputs.artifact-url }}
-      snapcraft-logs: ${{ steps.build.outputs.snapcraft-log }}
+      snapcraft-logs: ${{ steps.build.outputs.snapcraft-log || 'succeeded' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -154,34 +154,33 @@ jobs:
           exit ${ret}
           
       - name: Snapcraft remote log
-        if: ${{ steps.build.outcome != 'skipped' }}
+        if: ${{ steps.build.outcome == 'failure' }}
         run: |
           echo "LOG: ${{ steps.build.outputs.snapcraft-log || 'missing' }}"
 
       - name: Normalize .snap/.txt artifact names
         # Run if we actually built in this run
-        if: ${{ contains(fromJson('["success", "completed", "failed"]'), steps.build.outcome) }}
+        if: ${{ contains(fromJson('["success", "completed"]'), steps.build.outcome) }}
         shell: bash
         run: |
           set -euo pipefail
  
-          ls -al ./
           sn=$(yq '.name' snap/snapcraft.yaml)
           sv=$(yq '.version' snap/snapcraft.yaml)
 
           # Build root directory
-          dst_root=~+/build"
+          dst_root=~+/build
           mkdir -p "${dst_root}"
 
           # Parse platforms JSON array and iterate
           echo '${{ steps.extract.outputs.platforms }}' | jq -r '.[]' | while read p; do
             # Create per-platform directory under dst_root
-            platform_dir="$dst_root/$p"
-            mkdir -p "$platform_dir"
+            platform_dir="${dst_root}/${p}"
+            mkdir -p "${platform_dir}"
 
             find ./ -type f \( -name "${sn}*_${p}.snap" -o -name "*_${p}_*.txt" \) | while read src; do
               ext="${src##*.}"
-              # Move files into dst_root with normalized names($([[ $ext == "snap" ]] && echo "snap" || echo "log"))
+              # Move files into dst_root with normalized names
               dst="$platform_dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
               if [ "$(readlink -f "$src")" = "$(readlink -f "$dst")" ]; then
                 echo "Source and destination are the same (skipping mv)."
@@ -196,7 +195,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         id: upload-artifacts
-        if: ${{ contains(fromJson('["success", "completed", "failed"]'), steps.build.outcome) }}
+        if: ${{ contains(fromJson('["success", "completed"]'), steps.build.outcome) }}
         with:
           name: snap-build-artifacts
           path: build/
