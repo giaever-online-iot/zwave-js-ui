@@ -134,6 +134,7 @@ jobs:
             --build-for=$(yq '. | join(",")' <<< "$platforms")
 
           ret=$?
+          set -e
 
           ls -al ~+/
           logs=$(find ~+/ -name "snapcraft*.log")
