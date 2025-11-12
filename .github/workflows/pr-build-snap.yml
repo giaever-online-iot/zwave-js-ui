@@ -283,10 +283,12 @@ jobs:
           path: logs
 
       - name: Return build statuses
+        env: 
+          PLATFORMS: ${{ needs.build.output.platforms }}
         run: |
           set -exuo pipefail
           status="{}"
-          for arch in "$(echo "${{ needs.build.output.platforms }}" | yq '. | join(" ")')"; do
+          for arch in "$(echo "${PLATFORMS}" | yq '. | join(" ")')"; do
             urls_file=$(find ~+ -name "${arch}.json" -quit)
             # cat $urls_file
             # bs="$([ -n "$(yq '.snap-url' "${urls_file}" -os)" ] && echo true || false ])"
