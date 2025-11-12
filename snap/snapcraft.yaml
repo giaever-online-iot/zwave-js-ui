@@ -154,7 +154,6 @@ parts:
     stage-packages:
       - on armhf:
         - libatomic1
-        - hjiuahusdhuhuad
     stage:
       - -bin/corepack
       - -bin/npx
