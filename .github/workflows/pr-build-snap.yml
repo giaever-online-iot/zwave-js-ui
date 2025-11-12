@@ -177,8 +177,8 @@ jobs:
 
             find ./ -type f \( -name "${sn}*_${p}.snap" -o -name "*_${p}_*.txt" \) | while read src; do
               ext="${src##*.}"
-              # Move files into dst_root with normalized names
-              dst="$platform_dir/$([[ $ext == "snap" ]] && echo "snap" || echo "log")/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
+              # Move files into dst_root with normalized names($([[ $ext == "snap" ]] && echo "snap" || echo "log"))
+              dst="$platform_dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
               if [ "$(readlink -f "$src")" = "$(readlink -f "$dst")" ]; then
                 echo "Source and destination are the same (skipping mv)."
               else
