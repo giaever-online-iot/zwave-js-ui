@@ -388,7 +388,7 @@ jobs:
               'build/passed': { color: '0e8a16', description: 'All builds passed' },
               'build/failed': { color: 'b60205', description: 'One or more builds failed' },
               'build/core-failed': { color: 'f9c513', description: 'Snapcraft command failed.' },
-              'build/unknown': { color: 'f99113', description: 'Snapcraft command failed.' },
+              'build/unknown': { color: 'f99113', description: 'Build succeeded but logs are missing.' },
             };
 
             const statusesJson = `${{ needs.build-status.outputs.statuses }}`;
@@ -411,6 +411,12 @@ jobs:
             } else {
               // Get all architecture keys
               const archs = Object.keys(statuses);
+              
+              // Ensure we have architectures to evaluate
+              if (archs.length === 0) {
+                core.info('No architectures found in statuses.');
+                return;
+              }
               
               // Check build statuses
               const allBuilt = archs.every(arch => statuses[arch].built === 'true' || statuses[arch].built === true);
