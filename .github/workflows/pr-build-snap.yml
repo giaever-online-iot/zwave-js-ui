@@ -116,7 +116,7 @@ jobs:
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
-          set -uo pipefail
+          #set -euo pipefail
           echo "Run-id: ${{ github.run_id }}"
           # Read platforms JSON array from previous step
           platforms="$(echo "${{ steps.extract.outputs.platforms }}" | yq '.' -oj -I0)"
@@ -127,13 +127,22 @@ jobs:
           
           mkdir -p ~/.local/share/snapcraft
           echo "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
-          
+
+          set +e
           # Build for comma-separated list of arches
           snapcraft remote-build -v --launchpad-accept-public-upload \
             --build-for=$(yq '. | join(",")' <<< "$platforms")
 
+          ret=$?
+
           ls -al ~+/
-          cat "$(find ~+/ -name "snapcraft*.log" -quit)"
+          logs=$(find ~+/ -name "snapcraft*.log")
+
+          if [ -n "${logs}" ]; then
+            cat "${logs}"
+          fi
+          
+          return $?
 
       - name: Normalize .snap/.txt artifact names
         # Run if we actually built in this run
