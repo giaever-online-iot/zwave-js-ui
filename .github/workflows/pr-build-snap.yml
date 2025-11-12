@@ -118,6 +118,7 @@ jobs:
         run: |
           #set -euo pipefail
           echo "Run-id: ${{ github.run_id }}"
+          echo "Workspace: ${{ GITHUB_WORKSPACE }}"
           # Read platforms JSON array from previous step
           platforms="$(echo "${{ steps.extract.outputs.platforms }}" | yq '.' -oj -I0)"
 
@@ -143,7 +144,7 @@ jobs:
             cat "${logs}"
           fi
           
-          return $?
+          exit $?
 
       - name: Normalize .snap/.txt artifact names
         # Run if we actually built in this run
