@@ -290,12 +290,10 @@ jobs:
           for arch in $(echo "${PLATFORMS}" | yq '. | join(" ")'); do
             echo "Processing architecture: $arch"
             lfn=$(find "${PWD}" -name "*${arch}*.log" -print -quit)
-            cat $lfn
-            ajon=$(find "${PWD}" -name "*${arch}*.json" | yq '.' -oj -I0)
-            echo $ajon
+            ajon=$(find "${PWD}" -name "*${arch}*.json")
 
-            built=$(echo $ajon | yq '.snap-url')
-            logged=$(echo $ajon | yq '.log-url')
+            built=$(cat $ajon | yq '.snap-url')
+            logged=$(cat $ajon | yq '.log-url')
 
             echo "Built: $built, loogged: $logged"
           done
