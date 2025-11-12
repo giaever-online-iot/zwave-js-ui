@@ -287,13 +287,15 @@ jobs:
           PLATFORMS: ${{ needs.build.outputs.platforms }}
         run: |
           set -xuo pipefail
+          status="{}"
           for arch in $(echo "${PLATFORMS}" | yq '. | join(" ")'); do
             echo "Processing architecture: $arch"
+            status="$(echo "$status" | yq '.env(key) = {}' -oj -I0)
+            echo "${status}"
             lfn=$(find "${PWD}" -name "*${arch}*.log" -print -quit)
             ajon=$(find "${PWD}" -name "*${arch}*.json")
 
             built="$([[ -n "$(cat $ajon | yq '.snap-url')" ]] && echo true || echo false)"
             logged=d"$([[ -n "$(cat $ajon | yq '.snap-url')" ]] && echo true || echo false)"
 
-            echo "Built: $built, loogged: $logged"
           done
