@@ -127,8 +127,8 @@ jobs:
           export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}" 
           snapcraft whoami || true
           
-          mkdir -p ~/.local/share/snapcraft
-          echo "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
+          mkdir -p ~+/.local/share/snapcraft
+          echo "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~+/.local/share/snapcraft/launchpad-credentials
           
           set +e
           # Build for comma-separated list of arches
