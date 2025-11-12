@@ -388,7 +388,7 @@ jobs:
               'build/passed': { color: '0e8a16', description: 'All builds passed' },
               'build/failed': { color: 'b60205', description: 'One or more builds failed' },
               'build/core-failed': { color: 'f9c513', description: 'Snapcraft command failed.' },
-              'build/unknow': { color: 'f99113', description: 'Snapcraft command failed.' },
+              'build/unknown': { color: 'f99113', description: 'Snapcraft command failed.' },
             };
 
             const statusesJson = `${{ needs.build-status.outputs.statuses }}`;
