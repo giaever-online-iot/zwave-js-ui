@@ -113,8 +113,8 @@ jobs:
         id: build
         # if not DEV, or if DEV but download did not succeed
         if: ${{ success() && (env.DEV != 'true' || (env.DEV == 'true' && steps.download-artifacts.outcome != 'success')) }}
-        env:
-          #SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        # env:
+        #   SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
           set -exuo pipefail
           
