@@ -117,6 +117,7 @@ jobs:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
           #set -euo pipefail
+          set -x
           echo "Run-id: ${{ github.run_id }}"
           echo "Workspace: ${GITHUB_WORKSPACE}, ${HOME}"
           # Read platforms JSON array from previous step
