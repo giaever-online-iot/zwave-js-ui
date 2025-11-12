@@ -290,17 +290,10 @@ jobs:
           ls -al ./
           ls -al ./logs
           ls -al ./urls
-          status="{}"
           for arch in $(echo "${PLATFORMS}" | yq '. | join(" ")'); do
             echo $arch
-            #urls_file=$(find ~+ -name "*${arch}*" -quit)
-            #ls -al ~+/"${archs}"
-            # cat $urls_file
-            # bs="$([ -n "$(yq '.snap-url' "${urls_file}" -os)" ] && echo true || false ])"
-            # ls="$([ -n "$(yq '.log-url' "${urls_file}" -os)" ] && echo true || false ])"
-            # status=$(echo "$status" | jq --arg key "$key" \
-            #     --argjson build "$bs" \
-            #     --argjson logged "$ls" \
-            #   '. + {($key): {build: $build, logged: $logged}}')
+            lnf=$(find ~+/ -name "*{arch}*.log"
+            ajon=$(find ~+/ -name "*${arch}*.json")
+            echo $ajson
+            sulr=
           done
-          echo "$status"
