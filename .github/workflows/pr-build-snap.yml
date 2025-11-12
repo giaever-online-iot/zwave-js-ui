@@ -291,10 +291,7 @@ jobs:
             echo "Processing architecture: $arch"
             lnf=$(find "${PWD}" -name "*${arch}*.log")
             ajon=$(find "${PWD}" -name "*${arch}*.json")
-            
-            echo "Log files found for $arch:"
-            echo "$lnf"
-            
-            echo "JSON files found for $arch:"
-            cat "$ajon"
+
+            built=$(echo $ajon | yq '.snap-url' | xargs && echo 1 || echo 0)
+            logged=$(echo $ajon | yq '.log-url' | xargs && echo 1 || echo 0)
           done
