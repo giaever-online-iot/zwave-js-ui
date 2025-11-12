@@ -1,5 +1,8 @@
 name: PR Build Snap
 
+# JOBs
+# 19299607540: a*64= success, armhf=failed
+
 env:
   # DEV can be overridden when manually running this workflow via workflow_dispatch inputs.
   # Default is 'true' to preserve previous behavior.
@@ -288,11 +291,15 @@ jobs:
   build-status:
     needs: [build, upload]
     runs-on: ubuntu-latest
+    if: ${{ always() }}
     permissions:
       contents: write
       issues: write
+    env:
+      UPLOAD_OK: ${{ needs.upload.outcome == 'success' && 'true' || 'false' }}
     steps:
       - name: "Download all URLS for"
+        if: ${{ env.UPLOAD_OK == 'true' }}
         uses: actions/download-artifact@v6
         with:
           pattern: urls-*
@@ -300,6 +307,7 @@ jobs:
           path: urls
           
       - name: "Download all logs"
+        if: ${{ env.UPLOAD_OK == 'true' }}
         uses: actions/download-artifact@v6
         with:
           pattern: log-*
@@ -307,11 +315,12 @@ jobs:
           path: logs
 
       - name: Return build statuses
+        if: ${{ env.UPLOAD_OK == 'true' }}
         id: build
         env: 
           PLATFORMS: ${{ needs.build.outputs.platforms }}
         run: |
-          set -xuo pipefail
+          set -euo pipefail
           status="{}"
           for arch in $(echo "${PLATFORMS}" | yq '. | join(" ")'); do
             echo "Processing architecture: $arch"
@@ -328,10 +337,32 @@ jobs:
             status="$(echo "$status" | yq "eval(env(key)) = {\"built\": strenv(built), \"logged\": strenv(logged)}" -oj -I0)"
           done
           
-          echo "status<<EOF" >> $GITHUB_OUTPUT
+          echo "statuses<<EOF" >> $GITHUB_OUTPUT
           echo "${status}" | yq '.' -oj >> $GITHUB_OUTPUT
           echo EOF >> $GITHUB_OUTPUT
     
       - name: Print status
+        if: ${{ env.UPLOAD_OK == 'true' }}
         run: |
-          echo "${{ steps.build.outputs.status }}"
+          echo "${{ steps.build.outputs.statuses }}"
+
+      - name: "Builds failed for ${{ needs.build.outputs.platforms }}"
+        id: archs-logs
+        if: ${{ env.UPLOAD_OK != 'true' }}
+        run: |
+          archs="$(echo "${{ needs.build.outputs.platforms }}" | yq '. | join("-")')"
+          archs_fn=~+/"snapcraft-${archs}.log"
+          echo "${{ needs.build.outputs.snapcraft-logs }}" > "${archs_fn}"
+          echo "fn=${archs_fn}" >> $GITHUB_OUTPUT
+
+      - name: "Upload result metadata for platform (${{ matrix.platform }})"
+        if: ${{ env.UPLOAD_OK != 'true' }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: snapcraft-archs-logs
+          path: ${{ steps.archs-logs.outputs.fn }}
+
+      - name: Statuses
+        id: statuses
+        run: |
+          echo "statuses=${{ steps.build.outputs.statuses || '{"cmd-failed": true}' }}" >> $GITHUB_OUTPUT
