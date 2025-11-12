@@ -289,9 +289,11 @@ jobs:
           for urls_file in $(find ~+/urls -type f -name "*.json"); do
             key="$(basename "${urls_file}" .json)"
             cat $urls_file
-            build="$([ -n "$(yq '.snap-url' "${urls_file}")" ] && echo true || false ])"
-            logged="$([ -n "$(yq '.log-url' "${urls_file}")" ] && echo true || false ])"
-            echo "BUILD: ${build}"
-            echo "LOGGED: ${logged}"
+            bs="$([ -n "$(yq '.snap-url' "${urls_file}")" ] && echo true || false ])"
+            ls="$([ -n "$(yq '.log-url' "${urls_file}")" ] && echo true || false ])"
+            status=$(echo "$status" | jq --arg key "$key" \
+                --argjson build "$bs" \
+                --argjson logged "$ls" \
+              '. + {($key): {build: $build, logged: $logged}}')
           done
           echo "$status"
