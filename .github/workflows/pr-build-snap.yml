@@ -118,7 +118,7 @@ jobs:
         run: |
           #set -euo pipefail
           echo "Run-id: ${{ github.run_id }}"
-          echo "Workspace: ${{ GITHUB_WORKSPACE }}"
+          echo "Workspace: ${GITHUB_WORKSPACE}"
           # Read platforms JSON array from previous step
           platforms="$(echo "${{ steps.extract.outputs.platforms }}" | yq '.' -oj -I0)"
 
@@ -138,7 +138,8 @@ jobs:
           set -e
 
           ls -al ~+/
-          logs=$(find ~+/ -name "snapcraft*.log")
+          logs=$(find "${GITHUB_WORKSPACE}" -name "snapcraft*.log")
+          echo "logs: ${logs}"
 
           if [ -n "${logs}" ]; then
             cat "${logs}"
