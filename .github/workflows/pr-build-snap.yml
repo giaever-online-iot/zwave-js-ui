@@ -289,6 +289,7 @@ jobs:
           set -xuo pipefail
           status="{}"
           for arch in $(echo "${PLATFORMS}" | yq '. | join(" ")'); do
+            key=".${arch}"
             echo "Processing architecture: $arch"
             status="$(echo "$status" | yq '.env(key) = {}' -oj -I0)"
             echo "${status}"
@@ -299,3 +300,4 @@ jobs:
             logged=d"$([[ -n "$(cat $ajon | yq '.snap-url')" ]] && echo true || echo false)"
 
           done
+          echo ${status}
