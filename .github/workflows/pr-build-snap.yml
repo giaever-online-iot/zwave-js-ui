@@ -291,8 +291,8 @@ jobs:
             echo "Processing architecture: $arch"
             lfn=$(find "${PWD}" -name "*${arch}*.log" -print -quit)
             cat $lfn
-            ajon=$(find "${PWD}" -name "*${arch}*.json" -print -quit | yq '.' -oj -I0)
-            cat $ajon
+            ajon=$(find "${PWD}" -name "*${arch}*.json" | yq '.' -oj -I0)
+            echo $ajon
 
             built=$(echo $ajon | yq '.snap-url')
             logged=$(echo $ajon | yq '.log-url')
