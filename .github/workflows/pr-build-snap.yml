@@ -350,6 +350,7 @@ jobs:
         id: archs-logs
         if: ${{ env.UPLOAD_OK != 'true' }}
         run: |
+          set -x
           archs="$(echo "${{ needs.build.outputs.platforms }}" | yq '. | join("-")')"
           archs_fn=~+/"snapcraft-${archs}.log"
           echo "${{ needs.build.outputs.snapcraft-logs }}" > "${archs_fn}"
