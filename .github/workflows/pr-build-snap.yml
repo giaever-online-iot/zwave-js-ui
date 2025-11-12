@@ -139,7 +139,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
+ 
           ls -al ./
           sn=$(yq '.name' snap/snapcraft.yaml)
           sv=$(yq '.version' snap/snapcraft.yaml)
@@ -290,17 +290,20 @@ jobs:
           set -xuo pipefail
           status="{}"
           for arch in $(echo "${PLATFORMS}" | yq '. | join(" ")'); do
-            
             echo "Processing architecture: $arch"
-            lfn=$(find "${PWD}" -name "*${arch}*.log" -print -quit)
-            ajon=$(find "${PWD}" -name "*${arch}*.json")
+            ajon=$(find "${PWD}" -name "*${arch}*.json" -print -quit)
 
-            export key=".${arch}"
-            export built="$([[ -n "$(cat $ajon | yq '.snap-url')" ]] && echo true || echo false)"
-            export logged="$([[ -n "$(cat $ajon | yq '.snap-url')" ]] && echo true || echo false)"
-            status="$(echo "$status" | yq 'eval(env(key)) = {"built": strenv(built), "logged": strenv(logged)}' -oj -I0)"
-
+            built=false
+            logged=false
+            if [[ -n "$ajon" ]]; then
+              built="$([[ -n "$(cat "$ajon" | yq '.snap-url')" ]] && echo true || echo false)"
+              logged="$([[ -n "$(cat "$ajon" | yq '.log-url')" ]] && echo true || echo false)"
+            fi
+            
+            key=".${arch}"
+            status="$(echo "$status" | yq "eval(env(key)) = {\"built\": strenv(built), \"logged\": strenv(logged)}" -oj -I0)"
           done
+          
           echo "status<<EOF" >> $GITHUB_OUTPUT
           echo "${status}" | yq '.' -oj >> $GITHUB_OUTPUT
           echo EOF >> $GITHUB_OUTPUT
