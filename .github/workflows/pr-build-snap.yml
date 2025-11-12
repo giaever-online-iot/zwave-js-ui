@@ -289,9 +289,9 @@ jobs:
           set -xuo pipefail
           for arch in $(echo "${PLATFORMS}" | yq '. | join(" ")'); do
             echo "Processing architecture: $arch"
-            lfn=$(find "${PWD}" -name "*${arch}*.log")
+            lfn=$(find "${PWD}" -name "*${arch}*.log" -quit)
             cat $lfn
-            ajon=$(find "${PWD}" -name "*${arch}*.json")
+            ajon=$(find "${PWD}" -name "*${arch}*.json" -quit | yq '.' -oj -I0)
             cat $ajon
 
             built=$(echo $ajon | yq '.snap-url')
