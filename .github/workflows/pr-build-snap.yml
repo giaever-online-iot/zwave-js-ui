@@ -74,7 +74,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.ref }}
+          #ref: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
       - name: "Download build artifacts for all platforms"
@@ -114,7 +114,7 @@ jobs:
         # if not DEV, or if DEV but download did not succeed
         if: ${{ success() && (env.DEV != 'true' || (env.DEV == 'true' && steps.download-artifacts.outcome != 'success')) }}
         env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+          #SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
           set -exuo pipefail
           
@@ -124,20 +124,19 @@ jobs:
           platforms="$(echo "${{ steps.extract.outputs.platforms }}" | yq '.' -oj -I0)"
 
           sudo snap install snapcraft --classic
-          # export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}" 
+          export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}" 
           snapcraft whoami || true
           
           mkdir -p ~/.local/share/snapcraft
           echo "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
-
-          set +ex
+          
+          set +e
           # Build for comma-separated list of arches
           snapcraft remote-build -v --launchpad-accept-public-upload \
             --build-for=$(yq '. | join(",")' <<< "$platforms")
-
-          set -ex
           ret=$?
-
+          set -e
+          
           ls -al ~+/
           logs=$(find "${HOME}" -name "snapcraft*.log" -exec cat {} \;)
 
