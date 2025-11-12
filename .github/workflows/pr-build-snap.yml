@@ -132,6 +132,9 @@ jobs:
           snapcraft remote-build -v --launchpad-accept-public-upload \
             --build-for=$(yq '. | join(",")' <<< "$platforms")
 
+          ls -al ~+/
+          cat "$(find ~+/ -name "snapcraft*.log" -quit)"
+
       - name: Normalize .snap/.txt artifact names
         # Run if we actually built in this run
         if: ${{ steps.build.outcome == 'success' }} 
