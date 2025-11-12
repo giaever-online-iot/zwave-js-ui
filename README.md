@@ -12,9 +12,9 @@ This repository contains a snap package for Z-Wave JS UI, making installation st
 If you find this snap package useful, please consider:
 - Contributing with pull requests
 - Donating to support ongoing development:
-  - Snap package maintainer: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=69NA8SXXFBDBN
-  - Z-Wave JS UI developer: https://github.com/sponsors/robertsLando
-  - Z-Wave JS driver developer: https://github.com/sponsors/AlCalzone
+  - [@giaever-online-iot](https://github.com/sponsors/giaever-online-iot) (Snap maintainer)
+  - [@robertsLando](https://github.com/sponsors/robertsLando) (Z-Wave JS UI dev)
+  - [@AlCalzone](https://github.com/sponsors/AlCalzone) (Z-Wave JS driver dev)
 - Starring this repository
 
 ## Release Channels
