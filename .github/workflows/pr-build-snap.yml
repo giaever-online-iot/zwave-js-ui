@@ -156,8 +156,8 @@ jobs:
 
       - name: Normalize .snap/.txt artifact names
         # Run if we actually built in this run
-        if: ${{ contains(['success']), steps.build.outcome) }}
-        #if: ${{ contains(['success', 'failed']), steps.build.outcome) }} 
+        if: ${{ contains(['success'], steps.build.outcome) }}
+        #if: ${{ contains(['success', 'failed'], steps.build.outcome) }} 
         shell: bash
         run: |
           set -euo pipefail
@@ -193,8 +193,8 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         id: upload-artifacts
-        if: ${{ contains(['success']), steps.build.outcome) }}
-        # if: ${{ contains(['success', 'failed']), steps.build.outcome) }}
+        if: ${{ contains(['success'], steps.build.outcome) }}
+        # if: ${{ contains(['success', 'failed'], steps.build.outcome) }}
         with:
           name: snap-build-artifacts
           path: build/
