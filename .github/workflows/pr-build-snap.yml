@@ -304,6 +304,7 @@ jobs:
           echo "status<<EOF" >> $GITHUB_OUTPUT
           echo "${status}" | yq '.' -oj >> $GITHUB_OUTPUT
           echo EOF >> $GITHUB_OUTPUT
+    
       - name: Print status
         run: |
-          echo ${{ steps.build.outputs.status }}
+          echo "${{ steps.build.outputs.status }}"
