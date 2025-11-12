@@ -292,6 +292,8 @@ jobs:
             lnf=$(find "${PWD}" -name "*${arch}*.log")
             ajon=$(find "${PWD}" -name "*${arch}*.json")
 
-            built=$(echo $ajon | yq '.snap-url' | xargs && echo 1 || echo 0)
-            logged=$(echo $ajon | yq '.log-url' | xargs && echo 1 || echo 0)
+            built=$(echo $ajon | yq '.snap-url' | xargs && echo true || echo false)
+            logged=$(echo $ajon | yq '.log-url' | xargs && echo true || echo false)
+
+            echo "Built: $built, loogged: $logged"
           done
