@@ -287,13 +287,14 @@ jobs:
           PLATFORMS: ${{ needs.build.outputs.platforms }}
         run: |
           set -xuo pipefail
-          ls -al ./
-          ls -al ./logs
-          ls -al ./urls
           for arch in $(echo "${PLATFORMS}" | yq '. | join(" ")'); do
-            echo $arch
-            lnf=$(find ~+/ -name "*{arch}*.log"
-            ajon=$(find ~+/ -name "*${arch}*.json")
-            echo $ajson
-            sulr=
+            echo "Processing architecture: $arch"
+            lnf=$(find "${PWD}" -name "*${arch}*.log")
+            ajon=$(find "${PWD}" -name "*${arch}*.json")
+            
+            echo "Log files found for $arch:"
+            echo "$lnf"
+            
+            echo "JSON files found for $arch:"
+            echo "$ajon"
           done
