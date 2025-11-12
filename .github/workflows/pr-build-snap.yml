@@ -139,22 +139,25 @@ jobs:
           ret=$?
 
           ls -al ~+/
-          logs=$(find "${HOME}" -name "snapcraft*.log")
-          echo "logs: ${logs}"
+          logs=$(find "${HOME}" -name "snapcraft*.log" -exec cat {} \;)
 
           if [ -n "${logs}" ]; then
             {
               echo "snapcraft-logs<<EOF"
-              cat "${logs}"
+              echo "${logs}"
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
           fi
           
           exit ${ret}
+      - name: Snapcraft remote log
+        run: |
+          echo "${{ steps.build.outputs.snapcraft-log }}"
 
       - name: Normalize .snap/.txt artifact names
         # Run if we actually built in this run
-        if: ${{ steps.build.outcome == 'success' }} 
+        if: ${{ contains(['success']), steps.build.outcome) }}
+        #if: ${{ contains(['success', 'failed']), steps.build.outcome) }} 
         shell: bash
         run: |
           set -euo pipefail
@@ -190,7 +193,8 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         id: upload-artifacts
-        if: ${{ steps.build.outcome == 'success' }}
+        if: ${{ contains(['success']), steps.build.outcome) }}
+        # if: ${{ contains(['success', 'failed']), steps.build.outcome) }}
         with:
           name: snap-build-artifacts
           path: build/
