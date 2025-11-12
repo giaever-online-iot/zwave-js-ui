@@ -288,10 +288,12 @@ jobs:
         run: |
           set -xuo pipefail
           ls -al ./
+          ls -al ./logs
+          ls -al ./urls
           status="{}"
           for arch in $(echo "${PLATFORMS}" | yq '. | join(" ")'); do
-            urls_file=$(find ~+ -name "*${arch}*" -quit)
-            ls -al ~+/"${archs}"
+            #urls_file=$(find ~+ -name "*${arch}*" -quit)
+            #ls -al ~+/"${archs}"
             # cat $urls_file
             # bs="$([ -n "$(yq '.snap-url' "${urls_file}" -os)" ] && echo true || false ])"
             # ls="$([ -n "$(yq '.log-url' "${urls_file}" -os)" ] && echo true || false ])"
