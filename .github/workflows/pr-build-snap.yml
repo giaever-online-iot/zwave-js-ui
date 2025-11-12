@@ -288,7 +288,7 @@ jobs:
         run: |
           set -exuo pipefail
           status="{}"
-          for arch in "$(echo "${PLATFORMS}" | yq '. | join(" ")')"; do
+          for arch in $(echo "${PLATFORMS}" | yq '. | join(" ")'); do
             urls_file=$(find ~+ -name "${arch}.json" -quit)
             # cat $urls_file
             # bs="$([ -n "$(yq '.snap-url' "${urls_file}" -os)" ] && echo true || false ])"
