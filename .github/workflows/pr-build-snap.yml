@@ -116,7 +116,7 @@ jobs:
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           echo "Run-id: ${{ github.run_id }}"
           # Read platforms JSON array from previous step
           platforms="$(echo "${{ steps.extract.outputs.platforms }}" | yq '.' -oj -I0)"
