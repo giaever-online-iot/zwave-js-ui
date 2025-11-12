@@ -70,6 +70,7 @@ jobs:
     outputs:
       platforms: ${{ steps.extract.outputs.platforms }}
       artifacts-url: ${{ steps.upload-artifacts.outputs.artifact-url }}
+      snapcraft-logs: ${{ steps.build.outputs.snapcraft-log }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -149,14 +150,15 @@ jobs:
           fi
           
           exit ${ret}
+          
       - name: Snapcraft remote log
+        if: ${{ steps.build.outcome != 'skipped' }}
         run: |
-          echo "${{ steps.build.outputs.snapcraft-log }}"
+          echo "LOG: ${{ steps.build.outputs.snapcraft-log || 'missing' }}"
 
       - name: Normalize .snap/.txt artifact names
         # Run if we actually built in this run
-        if: ${{ contains(fromJson('["success", "completed"]'), steps.build.outcome) }}
-        #if: ${{ contains(['success', 'failed'], steps.build.outcome) }} 
+        if: ${{ contains(fromJson('["success", "completed", "failed"]'), steps.build.outcome) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -165,9 +167,9 @@ jobs:
           sn=$(yq '.name' snap/snapcraft.yaml)
           sv=$(yq '.version' snap/snapcraft.yaml)
 
-          # Create build root directory
-          dst_root="$(pwd)/build"
-          mkdir -p "$dst_root"
+          # Build root directory
+          dst_root=~+/build"
+          mkdir -p "${dst_root}"
 
           # Parse platforms JSON array and iterate
           echo '${{ steps.extract.outputs.platforms }}' | jq -r '.[]' | while read p; do
@@ -192,8 +194,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         id: upload-artifacts
-        if: ${{ contains(fromJson('["success", "completed"]'), steps.build.outcome) }}
-        # if: ${{ contains(['success', 'failed'], steps.build.outcome) }}
+        if: ${{ contains(fromJson('["success", "completed", "failed"]'), steps.build.outcome) }}
         with:
           name: snap-build-artifacts
           path: build/
