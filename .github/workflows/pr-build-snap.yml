@@ -138,15 +138,17 @@ jobs:
           ret=$?
           set -e
           
-          ls -al ~+/
-          logs=$(find "${HOME}" -name "snapcraft*.log" -exec cat {} \;)
+          find ~ -name "snapcraft-*.log"
+          logs=$(find ~ -name "snapcraft*.log" -exec cat {} \;)
 
           if [ -n "${logs}" ]; then
+            set +x
             {
               echo "snapcraft-logs<<EOF"
               echo "${logs}"
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
+            set -x
           fi
           
           exit ${ret}
