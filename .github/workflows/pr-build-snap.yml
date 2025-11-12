@@ -296,5 +296,5 @@ jobs:
             echo "$lnf"
             
             echo "JSON files found for $arch:"
-            echo "$ajon"
+            cat "$ajon"
           done
