@@ -293,14 +293,14 @@ jobs:
             echo "Processing architecture: $arch"
             ajon=$(find "${PWD}" -name "*${arch}*.json" -print -quit)
 
-            built=false
-            logged=false
+            export built=false
+            export logged=false
             if [[ -n "$ajon" ]]; then
               built="$([[ -n "$(cat "$ajon" | yq '.snap-url')" ]] && echo true || echo false)"
               logged="$([[ -n "$(cat "$ajon" | yq '.log-url')" ]] && echo true || echo false)"
             fi
             
-            key=".${arch}"
+            export key=".${arch}"
             status="$(echo "$status" | yq "eval(env(key)) = {\"built\": strenv(built), \"logged\": strenv(logged)}" -oj -I0)"
           done
           
