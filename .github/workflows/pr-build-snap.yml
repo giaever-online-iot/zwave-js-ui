@@ -143,7 +143,11 @@ jobs:
           echo "logs: ${logs}"
 
           if [ -n "${logs}" ]; then
-            cat "${logs}"
+            {
+              echo "snapcraft-logs<<EOF"
+              cat "${logs}"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
           fi
           
           exit ${ret}
