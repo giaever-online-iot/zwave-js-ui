@@ -283,6 +283,7 @@ jobs:
           path: logs
 
       - name: Return build statuses
+        id: build
         env: 
           PLATFORMS: ${{ needs.build.outputs.platforms }}
         run: |
@@ -296,9 +297,13 @@ jobs:
 
             export key=".${arch}"
             export built="$([[ -n "$(cat $ajon | yq '.snap-url')" ]] && echo true || echo false)"
-            export logged=d"$([[ -n "$(cat $ajon | yq '.snap-url')" ]] && echo true || echo false)"
-            status="$(echo "$status" | yq 'eval(env(key)) = {"built": env(built), "logged": env(logged)}' -oj -I0)"
-            echo "${status}"
+            export logged="$([[ -n "$(cat $ajon | yq '.snap-url')" ]] && echo true || echo false)"
+            status="$(echo "$status" | yq 'eval(env(key)) = {"built": strenv(built), "logged": strenv(logged)}' -oj -I0)"
 
           done
-          echo ${status}
+          echo "status<<EOF" >> $GITHUB_OUTPUT
+          echo "${status}" | yq '.' -oj >> $GITHUB_OUTPUT
+          echo EOF >> $GITHUB_OUTPUT
+      - name: Print status
+        run: |
+          echo ${{ steps.build.outputs.status }}
