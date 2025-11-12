@@ -145,7 +145,7 @@ parts:
 
       craftctl default
 
-      # ! add extra debugging
+      #! Add extra debugging
       if [ "${DEBUG_BUILD}" == true ]; then
         echo "DEBUG"
         echo "process.on(\"warning\", (warning) => { console.warn(\"Node.js warning: \" + warning.stack);});" >> "${CRAFT_PART_INSTALL}/lib/node_modules/zui-snap/node_modules/.bin/zwave-js-ui"
@@ -154,7 +154,6 @@ parts:
     stage-packages:
       - on armhf:
         - libatomic1
-        - sadasdihaiusdha
     stage:
       - -bin/corepack
       - -bin/npx
