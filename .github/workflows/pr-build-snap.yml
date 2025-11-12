@@ -284,7 +284,7 @@ jobs:
 
       - name: Return build statuses
         env: 
-          PLATFORMS: ${{ needs.build.output.platforms }}
+          PLATFORMS: ${{ needs.build.outputs.platforms }}
         run: |
           set -exuo pipefail
           status="{}"
