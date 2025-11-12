@@ -296,7 +296,7 @@ jobs:
 
             built="$([[ -n "$(cat $ajon | yq '.snap-url')" ]] && echo true || echo false)"
             logged=d"$([[ -n "$(cat $ajon | yq '.snap-url')" ]] && echo true || echo false)"
-            key=".${arch}" status="$(echo "$status" | yq 'eval(env(key)) = {"built": env(build), "logged": env(logged)}' -oj -I0)"
+            status="$(key=".${arch}" echo "$status" | yq 'eval(env(key)) = {"built": env(build), "logged": env(logged)}' -oj -I0)"
             echo "${status}"
 
           done
