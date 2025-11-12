@@ -426,7 +426,7 @@ jobs:
               if (anyFailed) {
                 labelToApply = 'build/failed';
               } else if (allBuilt && anyNotLogged) {
-                labelToApply = 'build/unknow';
+                labelToApply = 'build/unknown';
               } else if (allBuilt) {
                 labelToApply = 'build/passed';
               }
