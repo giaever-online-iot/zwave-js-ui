@@ -292,6 +292,7 @@ jobs:
           ls -al ./urls
           status="{}"
           for arch in $(echo "${PLATFORMS}" | yq '. | join(" ")'); do
+            echo $arch
             #urls_file=$(find ~+ -name "*${arch}*" -quit)
             #ls -al ~+/"${archs}"
             # cat $urls_file
