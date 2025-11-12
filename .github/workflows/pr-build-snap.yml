@@ -290,7 +290,7 @@ jobs:
           status="{}"
           for arch in $(echo "${PLATFORMS}" | yq '. | join(" ")'); do
             echo "Processing architecture: $arch"
-            status="$(echo "$status" | yq '.env(key) = {}' -oj -I0)
+            status="$(echo "$status" | yq '.env(key) = {}' -oj -I0)"
             echo "${status}"
             lfn=$(find "${PWD}" -name "*${arch}*.log" -print -quit)
             ajon=$(find "${PWD}" -name "*${arch}*.json")
