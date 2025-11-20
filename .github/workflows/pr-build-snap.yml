@@ -76,7 +76,7 @@ jobs:
       snapcraft-logs: ${{ steps.build.outputs.snapcraft-log || 'succeeded' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           #ref: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
