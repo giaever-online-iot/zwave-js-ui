@@ -21,6 +21,7 @@ on:
       - '.vscode/**'
       - '**/*.md'
       - '**/*.txt'
+      - 'renovate.json'
   workflow_run:
     branches:
       - main
