@@ -139,17 +139,16 @@ parts:
     npm-node-version: 22.20.0
     source: src/node
     override-build: | # shell
-      set -x
       ZUIV="${SNAPCRAFT_PROJECT_VERSION#v}" yq -i '.version=env(ZUIV),.dependencies.zwave-js-ui=env(ZUIV)' -o=j "${CRAFT_PART_BUILD}/package.json"
       #cat "${CRAFT_PART_BUILD}/package.json"
 
       craftctl default
 
       #! Add extra debugging
-      if [ "${DEBUG_BUILD}" == true ]; then
-        echo "DEBUG"
-        echo "process.on(\"warning\", (warning) => { console.warn(\"Node.js warning: \" + warning.stack);});" >> "${CRAFT_PART_INSTALL}/lib/node_modules/zui-snap/node_modules/.bin/zwave-js-ui"
-      fi
+      # if [ "${DEBUG_BUILD}" == true ]; then
+      #   echo "DEBUG"
+      #   echo "process.on(\"warning\", (warning) => { console.warn(\"Node.js warning: \" + warning.stack);});" >> "${CRAFT_PART_INSTALL}/lib/node_modules/zui-snap/node_modules/.bin/zwave-js-ui"
+      # fi
 
     stage-packages:
       - on armhf:
