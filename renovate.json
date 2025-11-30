@@ -14,8 +14,28 @@
       ],
       "depNameTemplate": "zwave-js/zwave-js-ui",
       "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^snap/snapcraft\\.yaml$/"
+      ],
+      "matchStrings": [
+        "npm-node-version: (?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "zwave-js-ui-node-version",
+      "datasourceTemplate": "custom.nodejs-zwave-js-ui",
+      "autoReplaceStringTemplate": "npm-node-version: {{{newValue}}}"
     }
   ],
+  "customDatasources": {
+    "nodejs-zwave-js-ui": {
+      "defaultRegistryUrlTemplate": "https://raw.githubusercontent.com/zwave-js/zwave-js-ui/refs/tags/{{{version}}}/docker/Dockerfile",
+      "transformTemplates": [
+        "{\"releases\": [{\"version\": $capture(\"ARG NODE_VERSION=([\\\\d.]+)\"), \"sourceUrl\": \"https://github.com/zwave-js/zwave-js-ui\"}]}"
+      ]
+    }
+  },
   "packageRules": [
     {
       "matchPackageNames": [
