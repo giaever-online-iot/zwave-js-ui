@@ -21,16 +21,17 @@
         "/^snap/snapcraft\\.yaml$/"
       ],
       "matchStrings": [
-        "npm-node-version: (?<currentValue>\\d+\\.\\d+\\.\\d+)"
+        "npm-node-version: (?<currentValue>\\d+\\.\\d+\\.\\d+)",
+        "version: +?['\"]?(?<zuiVersion>v[^'\"\n]*)['\"]?"
       ],
       "depNameTemplate": "zwave-js-ui-node-version",
       "datasourceTemplate": "custom.nodejs-zwave-js-ui",
-      "autoReplaceStringTemplate": "npm-node-version: {{{newValue}}}"
+      "autoReplaceStringTemplate": "npm-node-version: {{{newValue}}}",
+      "registryUrlTemplate": "https://raw.githubusercontent.com/zwave-js/zwave-js-ui/refs/tags/{{{zuiVersion}}}/docker/Dockerfile"
     }
   ],
   "customDatasources": {
     "nodejs-zwave-js-ui": {
-      "defaultRegistryUrlTemplate": "https://raw.githubusercontent.com/zwave-js/zwave-js-ui/refs/tags/{{{newVersion}}}/docker/Dockerfile",
       "transformTemplates": [
         "{\"releases\": [{\"version\": $capture(\"ARG NODE_VERSION=([\\\\d.]+)\"), \"sourceUrl\": \"https://github.com/zwave-js/zwave-js-ui\"}]}"
       ]
