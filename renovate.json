@@ -10,7 +10,7 @@
         "/^snap/snapcraft\\.yaml$/"
       ],
       "matchStrings": [
-        "version: +?['\"]?(?<currentVersion>v[^'\"\n]*)['\"]?"
+        "version: +?['\"]?(?<currentValue>v[^'\"\n]*)['\"]?"
       ],
       "depNameTemplate": "zwave-js/zwave-js-ui",
       "datasourceTemplate": "github-releases"
