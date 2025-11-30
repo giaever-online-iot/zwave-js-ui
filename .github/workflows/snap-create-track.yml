@@ -26,6 +26,7 @@ jobs:
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
+          set -x
           tracks="$(snapcraft list-tracks zwave-js-ui)"
           echo "all: ${tracks}"
           echo "all=$(echo "${tracks}" | awk 'NR > 1 && $1 ~ /^v/ {print "\""substr($1, 2)"\""}' | paste -sd, - | sed 's/.*/[&]/')" >> $GITHUB_OUTPUT
