@@ -7,7 +7,7 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "snap/snapcraft.yaml"
+        "/^snap/snapcraft\\.yaml$/"
       ],
       "matchStrings": [
         "^version: \"?(?<currentValue>[^\"\n]*)\"?$"
