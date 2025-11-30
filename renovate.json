@@ -32,10 +32,10 @@
   "customDatasources": {
     "npm-node-version": {
       "transformTemplates": [
-        "{\"releases\": [{\"version\": $capture(\"ARG NODE_VERSION=([\\d.]+)\")}]}"
+      "{\"releases\": [{\"version\": \"$capture(\\\"ARG NODE_VERSION=([\\\\d.]+)\\\")\" }]}"
       ]
     }
-  },
+    },
   "packageRules": [
     {
       "matchPackageNames": [
