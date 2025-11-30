@@ -26,7 +26,7 @@
       "depNameTemplate": "npm-node-version",
       "datasourceTemplate": "docker",
       "autoReplaceStringTemplate": "\\t+npm-node-version: {{{newVersion}}}",
-      "registryUrlTemplate": "https://raw.githubusercontent.com/zwave-js/zwave-js-ui/refs/tags/{{{version}}}/docker/Dockerfile"
+      "registryUrlTemplate": "https://raw.githubusercontent.com/zwave-js/zwave-js-ui/refs/tags/{{{version}}}"
     }
   ],
   "customDatasources": {
