@@ -29,7 +29,7 @@
   ],
   "customDatasources": {
     "npm-node-version": {
-      "defaultRegistryUrlTemplate": "https://raw.githubusercontent.com/zwave-js/zwave-js-ui/refs/tags/{{{version}}}/docker/Dockerfile",
+      "defaultRegistryUrlTemplate": "https://raw.githubusercontent.com/zwave-js/zwave-js-ui/refs/tags/{{version}}/docker/Dockerfile",
       "transformTemplates": [
         "{\"releases\": [{\"version\": $capture(\"ARG NODE_VERSION=([\\d.]+)\")}]}"
       ]
