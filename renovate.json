@@ -21,7 +21,8 @@
         "/^snap/snapcraft\\.yaml$/"
       ],
       "matchStrings": [
-        "version: (?<version>v[^\\s]+)(?:[\\s\\S]*?)npm-node-version: (?<currentValue>\\d+\\.\\d+\\.\\d+)"
+        "version: (?<version>v[^\\s]+)(?:[\\s\\S]*?",
+        "npm-node-version: (?<currentValue>\\d+\\.\\d+\\.\\d+)"
       ],
       "depNameTemplate": "npm-node-version",
       "datasourceTemplate": "custom.npm-node-version",
