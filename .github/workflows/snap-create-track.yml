@@ -9,7 +9,7 @@ on:
 
 jobs:
   create-track:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    #if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     env:
       SNAP_NAME: zwave-js-ui
