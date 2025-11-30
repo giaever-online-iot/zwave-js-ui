@@ -24,12 +24,12 @@
         "version: (?<version>v[^\\s]+)(?:[\\s\\S]*?)npm-node-version: (?<currentValue>\\d+\\.\\d+\\.\\d+)"
       ],
       "depNameTemplate": "npm-node-version",
-      "datasourceTemplate": "custom.npm-node-version"
+      "datasourceTemplate": "custom.npm-node-version",
+      "registryUrlTemplate": "https://raw.githubusercontent.com/zwave-js/zwave-js-ui/refs/tags/{{{version}}}/docker/Dockerfile"
     }
   ],
   "customDatasources": {
     "npm-node-version": {
-      "defaultRegistryUrlTemplate": "https://raw.githubusercontent.com/zwave-js/zwave-js-ui/refs/tags/{{version}}/docker/Dockerfile",
       "transformTemplates": [
         "{\"releases\": [{\"version\": $capture(\"ARG NODE_VERSION=([\\d.]+)\")}]}"
       ]
