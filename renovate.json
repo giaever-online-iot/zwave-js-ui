@@ -7,10 +7,10 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "^snap/snapcraft\\.yaml$"
+        "/^snap/snapcraft\\.yaml$"
       ],
       "matchStrings": [
-        "version: ['\"]?(?<currentValue>[^'\"\n]*)['\"]?$"
+        "version: ['\"]?(?<currentValue>[^'\"\n]*)['\"]?"
       ],
       "depNameTemplate": "zwave-js/zwave-js-ui",
       "datasourceTemplate": "github-releases"
