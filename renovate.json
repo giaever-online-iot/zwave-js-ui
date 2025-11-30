@@ -25,14 +25,14 @@
       ],
       "depNameTemplate": "zwave-js-ui-node-version",
       "datasourceTemplate": "custom.nodejs-zwave-js-ui",
-      // "autoReplaceStringTemplate": "npm-node-version: {{{newValue}}}",
+      "autoReplaceStringTemplate": "npm-node-version: {{{newValue}}}",
       "registryUrlTemplate": "https://raw.githubusercontent.com/zwave-js/zwave-js-ui/refs/tags/{{{currentVersion}}}/docker/Dockerfile"
     }
   ],
   "customDatasources": {
     "nodejs-zwave-js-ui": {
       "transformTemplates": [
-        "{\"releases\": [{\"version\": $capture(\"ARG NODE_VERSION=([\\\\d.]+)\"), \"sourceUrl\": \"https://github.com/zwave-js/zwave-js-ui\"}]}"
+        "$capture(\"ARG NODE_VERSION=([\\\\d.]+)\")"
       ]
     }
   },
