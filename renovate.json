@@ -21,7 +21,6 @@
         "/^snap/snapcraft\\.yaml$/"
       ],
       "matchStrings": [
-        "version: +?['\"]?(?<currentVersion>v[^'\"\n]*)['\"]?",
         "npm-node-version: (?<currentValue>\\d+\\.\\d+\\.\\d+)"
       ],
       "depNameTemplate": "zwave-js-ui-node-version",
