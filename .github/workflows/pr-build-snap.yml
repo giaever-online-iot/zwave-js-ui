@@ -62,7 +62,8 @@ on:
 permissions:
   contents: read
   actions: read
-  pull-requests: read
+  pull-requests: write
+  issues: write
 
 jobs:
   build:
@@ -296,6 +297,8 @@ jobs:
     permissions:
       contents: write
       issues: write
+    outputs:
+      statuses: ${{ steps.statuses.outputs.statuses }}
     env:
       UPLOAD_OK: ${{ needs.upload.outcome == 'success' && 'true' || 'false' }}
     steps:
@@ -368,3 +371,140 @@ jobs:
         id: statuses
         run: |
           echo "statuses=${{ steps.build.outputs.statuses || '{"cmd-failed": true}' }}" >> $GITHUB_OUTPUT
+
+  label-build-status:
+    needs: build-status
+    runs-on: ubuntu-latest
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Determine and set build status label
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const labelMeta = {
+              'build/passed': { color: '0e8a16', description: 'All builds passed' },
+              'build/failed': { color: 'b60205', description: 'One or more builds failed' },
+              'build/core-failed': { color: 'f9c513', description: 'Snapcraft command failed.' },
+              'build/unknown': { color: 'f99113', description: 'Build succeeded but logs are missing.' },
+            };
+
+            const statusesJson = `${{ needs.build-status.outputs.statuses }}`;
+            core.info(`Build statuses: ${statusesJson}`);
+            
+            let statuses;
+            try {
+              statuses = JSON.parse(statusesJson);
+            } catch (e) {
+              core.error(`Failed to parse statuses JSON: ${e.message}`);
+              return;
+            }
+
+            // Determine which label to apply based on the logic
+            let labelToApply = null;
+
+            // Check if cmd-failed is defined
+            if (statuses.hasOwnProperty('cmd-failed')) {
+              labelToApply = 'build/core-failed';
+            } else {
+              // Get all architecture keys
+              const archs = Object.keys(statuses);
+              
+              // If no architectures found, treat as failed
+              if (archs.length === 0) {
+                labelToApply = 'build/failed';
+              } else {
+                // Check build statuses
+                const allBuilt = archs.every(arch => statuses[arch].built === 'true' || statuses[arch].built === true);
+                const anyBuilt = archs.some(arch => statuses[arch].built === 'true' || statuses[arch].built === true);
+                const anyFailed = archs.some(arch => statuses[arch].built === 'false' || statuses[arch].built === false);
+                const anyNotLogged = archs.some(arch => {
+                  const built = statuses[arch].built === 'true' || statuses[arch].built === true;
+                  const logged = statuses[arch].logged === 'true' || statuses[arch].logged === true;
+                  return built && !logged;
+                });
+
+                // Apply label based on priority
+                if (anyFailed) {
+                  labelToApply = 'build/failed';
+                } else if (allBuilt && anyNotLogged) {
+                  labelToApply = 'build/unknown';
+                } else if (allBuilt) {
+                  labelToApply = 'build/passed';
+                }
+              }
+            }
+
+            if (!labelToApply) {
+              core.info('No label to apply based on current statuses.');
+              return;
+            }
+
+            core.info(`Label to apply: ${labelToApply}`);
+
+            const prNumber = context.issue.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Ensure the label exists; create if missing
+            const labelInfo = labelMeta[labelToApply];
+            try {
+              await github.rest.issues.getLabel({
+                owner,
+                repo,
+                name: labelToApply
+              });
+              core.info(`Label '${labelToApply}' already exists.`);
+            } catch (err) {
+              if (err && err.status === 404) {
+                core.info(`Label '${labelToApply}' not found — creating it.`);
+                await github.rest.issues.createLabel({
+                  owner,
+                  repo,
+                  name: labelToApply,
+                  color: labelInfo.color,
+                  description: labelInfo.description
+                });
+              } else {
+                throw err;
+              }
+            }
+
+            // Remove any existing build/* labels first
+            const existingLabels = await github.rest.issues.listLabelsOnIssue({
+              owner,
+              repo,
+              issue_number: prNumber
+            });
+
+            const buildLabels = existingLabels.data
+              .map(label => label.name)
+              .filter(name => name.startsWith('build/'));
+
+            for (const label of buildLabels) {
+              if (label !== labelToApply) {
+                core.info(`Removing old build label: ${label}`);
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: prNumber,
+                  name: label
+                });
+              }
+            }
+
+            // Add the new label
+            if (!buildLabels.includes(labelToApply)) {
+              core.info(`Adding label: ${labelToApply}`);
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: prNumber,
+                labels: [labelToApply]
+              });
+            } else {
+              core.info(`Label '${labelToApply}' already applied.`);
+            }
