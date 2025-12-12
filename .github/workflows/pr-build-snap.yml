@@ -83,7 +83,7 @@ jobs:
           fetch-depth: 0
 
       - name: "Download build artifacts for all platforms"
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         continue-on-error: true
         id: download-artifacts
         # explicit comparison is clearer and avoids edge-cases
@@ -197,7 +197,7 @@ jobs:
           find "$dst_root" -type f
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         id: upload-artifacts
         if: ${{ contains(fromJson('["success", "completed"]'), steps.build.outcome) }}
         with:
@@ -218,7 +218,7 @@ jobs:
       PLATFORM: ${{ matrix.platform }}
     steps:
       - name: "Download build artifacts for all platforms"
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         id: download-artifacts
         with:
           run-id: ${{ env.RUN_ID || github.run_id }}
@@ -240,7 +240,7 @@ jobs:
       - name: "Upload snap for platform (${{ matrix.platform }})"
         id: upload-snap-artifact
         if: ${{ steps.files.outputs.sfn != '' }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: snap-${{ matrix.platform }}
           path: ${{ steps.files.outputs.sfn }}
@@ -256,7 +256,7 @@ jobs:
           echo "url=${URL}" >> $GITHUB_OUTPUT
 
       - name: "Upload log for platform (${{ matrix.platform }})"
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         id: upload-log-artifact
         if: ${{ steps.files.outputs.lfn != '' }}
         with:
@@ -284,7 +284,7 @@ jobs:
           EOF
 
       - name: "Upload result metadata for platform (${{ matrix.platform }})"
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: urls-${{ matrix.platform }}
           path: ${{ matrix.platform }}.json
@@ -301,7 +301,7 @@ jobs:
     steps:
       - name: "Download all URLS for"
         if: ${{ env.UPLOAD_OK == 'true' }}
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           pattern: urls-*
           merge-multiple: true
@@ -309,7 +309,7 @@ jobs:
           
       - name: "Download all logs"
         if: ${{ env.UPLOAD_OK == 'true' }}
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           pattern: log-*
           merge-multiple: true
@@ -359,7 +359,7 @@ jobs:
 
       - name: "Upload result metadata for platform (${{ matrix.platform }})"
         if: ${{ env.UPLOAD_OK != 'true' }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: snapcraft-archs-logs
           path: ${{ steps.archs-logs.outputs.fn }}
