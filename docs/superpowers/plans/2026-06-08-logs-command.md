@@ -294,9 +294,10 @@ git commit -m "feat(logs): read logToFile settings via yq"
 
 Append to `tests/logs_test.sh`:
 ```bash
-# canonical paths
+# canonical paths (logs_dir defaults to $SNAP_DATA/logs/zwavejs — the dir env-wrapper
+# sets for the daemon; ZUI current file is z-ui_current.log, NOT zwave-js-ui_current.log)
 assert_eq "$(canonical_log_path zwjs)" "$SNAP_DATA/logs/zwavejs/zwavejs_current.log" "zwjs canonical"
-assert_eq "$(canonical_log_path zui)"  "$SNAP_DATA/logs/zwave-js-ui_current.log"     "zui canonical"
+assert_eq "$(canonical_log_path zui)"  "$SNAP_DATA/logs/zwavejs/z-ui_current.log"    "zui canonical"
 
 # resolve_source: explicit false -> journal
 assert_eq "$(resolve_source zui false)" "journal" "false -> journal"
@@ -307,10 +308,14 @@ assert_eq "$(resolve_source zwjs true)" "file:$SNAP_DATA/logs/zwavejs/zwavejs_cu
 # unset, no file -> journal
 assert_eq "$(resolve_source zui '')" "journal" "unset,no file -> journal"
 
-# unset, file exists -> file:<existing>
+# unset, file exists in logs_dir -> file:<existing>
 mkdir -p "$SNAP_DATA/logs/zwavejs"
 : > "$SNAP_DATA/logs/zwavejs/zwavejs_current.log"
 assert_eq "$(resolve_source zwjs '')" "file:$SNAP_DATA/logs/zwavejs/zwavejs_current.log" "unset,file -> file"
+
+# tolerant: ZUI file in the parent $SNAP_DATA/logs is also found
+: > "$SNAP_DATA/logs/z-ui_current.log"
+assert_eq "$(resolve_source zui '')" "file:$SNAP_DATA/logs/z-ui_current.log" "unset,zui file in parent -> file"
 ```
 
 - [ ] **Step 2: Run to verify failure**
@@ -322,21 +327,28 @@ Expected: new asserts FAIL.
 
 Add to `src/bin/logs`:
 ```bash
-zwjs_logdir() { echo "${ZWAVEJS_LOGS_DIR:-$SNAP_DATA/logs/zwavejs}"; }
+# Both ZUI and ZWJS write to one shared logs dir. The daemon's env-wrapper sets
+# ZWAVEJS_LOGS_DIR=$SNAP_DATA/logs/zwavejs; the logs command does NOT run through
+# env-wrapper, so it falls back to that same path and also searches the parent
+# $SNAP_DATA/logs for tolerance. Filenames confirmed in Task 1:
+#   ZUI -> z-ui_current.log / z-ui_*.log     ZWJS -> zwavejs_current.log / zwavejs_*.log
+logs_dir() { echo "${ZWAVEJS_LOGS_DIR:-$SNAP_DATA/logs/zwavejs}"; }
+
+log_basename() {               # $1 stream -> filename stem
+    case "$1" in zui) echo "z-ui" ;; zwjs) echo "zwavejs" ;; esac
+}
 
 canonical_log_path() {         # $1 stream -> path the app writes when logging to file
-    case "$1" in
-        zwjs) echo "$(zwjs_logdir)/zwavejs_current.log" ;;
-        zui)  echo "$SNAP_DATA/logs/zwave-js-ui_current.log" ;;  # VERIFY in Task 1
-    esac
+    echo "$(logs_dir)/$(log_basename "$1")_current.log"
 }
 
 existing_log_file() {          # $1 stream -> newest existing file, or empty
+    local base; base="$(log_basename "$1")"
     local f
-    case "$1" in
-        zwjs) f=$(ls -t "$(zwjs_logdir)"/zwavejs_current.log "$(zwjs_logdir)"/zwavejs_*.log 2>/dev/null | head -1) ;;
-        zui)  f=$(ls -t "$SNAP_DATA/logs"/*_current.log "$SNAP_DATA/logs"/zwave-js-ui_*.log 2>/dev/null | head -1) ;;
-    esac
+    f=$(ls -t \
+        "$(logs_dir)/${base}_current.log" "$SNAP_DATA/logs/${base}_current.log" \
+        "$(logs_dir)/${base}_"*.log "$SNAP_DATA/logs/${base}_"*.log \
+        2>/dev/null | head -1)
     [ -n "${f:-}" ] && [ -e "$f" ] && echo "$f"
 }
 

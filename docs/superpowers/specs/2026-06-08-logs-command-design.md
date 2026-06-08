@@ -47,9 +47,10 @@ Decide each stream's source by precedence — the filesystem is treated as groun
    - If a current log file exists for the stream → **file source.**
    - Otherwise → **journal source** (upstream default).
 
-**File source locations** (confirmed against upstream source):
-- ZWJS: `${ZWAVEJS_LOGS_DIR:-$SNAP_DATA/store/logs}` — prefer `zwavejs_current.log` (symlink created by `DailyRotateFile`), else newest `zwavejs_*.log`. (Note: ZWJS and ZUI share the same `logsDir`; there is no `zwavejs/` subdirectory.)
-- ZUI: same `${ZWAVEJS_LOGS_DIR:-$SNAP_DATA/store/logs}` — prefer `z-ui_current.log` (symlink; **not** `zwave-js-ui_current.log`), else newest `z-ui_*.log`.
+**File source locations** (confirmed against upstream source + this snap's `env-wrapper`):
+- This snap's `env-wrapper` sets `ZWAVEJS_LOGS_DIR=$SNAP_DATA/logs/zwavejs` for the daemon, so both components write into that shared dir. The `logs` command does **not** run through `env-wrapper`, so it falls back to that same path: `${ZWAVEJS_LOGS_DIR:-$SNAP_DATA/logs/zwavejs}`, and also searches the parent `$SNAP_DATA/logs` for tolerance.
+- ZWJS: prefer `zwavejs_current.log` (symlink created by `winston-daily-rotate-file`), else newest `zwavejs_*.log`.
+- ZUI: prefer `z-ui_current.log` (symlink; **not** `zwave-js-ui_current.log`), else newest `z-ui_*.log`.
 
 **Journal source** = the systemd unit `snap.${SNAP_NAME}.${SNAP_NAME}.service`, read via `journalctl`.
 
