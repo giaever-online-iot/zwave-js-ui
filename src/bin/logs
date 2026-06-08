@@ -5,6 +5,31 @@ source "$SNAP/helper/functions"
 
 # ---- pure helpers (unit-tested) added by later tasks ----
 
+usage() {
+    cat <<EOF
+Usage: ${SNAP_NAME}.logs [zui|--zui|zwjs|--zwjs]
+
+  (no arg)        follow both streams, merged
+  zui  | --zui    follow the Z-Wave JS UI application log only
+  zwjs | --zwjs   follow the Z-Wave JS driver log only
+  -h   | --help   show this help
+EOF
+}
+
+normalize_target() {           # $1 raw token; echoes both|zui|zwjs; status 2 if unknown
+    case "${1#--}" in
+        "")   echo both ;;
+        zui)  echo zui ;;
+        zwjs) echo zwjs ;;
+        *)    return 2 ;;
+    esac
+}
+
+parse_args() {                 # echoes target or status 2; accepts 0 or 1 token
+    [ "$#" -le 1 ] || return 2
+    normalize_target "${1:-}"
+}
+
 main() {
     : # assembled in a later task
 }
