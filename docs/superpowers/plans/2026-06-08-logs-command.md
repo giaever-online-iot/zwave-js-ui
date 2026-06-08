@@ -263,11 +263,15 @@ settings_file() { echo "$SNAP_DATA/settings.json"; }
 read_log_setting() {           # $1 settings file, $2 yq path -> true|false|""
     local sf="$1" key="$2" v
     [ -n "$sf" ] && [ -e "$sf" ] || { echo ""; return 0; }
-    v=$(yq -r "${key} // \"\"" "$sf" 2>/dev/null)
+    # Feed via stdin redirect (shell opens the file) rather than passing the path
+    # to yq: yq is a confined snap that cannot open arbitrary paths (e.g. /tmp under
+    # test). Do NOT use `// ""` — that alternative operator treats `false` as empty,
+    # collapsing an explicit "log to file OFF" into the unset/infer path.
+    v=$(yq -r "$key" - < "$sf" 2>/dev/null)
     case "$v" in
         true)  echo true ;;
         false) echo false ;;
-        *)     echo "" ;;
+        *)     echo "" ;;   # null / missing / anything else
     esac
 }
 ```
