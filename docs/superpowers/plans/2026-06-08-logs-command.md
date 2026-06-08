@@ -517,16 +517,22 @@ Replace the placeholder `main()` in `src/bin/logs` with:
 ```bash
 BACKLOG=20
 
-launch_follower() {            # $1 source spec, $2 prefix
-    # Own process group so the trap can kill the whole pipeline (tail/journalctl + reader).
-    setsid bash -c "$(follower_cmd "$1" "$BACKLOG") 2>&1" | prefix_lines "$2" &
+launch_follower() {            # $1 source spec, $2 prefix — backgrounds a subshell pipeline
+    # Wrap the whole pipeline in a subshell so $! is the subshell, whose children are
+    # the follower (tail/journalctl) and the prefixer. That lets cleanup kill BOTH via
+    # `pkill -P <subshell>`. (Do NOT use setsid here — it detaches the follower into a
+    # new session the trap can no longer reach, leaking tail/journalctl on Ctrl-C.)
+    # shellcheck disable=SC2294
+    ( eval "$(follower_cmd "$1" "$BACKLOG")" 2>&1 | prefix_lines "$2" ) &
 }
 
 main() {
+    # Help works without root and before arg validation.
+    case "${1:-}" in -h|--help|help) usage; exit 0 ;; esac
+
     require_root
 
     local target; target="$(parse_args "$@")" || { usage >&2; exit 2; }
-    case "$target" in -h|--help|help) usage; exit 0 ;; esac
 
     local use_color=0; [ -t 1 ] && use_color=1
 
@@ -538,7 +544,7 @@ main() {
     esac
 
     local sf; sf="$(settings_file)"
-    local pids=() journal_streams=() s setting src
+    local pids=() journal_streams=() s setting src p
     for s in "${streams[@]}"; do
         setting="$(read_log_setting "$sf" "$(setting_key "$s")")"
         src="$(resolve_source "$s" "$setting")"
@@ -546,7 +552,7 @@ main() {
             journal_streams+=("$s")
         else
             launch_follower "$src" "$(make_prefix "$(stream_upper "$s")" "$(stream_color "$s")" "$use_color")"
-            pids+=($!)
+            pids+=("$!")
         fi
     done
 
@@ -556,7 +562,7 @@ main() {
             lprint "Note: ${target} is logging to the journal, a shared process stream; other components may appear." >&2
         fi
         launch_follower journal "$(make_prefix "$(journal_label "${journal_streams[@]}")" yellow "$use_color")"
-        pids+=($!)
+        pids+=("$!")
     fi
 
     if [ "${#pids[@]}" -eq 0 ]; then
@@ -564,7 +570,8 @@ main() {
         exit 1
     fi
 
-    trap 'kill "${pids[@]}" 2>/dev/null' EXIT INT TERM
+    # On exit/Ctrl-C, kill each follower subshell AND its children (tail/journalctl + prefixer).
+    trap 'for p in "${pids[@]}"; do pkill -P "$p" 2>/dev/null; kill "$p" 2>/dev/null; done' EXIT INT TERM
     wait
 }
 ```
