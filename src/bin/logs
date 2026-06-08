@@ -54,6 +54,45 @@ read_log_setting() {           # $1 settings file, $2 yq path -> true|false|""
     esac
 }
 
+# Both ZUI and ZWJS write to one shared logs dir. The daemon's env-wrapper sets
+# ZWAVEJS_LOGS_DIR=$SNAP_DATA/logs/zwavejs; the logs command does NOT run through
+# env-wrapper, so it falls back to that same path and also searches the parent
+# $SNAP_DATA/logs for tolerance. Filenames confirmed upstream:
+#   ZUI -> z-ui_current.log / z-ui_*.log     ZWJS -> zwavejs_current.log / zwavejs_*.log
+logs_dir() { echo "${ZWAVEJS_LOGS_DIR:-$SNAP_DATA/logs/zwavejs}"; }
+
+log_basename() {               # $1 stream -> filename stem
+    case "$1" in zui) echo "z-ui" ;; zwjs) echo "zwavejs" ;; esac
+}
+
+canonical_log_path() {         # $1 stream -> path the app writes when logging to file
+    echo "$(logs_dir)/$(log_basename "$1")_current.log"
+}
+
+existing_log_file() {          # $1 stream -> newest existing file, or empty
+    local base; base="$(log_basename "$1")"
+    local f
+    f=$(ls -t \
+        "$(logs_dir)/${base}_current.log" "$SNAP_DATA/logs/${base}_current.log" \
+        "$(logs_dir)/${base}_"*.log "$SNAP_DATA/logs/${base}_"*.log \
+        2>/dev/null | head -1)
+    [ -n "${f:-}" ] && [ -e "$f" ] && echo "$f"
+}
+
+resolve_source() {             # $1 stream, $2 setting(true|false|"") -> file:<path> | journal
+    local stream="$1" setting="$2" f
+    case "$setting" in
+        true)
+            f=$(existing_log_file "$stream"); [ -n "$f" ] || f=$(canonical_log_path "$stream")
+            echo "file:$f" ;;
+        false)
+            echo journal ;;
+        *)
+            f=$(existing_log_file "$stream")
+            if [ -n "$f" ]; then echo "file:$f"; else echo journal; fi ;;
+    esac
+}
+
 main() {
     : # assembled in a later task
 }

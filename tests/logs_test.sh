@@ -32,4 +32,27 @@ assert_eq "$(read_log_setting "$_sf" .zwave.logToFile)"   "false" "reads false"
 assert_eq "$(read_log_setting "$_sf" .missing.key)"       ""      "missing key -> empty"
 assert_eq "$(read_log_setting "/no/such/file" .gateway.logToFile)" "" "no file -> empty"
 
+# canonical paths (logs_dir defaults to $SNAP_DATA/logs/zwavejs — the dir env-wrapper
+# sets for the daemon; ZUI current file is z-ui_current.log, NOT zwave-js-ui_current.log)
+assert_eq "$(canonical_log_path zwjs)" "$SNAP_DATA/logs/zwavejs/zwavejs_current.log" "zwjs canonical"
+assert_eq "$(canonical_log_path zui)"  "$SNAP_DATA/logs/zwavejs/z-ui_current.log"    "zui canonical"
+
+# resolve_source: explicit false -> journal
+assert_eq "$(resolve_source zui false)" "journal" "false -> journal"
+
+# explicit true, no file yet -> file:<canonical>
+assert_eq "$(resolve_source zwjs true)" "file:$SNAP_DATA/logs/zwavejs/zwavejs_current.log" "true,no file -> canonical"
+
+# unset, no file -> journal
+assert_eq "$(resolve_source zui '')" "journal" "unset,no file -> journal"
+
+# unset, file exists in logs_dir -> file:<existing>
+mkdir -p "$SNAP_DATA/logs/zwavejs"
+: > "$SNAP_DATA/logs/zwavejs/zwavejs_current.log"
+assert_eq "$(resolve_source zwjs '')" "file:$SNAP_DATA/logs/zwavejs/zwavejs_current.log" "unset,file -> file"
+
+# tolerant: ZUI file in the parent $SNAP_DATA/logs is also found
+: > "$SNAP_DATA/logs/z-ui_current.log"
+assert_eq "$(resolve_source zui '')" "file:$SNAP_DATA/logs/z-ui_current.log" "unset,zui file in parent -> file"
+
 finish
