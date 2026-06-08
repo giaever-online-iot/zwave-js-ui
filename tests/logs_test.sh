@@ -67,4 +67,14 @@ assert_eq "$(make_prefix ZUI cyan 0)" "[ZUI] " "plain prefix"
 assert_contains "$(make_prefix ZUI cyan 1)" "[ZUI]" "color prefix has label"
 assert_contains "$(make_prefix ZUI cyan 1)" "$(printf '\033[36m')" "color prefix has cyan"
 
+# prefix_lines prepends to each line
+out="$(printf 'a\nb\n' | prefix_lines '[X] ')"
+assert_eq "$out" "$(printf '[X] a\n[X] b')" "prefix_lines per line"
+
+# follower_cmd builds tail / journalctl invocations
+assert_contains "$(follower_cmd 'file:/var/log/zui_current.log' 20)" "tail -n 20 -F" "file -> tail"
+assert_contains "$(follower_cmd 'file:/var/log/zui_current.log' 20)" "zui_current.log" "file -> path"
+assert_contains "$(follower_cmd journal 20)" "journalctl -u" "journal -> journalctl"
+assert_contains "$(follower_cmd journal 20)" "snap.zwave-js-ui.zwave-js-ui.service" "journal -> unit"
+
 finish

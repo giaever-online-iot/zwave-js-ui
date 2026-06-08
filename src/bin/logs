@@ -112,6 +112,21 @@ make_prefix() {                # $1 text, $2 color, $3 use_color(0|1) -> "[TEXT]
     fi
 }
 
+prefix_lines() {               # $1 prefix; prepends to each stdin line
+    local prefix="$1" line
+    while IFS= read -r line; do printf '%s%s\n' "$prefix" "$line"; done
+}
+
+journal_unit() { echo "snap.${SNAP_NAME}.${SNAP_NAME}.service"; }
+
+follower_cmd() {               # $1 source spec, $2 backlog -> a %q-quoted command string
+    local spec="$1" n="$2"
+    case "$spec" in
+        file:*)  printf 'tail -n %s -F %q' "$n" "${spec#file:}" ;;
+        journal) printf 'journalctl -u %q -n %s -f' "$(journal_unit)" "$n" ;;
+    esac
+}
+
 main() {
     : # assembled in a later task
 }
