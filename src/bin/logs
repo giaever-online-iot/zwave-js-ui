@@ -168,6 +168,9 @@ main() {
         if [ "$src" = journal ]; then
             journal_streams+=("$s")
         else
+            # If the file doesn't exist yet (e.g. logToFile just enabled), tail -F waits
+            # silently — tell the user what it's waiting for.
+            [ -e "${src#file:}" ] || lprint "Waiting for log file: ${src#file:}" >&2
             launch_follower "$src" "$(make_prefix "$(stream_upper "$s")" "$(stream_color "$s")" "$use_color")"
             pids+=("$!")
         fi
@@ -178,10 +181,16 @@ main() {
         if [ "$target" != both ]; then
             lprint "Note: ${target} is logging to the journal, a shared process stream; other components may appear." >&2
         fi
+        # Probe journal access; on denial, point the user at the interface to connect.
+        if ! journalctl -u "$(journal_unit)" -n 0 >/dev/null 2>&1; then
+            lprint "Cannot read the journal (permission?). Connect the interface with:" >&2
+            lprint "  sudo snap connect ${SNAP_NAME}:log-observe" >&2
+        fi
         launch_follower journal "$(make_prefix "$(journal_label "${journal_streams[@]}")" yellow "$use_color")"
         pids+=("$!")
     fi
 
+    # Defensive: with the current stream logic at least one follower is always launched.
     if [ "${#pids[@]}" -eq 0 ]; then
         lprint "No logs to follow yet. Start/configure ${SNAP_NAME} first (see ${SNAP_NAME}.help)." >&2
         exit 1

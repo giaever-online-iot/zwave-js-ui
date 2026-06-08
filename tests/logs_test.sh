@@ -58,6 +58,7 @@ assert_eq "$(resolve_source zui '')" "file:$SNAP_DATA/logs/z-ui_current.log" "un
 assert_eq "$(stream_upper zui)"  "ZUI"  "upper zui"
 assert_eq "$(stream_upper zwjs)" "ZWJS" "upper zwjs"
 assert_eq "$(stream_color zui)"  "cyan" "color zui"
+assert_eq "$(stream_color zwjs)" "green" "color zwjs"
 assert_eq "$(journal_label zwjs)" "ZWJS" "journal label single"
 assert_eq "$(journal_label zui zwjs)" "ZUI/ZWJS" "journal label combined"
 
