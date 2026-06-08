@@ -127,20 +127,19 @@ follower_cmd() {               # $1 source spec, $2 backlog -> a %q-quoted comma
     esac
 }
 
-BACKLOG=20
-
 launch_follower() {            # $1 source spec, $2 prefix — backgrounds a subshell pipeline
-    # Wrap the whole pipeline in a subshell so $! is the subshell, whose children are
-    # the follower (tail/journalctl) and the prefixer. That lets cleanup kill BOTH via
-    # `pkill -P <subshell>`. (Do NOT use setsid here — it detaches the follower into a
-    # new session the trap can no longer reach, leaking tail/journalctl on Ctrl-C.)
+    # Wrap the pipeline in a subshell so $! is the subshell. Use `exec` inside the eval
+    # so the follower (tail/journalctl) REPLACES the intermediate shell and becomes a
+    # DIRECT child of the subshell — otherwise `pkill -P` only reaches the intermediate
+    # shell and tail/journalctl orphans (keeps running, root-owned) on Ctrl-C.
+    # follower_cmd always emits a single external-command invocation, so exec is safe.
     # shellcheck disable=SC2294
-    ( eval "$(follower_cmd "$1" "$BACKLOG")" 2>&1 | prefix_lines "$2" ) &
+    ( eval "exec $(follower_cmd "$1" "$BACKLOG")" 2>&1 | prefix_lines "$2" ) &
 }
 
 main() {
-    # Help works without root and before arg validation.
-    case "${1:-}" in -h|--help|help) usage; exit 0 ;; esac
+    # Help works without root and before arg validation. (Only -h/--help; no bare alias.)
+    case "${1:-}" in -h|--help) usage; exit 0 ;; esac
 
     require_root
 
@@ -156,7 +155,13 @@ main() {
     esac
 
     local sf; sf="$(settings_file)"
+    local BACKLOG=20
     local pids=() journal_streams=() s setting src p
+
+    # Register cleanup BEFORE launching anything, so a Ctrl-C mid-launch still reaps every
+    # follower subshell AND its children (tail/journalctl + prefixer). Empty pids = no-op.
+    trap 'for p in "${pids[@]}"; do pkill -P "$p" 2>/dev/null; kill "$p" 2>/dev/null; done' EXIT INT TERM
+
     for s in "${streams[@]}"; do
         setting="$(read_log_setting "$sf" "$(setting_key "$s")")"
         src="$(resolve_source "$s" "$setting")"
@@ -169,8 +174,8 @@ main() {
     done
 
     if [ "${#journal_streams[@]}" -gt 0 ]; then
-        # Honesty notice: a filtered journal view can include the other component.
-        if [ "$target" != both ] && [ "${#streams[@]}" -eq 1 ]; then
+        # Honesty notice: a filtered (single-stream) journal view can include the other component.
+        if [ "$target" != both ]; then
             lprint "Note: ${target} is logging to the journal, a shared process stream; other components may appear." >&2
         fi
         launch_follower journal "$(make_prefix "$(journal_label "${journal_streams[@]}")" yellow "$use_color")"
@@ -182,8 +187,6 @@ main() {
         exit 1
     fi
 
-    # On exit/Ctrl-C, kill each follower subshell AND its children (tail/journalctl + prefixer).
-    trap 'for p in "${pids[@]}"; do pkill -P "$p" 2>/dev/null; kill "$p" 2>/dev/null; done' EXIT INT TERM
     wait
 }
 
