@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# logs — unified, terminal-friendly log follower for zwave-js-ui
+: "${SNAP:?SNAP must be set}"
+source "$SNAP/helper/functions"
+
+# ---- pure helpers (unit-tested) added by later tasks ----
+
+main() {
+    : # assembled in a later task
+}
+
+# run main only when executed, not when sourced (enables unit tests)
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi
