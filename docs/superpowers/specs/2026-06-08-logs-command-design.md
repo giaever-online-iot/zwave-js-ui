@@ -47,9 +47,9 @@ Decide each stream's source by precedence — the filesystem is treated as groun
    - If a current log file exists for the stream → **file source.**
    - Otherwise → **journal source** (upstream default).
 
-**File source locations** (patterns are tolerant; exact names are a verification item):
-- ZWJS: `${ZWAVEJS_LOGS_DIR:-$SNAP_DATA/logs/zwavejs}` — prefer `zwavejs_current.log`, else newest `zwavejs_*.log`.
-- ZUI: under `$SNAP_DATA/logs/` — prefer a `*_current.log`, else newest matching `*.log` (excluding the `zwavejs/` subdir).
+**File source locations** (confirmed against upstream source):
+- ZWJS: `${ZWAVEJS_LOGS_DIR:-$SNAP_DATA/store/logs}` — prefer `zwavejs_current.log` (symlink created by `DailyRotateFile`), else newest `zwavejs_*.log`. (Note: ZWJS and ZUI share the same `logsDir`; there is no `zwavejs/` subdirectory.)
+- ZUI: same `${ZWAVEJS_LOGS_DIR:-$SNAP_DATA/store/logs}` — prefer `z-ui_current.log` (symlink; **not** `zwave-js-ui_current.log`), else newest `z-ui_*.log`.
 
 **Journal source** = the systemd unit `snap.${SNAP_NAME}.${SNAP_NAME}.service`, read via `journalctl`.
 
@@ -101,8 +101,17 @@ Decide each stream's source by precedence — the filesystem is treated as groun
 
 ## Verification checklist (resolve during implementation, do not guess)
 
-1. **Exact log filenames** ZUI and ZWJS write on disk — confirm against a running instance and/or the upstream config/logging source. The `_current.log` → newest-glob resolution is built to tolerate variation, but the patterns must be checked.
-2. **Upstream `logToFile` defaults** for `gateway` and `zwave` — confirm both default to `false` (console → journal) from the upstream source/schema, to set the last-resort fallback correctly. The runtime file-existence check makes the command correct in the common cases regardless; this only fixes the truly-fresh corner case.
+1. **RESOLVED — Exact log filenames.** Both components use `winston-daily-rotate-file` with `createSymlink: true` and a `symlinkName` derived by replacing `_%DATE%` with `_current` in the base filename:
+   - **ZUI gateway logger** (`gateway.logToFile`): rotated files match `z-ui_YYYY-MM-DD.log`; current-file symlink is **`z-ui_current.log`**. Default filename constant: `export const defaultLogFile = 'z-ui_%DATE%.log'`. Source: `api/lib/logger.ts` in `zwave-js/zwave-js-ui`.
+   - **ZWJS driver logger** (`zwave.logToFile`): rotated files match `zwavejs_YYYY-MM-DD.log`; current-file symlink is **`zwavejs_current.log`**. Default filename: `path.join(process.cwd(), 'zwavejs_%DATE%.log')`, overridden by `buildLogConfig` to `joinPath(logsDir, 'zwavejs_%DATE%.log')`. Source: `packages/core/src/bindings/log/node.ts` in `zwave-js/node-zwave-js` and `api/lib/utils.ts` in `zwave-js/zwave-js-ui`.
+   - Both log files land under the same directory: `$ZWAVEJS_LOGS_DIR` (if set) or `$STORE_DIR/logs` (default). On snap: `$SNAP_DATA/store/logs`. The ZWJS driver writes its file there via `buildLogConfig`; ZUI writes its file there via `logsDir`.
+   - **The working assumption of `zwave-js-ui_current.log` was WRONG.** The correct ZUI current-log filename is `z-ui_current.log`.
+
+2. **RESOLVED — Upstream `logToFile` defaults.** Both default to **`false`** (console/journal, not file):
+   - **`gateway.logToFile`**: defaulted explicitly in `sanitizedConfig()`: `logToFile: config.logToFile !== undefined ? config.logToFile : false`. Source: `api/lib/logger.ts` in `zwave-js/zwave-js-ui`.
+   - **`zwave.logToFile`**: defaulted in the driver's `ZWaveLogContainer` private `logConfig`: `logToFile: !!getenv("LOGTOFILE")` — evaluates to `false` unless the `LOGTOFILE` env var is set. `buildLogConfig` passes `config.logToFile` (which is `undefined`/unset when the user has not configured it), and `nonUndefinedLogConfigKeys` filtering means the driver keeps its own default of `false`. Source: `packages/core/src/bindings/log/node.ts` in `zwave-js/node-zwave-js`.
+   - Consequence for `zwave-js-ui.logs`: when neither a current log file exists nor the setting is explicitly set, fall back to journal. This is the correct behavior.
+
 3. **Root requirement** — whether `journalctl` under `log-observe` reads the journal without `sudo`, and whether `$SNAP_DATA` log files are readable unprivileged. If both work unprivileged, drop `require_root`; otherwise keep it.
 
 ## Explicitly out of scope (YAGNI)
