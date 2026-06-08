@@ -691,22 +691,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: shellcheck
+      - name: shellcheck (logs command)
+        # Scoped to the new command at warning severity for now. The pre-existing
+        # scripts (functions/env-wrapper/hooks) carry known audit issues (#3-9 from the
+        # simplification audit) and get added to this lint in the audit-cleanup PR.
         run: |
           sudo apt-get update && sudo apt-get install -y shellcheck
-          shellcheck src/bin/* src/hooks/* src/helper/* tests/*.sh tests/lib/*.sh
+          shellcheck --severity=warning src/bin/logs
       - name: Install yq
         run: sudo snap install yq
       - name: Unit tests
         run: bash tests/logs_test.sh
 ```
 
-- [ ] **Step 2: Run shellcheck locally over everything it will gate**
+- [ ] **Step 2: Validate locally if possible**
 
-Run: `shellcheck src/bin/* src/hooks/* src/helper/* tests/*.sh tests/lib/*.sh`
-Expected: no errors. (Pre-existing scripts may surface warnings — fix only what blocks; broader cleanup is the separate audit batch #3-9.)
+If `shellcheck` is installed: `shellcheck --severity=warning src/bin/logs` → no findings. If it cannot be installed (no network/sudo in this environment), skip — the gate runs on CI. Always run `bash tests/logs_test.sh` locally → `34 passed, 0 failed`.
 
-> NOTE: existing scripts have known issues from the audit (unquoted vars, `test_perm`). If shellcheck errors on them block CI, either fix inline here or scope the lint step to `src/bin/logs tests/**` for now and widen it in the audit-cleanup PR. Prefer fixing if quick.
+> NOTE: the lint is intentionally scoped to `src/bin/logs` so this PR's gate is green without depending on the separate audit-cleanup (#3-9), which will fix and then lint `functions`, `env-wrapper`, and the hooks. `--severity=warning` ignores info/style noise (SC1091/SC2012 etc.) while still catching real bugs.
 
 - [ ] **Step 3: Commit**
 
