@@ -112,8 +112,12 @@ apps:
     command: bin/de-daemonize
   restart:
     command: bin/restart
+  logs:
+    command: bin/logs
+    plugs:
+      - log-observe
 
-layout: 
+layout:
   # Cache is set to (env) something outside the rw mount, to prevent storing it inside the store dir.
   /usr/local/share/.cache/npm:
     bind: $SNAP/.cache/npm
