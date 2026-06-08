@@ -93,6 +93,25 @@ resolve_source() {             # $1 stream, $2 setting(true|false|"") -> file:<p
     esac
 }
 
+stream_upper() { case "$1" in zui) echo ZUI ;; zwjs) echo ZWJS ;; esac; }
+stream_color() { case "$1" in zui) echo cyan ;; zwjs) echo green ;; esac; }
+
+journal_label() {              # $@ streams -> "ZUI", "ZWJS", or "ZUI/ZWJS"
+    local out="" s
+    for s in "$@"; do out="${out:+$out/}$(stream_upper "$s")"; done
+    echo "$out"
+}
+
+ansi() { case "$1" in cyan) printf '\033[36m' ;; green) printf '\033[32m' ;; yellow) printf '\033[33m' ;; esac; }
+
+make_prefix() {                # $1 text, $2 color, $3 use_color(0|1) -> "[TEXT] " maybe colored
+    if [ "$3" = "1" ] && [ -n "$2" ]; then
+        printf '%b[%s]%b ' "$(ansi "$2")" "$1" '\033[0m'
+    else
+        printf '[%s] ' "$1"
+    fi
+}
+
 main() {
     : # assembled in a later task
 }

@@ -55,4 +55,16 @@ assert_eq "$(resolve_source zwjs '')" "file:$SNAP_DATA/logs/zwavejs/zwavejs_curr
 : > "$SNAP_DATA/logs/z-ui_current.log"
 assert_eq "$(resolve_source zui '')" "file:$SNAP_DATA/logs/z-ui_current.log" "unset,zui file in parent -> file"
 
+assert_eq "$(stream_upper zui)"  "ZUI"  "upper zui"
+assert_eq "$(stream_upper zwjs)" "ZWJS" "upper zwjs"
+assert_eq "$(stream_color zui)"  "cyan" "color zui"
+assert_eq "$(journal_label zwjs)" "ZWJS" "journal label single"
+assert_eq "$(journal_label zui zwjs)" "ZUI/ZWJS" "journal label combined"
+
+# no-color prefix is plain
+assert_eq "$(make_prefix ZUI cyan 0)" "[ZUI] " "plain prefix"
+# colored prefix contains the escape and the label
+assert_contains "$(make_prefix ZUI cyan 1)" "[ZUI]" "color prefix has label"
+assert_contains "$(make_prefix ZUI cyan 1)" "$(printf '\033[36m')" "color prefix has cyan"
+
 finish
