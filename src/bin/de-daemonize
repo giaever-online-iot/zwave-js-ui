@@ -4,9 +4,7 @@ source $SNAP/helper/functions
 
 require_root
 
-snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"
-
-if [ $? -eq 0 ]; then
+if snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"; then
     echo "Service ${SNAP_NAME} disabled."
     exit 0
 fi

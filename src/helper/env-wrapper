@@ -8,9 +8,8 @@ if [ "${1}" = "--help" ]; then
     OPT_HELP=true
 fi
 
-if [ ${OPT_HELP} = true ]; then
-    plugs_connected
-    if [ $? -ne 0 ]; then
+if [ "${OPT_HELP}" = true ]; then
+    if ! plugs_connected; then
         echo ""
         echo "NOTE! NOTE! NOTE!"
         echo ""
@@ -74,17 +73,11 @@ fi
 
 require_root
 
-plugs_connected
-if [ $? -ne 0 ]; then
-    exit 1
-fi
+plugs_connected || exit 1
 
 
-export SERVER_HOST=$(snapctl get server.host)
-export SERVER_PORT=$(snapctl get server.port)
-
-export HOST="${SERVER_HOST}"
-export PORT="${SERVER_PORT}"
+export HOST=$(snapctl get server.host)
+export PORT=$(snapctl get server.port)
 
 export SERVER_SSL=$(snapctl get server.ssl)
 export HTTPS="${SERVER_SSL}"
