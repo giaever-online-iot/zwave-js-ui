@@ -161,7 +161,8 @@ Single job `build-and-release`:
 
 **Trigger:** `pull_request` `[closed]` → `main`, guarded by
 `if: github.event.pull_request.merged == true`.
-**Permissions:** `contents: read`, `pull-requests: read`.
+**Permissions:** `contents: read` (the PR number + `merged` flag come from the
+event payload, so no `pull-requests` API scope is needed — least privilege).
 
 Single job `promote`:
 

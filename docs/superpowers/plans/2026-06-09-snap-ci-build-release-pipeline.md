@@ -464,6 +464,12 @@ on:
 permissions:
   contents: read
 
+# Serialize ALL merge releases so two near-simultaneous merges can't race on the
+# shared latest/* channels + default track. Never cancel an in-flight promotion.
+concurrency:
+  group: snap-release
+  cancel-in-progress: false
+
 env:
   SNAP_NAME: zwave-js-ui
 
