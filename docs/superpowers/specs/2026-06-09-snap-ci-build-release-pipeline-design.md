@@ -95,16 +95,34 @@ stdout; non-zero exit on bad input.
 |-----------|-------|--------|-------|
 | `version-to-track <ver>` | `v11.19.1` or `11.19.1` | `v11.19` | strip leading `v`; first two dotted fields, re-prefixed `v`. |
 | `major <ver>` | `v12.0.0` | `12` | numeric. |
-| `newest-track` | track lines on **stdin** (e.g. `snapcraft list-tracks` output) | `v12.0` | greatest by (major, minor) among names matching `^v[0-9]+\.[0-9]+$`. |
-| `channel-version <track> <channel>` | `snapcraft status` text on **stdin** | version string or empty | e.g. `latest candidate` → `11.20.3`; empty if closed (`-`). |
-| `branch-has-revisions <track> <branch>` | `snapcraft status` text on **stdin** | `yes`/`no` | true if any arch row exists for `<track>` channel `edge/<branch>`. |
+| `channel-version <channel>` | `snap info` text on **stdin** | version string (incl. `v` prefix) or empty | `latest/candidate` → `v11.19.1`; empty if the channel is absent or shows `^` (inherits the channel above). |
+| `branch-has-revisions <track> <branch>` | `snap info` text on **stdin** | `yes`/`no` | `yes` iff channel `<track>/edge/<branch>` has a concrete version (thin wrapper over `channel-version`). |
 | `needs-stable-bump <new-ver> <cand-ver>` | two versions | `yes`/`no` | `yes` iff `cand-ver` non-empty and `major(new) > major(cand)`. |
-| `is-at-least <ver> <floor>` | two versions | `yes`/`no` | semver-ish `yes` iff `ver >= floor` (numeric major.minor.patch compare); `yes` if `floor` empty. Guards `latest/*` against regression on backports. |
+| `is-at-least <ver> <floor>` | two versions | `yes`/`no` | numeric major.minor.patch compare; `yes` iff `ver >= floor`; `yes` if `floor` empty. Strips a leading `v` from either side. Guards `latest/*` + default track against regression on backports. |
 
-Parsing target: `snapcraft status` rows are `Track  Arch  Channel  Version  Revision`
-(dash = closed; branches show channel `edge/<branch>` and an extra expiry column).
-A captured real-output fixture is committed under
-`.github/scripts/fixtures/` and drives `snap-release.test.sh`.
+**Data source = `snap info zwave-js-ui` (public, no auth, host-arch view).** Chosen
+over `snapcraft status` because its channel block is one `track/risk[/branch]: version …`
+per line — robustly parseable — whereas `snapcraft status` is column-aligned with
+sparse carry-forward cells. Real format (captured 2026-06-09):
+
+```
+channels:
+  latest/candidate: v11.19.1 2026-06-07 (850) 75.4MB -
+  latest/beta:      ^
+  v11.19/stable:    v11.19.1 2026-06-07 (850) 75.4MB -
+  v11.19/edge/42:   v11.19.2 2026-06-09 (856) 75.4MB -
+```
+
+A captured fixture is committed under `.github/scripts/fixtures/` and drives
+`snap-release.test.sh`.
+
+> **No `newest-track` helper.** Real store data contains a stray `v20.0` track
+> (created in error, 2024-10). A numeric-max "newest track" would pick it. Instead
+> the default track is derived from the **release line actually being merged** vs.
+> the current `latest/candidate` line (see §7 step 10) — stray future tracks are
+> never considered.
+
+> **Tracks command:** `snapcraft list-tracks` is deprecated → use `snapcraft tracks`.
 
 ## 6. Flow — `pr-build-snap.yml`
 
@@ -128,9 +146,9 @@ Single job `build-and-release`:
    Collect `*.snap` actually produced; compute the set of missing archs.
 4. `V=$(yq '.version' snap/snapcraft.yaml)`; `TRACK=$(snap-release.sh version-to-track "$V")`;
    `PR=${{ github.event.pull_request.number }}`.
-5. **Ensure track:** if `TRACK` ∉ `snapcraft list-tracks zwave-js-ui`, POST
-   `create-track` (see §8). On non-2xx, fail with a message naming the likely
-   cause (TCG not approved / cookie expired).
+5. **Ensure track:** if `TRACK` ∉ `snapcraft tracks zwave-js-ui` (first column),
+   POST `create-track` (see §8). On non-2xx, fail with a message naming the
+   likely cause (TCG not approved / cookie expired).
 6. **Release each built arch:** `snapcraft upload "<file>" --release="$TRACK/edge/$PR"`.
    (Branch `<PR>` is auto-created; PR number is a valid branch name.)
 7. **Sticky PR comment** (one comment, updated each push) listing per-arch
@@ -149,11 +167,11 @@ Single job `promote`:
 
 1. Checkout; install snapcraft; export store creds.
 2. `V`, `TRACK`, `PR` as in §6.
-3. `STATUS=$(snapcraft status zwave-js-ui)`.
-4. **Guard:** `branch-has-revisions "$TRACK" "$PR"` over `$STATUS`. If `no`,
+3. `INFO=$(snap info zwave-js-ui)`.
+4. **Guard:** if `branch-has-revisions "$TRACK" "$PR" <<<"$INFO"` is `no`,
    log "nothing to promote (docs-only merge / build failed / branch expired)"
    and exit 0.
-5. `CAND=$(channel-version latest candidate <<<"$STATUS")`.
+5. `CAND=$(snap-release.sh channel-version latest/candidate <<<"$INFO")` (e.g. `v11.19.1`).
 6. **Stable bump (major rule):** if `needs-stable-bump "$V" "$CAND"` == `yes`:
    `snapcraft promote zwave-js-ui --from-channel latest/candidate --to-channel latest/stable --yes`
    *(moves the previous major's final to stable before candidate is overwritten).*
@@ -164,8 +182,18 @@ Single job `promote`:
    - `snapcraft promote zwave-js-ui --from-channel "$TRACK/edge/$PR" --to-channel latest/candidate --yes`
    - `snapcraft promote zwave-js-ui --from-channel "$TRACK/edge/$PR" --to-channel latest/edge --yes`
 9. `snapcraft close zwave-js-ui "$TRACK/edge/$PR" --yes`
-10. **Default track (D4):** `NEWEST=$(snapcraft list-tracks zwave-js-ui | snap-release.sh newest-track)`;
-    `snapcraft set-default-track zwave-js-ui "$NEWEST"`.
+10. **Default track (D4), regression-safe & stray-track-proof:** the new default
+    is the merged version's own track, set only when it advances past the current
+    candidate's line:
+    ```bash
+    CAND_TRACK=$(snap-release.sh version-to-track "$CAND")   # "" if CAND empty
+    if [ "$TRACK" != "$CAND_TRACK" ] && [ "$(snap-release.sh is-at-least "$TRACK" "$CAND_TRACK")" = yes ]; then
+      snapcraft set-default-track zwave-js-ui "$TRACK"
+    fi
+    ```
+    This sets default to `v<MM>` of the release (matching "newest `v<MM>`"), never
+    regresses on a backport, and ignores the stray `v20.0` track because only
+    `$TRACK` and the candidate line are ever compared.
 
 ### Channel semantics (derived from README §"Release Channels")
 
@@ -188,7 +216,7 @@ Single job `promote`:
 
 | Secret | Used by | Purpose |
 |--------|---------|---------|
-| `SNAPCRAFT_STORE_CREDENTIALS` | both | `snapcraft upload/release/promote/status/list-tracks/close/set-default-track`. |
+| `SNAPCRAFT_STORE_CREDENTIALS` | both | `snapcraft upload/release/promote/tracks/close/set-default-track`. |
 | `LAUNCHPAD_CREDENTIALS` | build | `remote-build` on Launchpad. |
 | `SNAPCRAFT_SESSION` | build (ensure-track) | dashboard `create-track` cookie. **Expires periodically — known fragility; refresh when create-track 401/403s.** |
 
@@ -214,22 +242,26 @@ curl -sS -w '\n%{http_code}' \
   the only track.
 - **Backport to an older `v<MM>`:** branch still promotes to its own
   `v<MM>/stable`, but the `is-at-least` guard skips `latest/candidate` and
-  `latest/edge` so the shared channels don't regress; `newest-track` keeps the
-  default on the highest track. (Safe no-op for the global channels — full
-  backport support is a non-goal.)
+  `latest/edge` so the shared channels don't regress, and the default-track step
+  (§7.10) leaves the default unchanged. (Safe no-op for the global channels —
+  full backport support is a non-goal.)
+- **Stray `v20.0` track:** ignored — default-track logic only compares the merged
+  version's track against the candidate line, never a numeric max over all tracks.
 - **`promote --from-channel <branch>` validity:** channel grammar allows
   `[<track>/]<risk>[/<branch>]`; this is the one assumption to confirm in the
   first live run. Fallback: `snapcraft release <snap> <rev> <channel>` per arch
-  using revisions parsed from `snapcraft status`.
+  using revisions from `snapcraft status`.
 
 ## 10. Testing & validation
 
-- **Helper unit tests** (`snap-release.test.sh`): table fixtures for
-  `version-to-track`, `major`, `newest-track`, `channel-version`,
-  `branch-has-revisions`, `needs-stable-bump`, incl. empty-candidate and
-  major-bump cases. Written **before** the helper (TDD).
-- **Capture a real `snapcraft status` / `list-tracks` sample** early to anchor
-  fixtures to actual column layout.
+- **Helper unit tests** (`snap-release.test.sh`): fixture-driven cases for
+  `version-to-track`, `major`, `channel-version`, `branch-has-revisions`,
+  `needs-stable-bump`, `is-at-least`, incl. empty-candidate, `^`-inheritance,
+  and major-bump cases. Written **before** the helper (TDD). `shellcheck` is
+  available and run on the helper + test.
+- **Fixture** (`.github/scripts/fixtures/snap-info.txt`) is a real
+  `snap info zwave-js-ui` capture (taken 2026-06-09), so the parser matches
+  actual output incl. the `v` prefix and `^` rows.
 - **Live validation:** open a throwaway PR → confirm `v<MM>/edge/<PR>` appears
   in `snap info`; merge → confirm promotion + branch closed + default track.
 - Optional later: a tiny workflow that runs `snap-release.test.sh` on PRs
@@ -239,5 +271,7 @@ curl -sS -w '\n%{http_code}' \
 
 - Dashboard session cookie expiry (mitigated by a clear failure message).
 - `remote-build` queue latency / flaky armhf (mitigated by D6).
-- `snapcraft status` table format drift (mitigated by isolating parsing + fixture).
+- `snap info` channel-block format drift (mitigated by isolating parsing + a real fixture).
 - Promote-from-branch behavior (mitigated by documented fallback).
+- `actionlint` is not installed here; workflow YAML is validated with `yq` syntax
+  parse + manual review, and confirmed live on the first PR.
