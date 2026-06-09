@@ -1,0 +1,16 @@
+name:      zwave-js-ui
+summary:   Full-featured Z-Wave Control Panel and MQTT Gateway.
+store-url: https://snapcraft.io/zwave-js-ui
+license:   MIT
+channels:
+  latest/stable:    v11.14.0 2026-06-07 (847)  107MB -
+  latest/candidate: v11.19.1 2026-06-07 (850) 75.4MB -
+  latest/beta:      ^
+  latest/edge:      v11.19.1 2026-06-09 (856) 75.4MB -
+  v11.19/stable:    v11.19.1 2026-06-07 (850) 75.4MB -
+  v11.19/candidate: ^
+  v11.19/beta:      ^
+  v11.19/edge:      ^
+  v11.19/edge/42:   v11.19.2 2026-06-09 (856) 75.4MB 2026-07-09T00:00:00Z
+  v11.8/stable:     v11.8.2  2025-12-02 (829)  105MB -
+
