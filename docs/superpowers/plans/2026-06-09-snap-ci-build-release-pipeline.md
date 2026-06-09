@@ -63,7 +63,7 @@ channels:
 ```bash
 #!/usr/bin/env bash
 # Fixture-driven unit tests for snap-release.sh. No network.
-set -uo pipefail
+set -uo pipefail  # no -e: keep all tests running even if earlier ones fail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SR="$HERE/snap-release.sh"
@@ -97,9 +97,10 @@ check "channel-version absent"    ""         "$("$SR" channel-version v99.9/stab
 check "branch-has-revisions yes" "yes" "$("$SR" branch-has-revisions v11.19 42 <"$INFO")"
 check "branch-has-revisions no"  "no"  "$("$SR" branch-has-revisions v11.19 99 <"$INFO")"
 
-check "needs-stable-bump major" "yes" "$("$SR" needs-stable-bump v12.0.0 v11.20.3)"
-check "needs-stable-bump minor" "no"  "$("$SR" needs-stable-bump v11.20.0 v11.19.1)"
-check "needs-stable-bump empty" "no"  "$("$SR" needs-stable-bump v11.19.1 "")"
+check "needs-stable-bump major"      "yes" "$("$SR" needs-stable-bump v12.0.0 v11.20.3)"
+check "needs-stable-bump minor"      "no"  "$("$SR" needs-stable-bump v11.20.0 v11.19.1)"
+check "needs-stable-bump empty-cand" "no"  "$("$SR" needs-stable-bump v11.19.1 "")"
+check "needs-stable-bump empty-new"  "no"  "$("$SR" needs-stable-bump "" v11.19.1)"
 
 check "is-at-least equal"        "yes" "$("$SR" is-at-least v11.19.1 v11.19.1)"
 check "is-at-least greater"      "yes" "$("$SR" is-at-least v11.20.0 v11.19.9)"
@@ -144,7 +145,7 @@ git commit -m "test: add snap-release helper tests + snap info fixture (red)"
 # Subcommands:
 #   version-to-track <ver>             v11.19.1|11.19.1 -> v11.19    (""->"")
 #   major <ver>                        v12.0.0 -> 12                 (""->"")
-#   channel-version <channel>          (stdin: `snap info`) -> version or ""
+#   channel-version <channel>          (stdin: `snap info`) -> version or "" (^/--/- -> "")
 #   branch-has-revisions <track> <pr>  (stdin: `snap info`) -> yes|no
 #   needs-stable-bump <new> <cand>     yes iff cand set & major(new)>major(cand)
 #   is-at-least <ver> <floor>          yes iff ver>=floor  (floor "" -> yes)
@@ -200,12 +201,13 @@ case "$cmd" in
     # stdin = `snap info`; args = track pr. Re-use channel-version via `bash "$0"`
     # so this works whether or not the script's exec bit is set.
     info="$(cat)"
-    ver="$(printf '%s\n' "$info" | bash "$0" channel-version "${1:-}/edge/${2:-}")"
+    ver="$(bash "$0" channel-version "${1:-}/edge/${2:-}" <<<"$info")"
     if [ -n "$ver" ]; then echo yes; else echo no; fi
     ;;
   needs-stable-bump)
     new="${1:-}"; cand="${2:-}"
     if [ -z "$cand" ]; then echo no; exit 0; fi
+    if [ -z "$new" ]; then echo no; exit 0; fi
     mn="${new#v}"; mn="${mn%%.*}"
     mc="${cand#v}"; mc="${mc%%.*}"
     if (( 10#$mn > 10#$mc )); then echo yes; else echo no; fi
