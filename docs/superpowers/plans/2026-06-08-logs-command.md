@@ -544,7 +544,7 @@ main() {
 
     local sf; sf="$(settings_file)"
     local BACKLOG=20
-    local pids=() journal_streams=() s setting src p
+    local pids=() journal_streams=() s setting src p other
 
     # Register cleanup BEFORE launching anything, so a Ctrl-C mid-launch still reaps every
     # follower subshell AND its children (tail/journalctl + prefixer). Empty pids = no-op.
@@ -565,9 +565,14 @@ main() {
     done
 
     if [ "${#journal_streams[@]}" -gt 0 ]; then
-        # Honesty notice: a filtered (single-stream) journal view can include the other component.
+        # Honesty notice: only when a single stream is requested AND the OTHER stream is
+        # also journal-backed — then the shared journald stream genuinely carries both. If
+        # the other stream logs to a file, its lines won't appear here, so don't cry wolf.
         if [ "$target" != both ]; then
-            lprint "Note: ${target} is logging to the journal, a shared process stream; other components may appear." >&2
+            other=$([ "$target" = zui ] && echo zwjs || echo zui)
+            if [ "$(resolve_source "$other" "$(read_log_setting "$sf" "$(setting_key "$other")")")" = journal ]; then
+                lprint "Note: ${target} and ${other} share one journald stream; ${other} lines may also appear." >&2
+            fi
         fi
         # Probe journal access; on denial, point the user at the interface to connect.
         if ! journalctl -u "$(journal_unit)" -n 0 >/dev/null 2>&1; then
