@@ -1,0 +1,26 @@
+name: Lint & test
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/lint-test.yml'
+  workflow_dispatch:
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: shellcheck (logs command)
+        # Scoped to the new command at warning severity for now. The pre-existing
+        # scripts (functions/env-wrapper/hooks) carry known audit issues and get added
+        # to this lint in a later audit-cleanup PR.
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck --severity=warning src/bin/logs
+      - name: Install yq
+        run: sudo snap install yq
+      - name: Unit tests
+        run: bash tests/logs_test.sh

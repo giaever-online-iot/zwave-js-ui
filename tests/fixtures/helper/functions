@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+SNAP_NAME="zwave-js-ui"
+lprint() { echo "$*"; }
+require_root() { :; }   # no-op under test
