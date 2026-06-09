@@ -325,7 +325,7 @@ jobs:
           echo "snaps=$count" >> "$GITHUB_OUTPUT"
 
       - name: Ensure version track exists
-        if: ${{ steps.build.outputs.snaps != '0' }}
+        if: ${{ steps.build.outputs.snaps != '0' && github.event_name == 'pull_request' }}
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
           SNAPCRAFT_SESSION: ${{ secrets.SNAPCRAFT_SESSION }}
@@ -366,7 +366,8 @@ jobs:
           IFS=',' read -ra WANT <<< "${{ steps.meta.outputs.archs }}"
           uploaded=(); missing=()
           for arch in "${WANT[@]}"; do
-            f="$(ls -1 "${SNAP_NAME}"_*_"${arch}".snap 2>/dev/null | head -n1 || true)"
+            # Matches name_version_arch.snap (snapcraft 8.x / core24) — '*' also tolerates name_arch.snap.
+            f="$(ls -1 "${SNAP_NAME}"*"${arch}".snap 2>/dev/null | head -n1 || true)"
             if [ -z "$f" ]; then echo "missing snap for $arch"; missing+=("$arch"); continue; fi
             echo "Uploading $f -> $CHAN"
             if snapcraft upload "$f" --release="$CHAN"; then uploaded+=("$arch"); else echo "upload failed for $arch"; missing+=("$arch"); fi
@@ -397,8 +398,8 @@ jobs:
         with:
           script: |
             const marker = '<!-- pr-build-snap -->';
-            const text = (process.env.BUILT === '0' || !process.env.BODY)
-              ? '❌ Build produced no snaps. Check the Action logs.'
+            const text = (!process.env.BUILT || process.env.BUILT === '0' || !process.env.BODY)
+              ? '❌ Build produced no snaps (or a preceding step failed). Check the Action logs.'
               : process.env.BODY;
             const body = `${marker}\n${text}`;
             const { owner, repo } = context.repo;
