@@ -45,8 +45,9 @@ zwave-js-ui.enable     # daemonize (snapctl start --enable)
 zwave-js-ui.disable    # de-daemonize
 zwave-js-ui.restart
 zwave-js-ui.exec       # run the app in the foreground (debug boot issues before enabling)
-snap logs zwave-js-ui -f                  # when "log to file" is OFF (logs to syslog)
-tail -f $SNAP_DATA/*.log                  # when "log to file" is ON
+zwave-js-ui.logs       # unified, terminal-friendly live log view; append zui|zwjs to filter
+snap logs zwave-js-ui -f                  # manual fallback when "log to file" is OFF (syslog/journal)
+tail -f $SNAP_DATA/*.log                  # manual fallback when "log to file" is ON
 ```
 
 ## Architecture
@@ -77,7 +78,7 @@ Snap users set config with `snap set zwave-js-ui server.host=0.0.0.0` (namespace
 
 ### User commands (`src/bin/`)
 
-`daemonize`/`de-daemonize`/`restart` wrap `snapctl` service control and require root + connected plugs. `backup` and `logs-observe` are present but minimal/WIP.
+`daemonize`/`de-daemonize`/`restart` wrap `snapctl` service control and require root + connected plugs. `logs` is the unified, terminal-friendly log follower (the `logs` app: merges the ZUI app + Z-Wave JS driver streams, auto-selecting file vs journal per stream). `backup` is present but minimal/WIP.
 
 ### Paths & layout
 

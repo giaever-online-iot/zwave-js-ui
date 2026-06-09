@@ -1,0 +1,210 @@
+#!/usr/bin/env bash
+# logs — unified, terminal-friendly log follower for zwave-js-ui
+: "${SNAP:?SNAP must be set}"
+source "$SNAP/helper/functions"
+
+# ---- pure helpers (unit-tested) added by later tasks ----
+
+usage() {
+    cat <<EOF
+Usage: ${SNAP_NAME}.logs [zui|--zui|zwjs|--zwjs]
+
+  (no arg)        follow both streams, merged
+  zui  | --zui    follow the Z-Wave JS UI application log only
+  zwjs | --zwjs   follow the Z-Wave JS driver log only
+  -h   | --help   show this help
+EOF
+}
+
+normalize_target() {           # $1 raw token; echoes both|zui|zwjs; status 2 if unknown
+    case "${1#--}" in
+        "")   echo both ;;
+        zui)  echo zui ;;
+        zwjs) echo zwjs ;;
+        *)    return 2 ;;
+    esac
+}
+
+parse_args() {                 # echoes target or status 2; accepts 0 or 1 token
+    [ "$#" -le 1 ] || return 2
+    normalize_target "${1:-}"
+}
+
+setting_key() {                # $1 stream -> yq path
+    case "$1" in
+        zui)  echo ".gateway.logToFile" ;;
+        zwjs) echo ".zwave.logToFile" ;;
+    esac
+}
+
+settings_file() { echo "$SNAP_DATA/settings.json"; }
+
+read_log_setting() {           # $1 settings file, $2 yq path -> true|false|""
+    local sf="$1" key="$2" v
+    [ -n "$sf" ] && [ -e "$sf" ] || { echo ""; return 0; }
+    # Feed via stdin redirect (shell opens the file) rather than passing the path
+    # to yq: yq is a confined snap that cannot open arbitrary paths (e.g. /tmp under
+    # test). Do NOT use `// ""` — that alternative operator treats `false` as empty,
+    # collapsing an explicit "log to file OFF" into the unset/infer path.
+    v=$(yq -r "$key" - < "$sf" 2>/dev/null)
+    case "$v" in
+        true)  echo true ;;
+        false) echo false ;;
+        *)     echo "" ;;   # null / missing / anything else
+    esac
+}
+
+# Both ZUI and ZWJS write to one shared logs dir. The daemon's env-wrapper sets
+# ZWAVEJS_LOGS_DIR=$SNAP_DATA/logs/zwavejs; the logs command does NOT run through
+# env-wrapper, so it falls back to that same path and also searches the parent
+# $SNAP_DATA/logs for tolerance. Filenames confirmed upstream:
+#   ZUI -> z-ui_current.log / z-ui_*.log     ZWJS -> zwavejs_current.log / zwavejs_*.log
+logs_dir() { echo "${ZWAVEJS_LOGS_DIR:-$SNAP_DATA/logs/zwavejs}"; }
+
+log_basename() {               # $1 stream -> filename stem
+    case "$1" in zui) echo "z-ui" ;; zwjs) echo "zwavejs" ;; esac
+}
+
+canonical_log_path() {         # $1 stream -> path the app writes when logging to file
+    echo "$(logs_dir)/$(log_basename "$1")_current.log"
+}
+
+existing_log_file() {          # $1 stream -> newest existing file, or empty
+    local base; base="$(log_basename "$1")"
+    local f
+    f=$(ls -t \
+        "$(logs_dir)/${base}_current.log" "$SNAP_DATA/logs/${base}_current.log" \
+        "$(logs_dir)/${base}_"*.log "$SNAP_DATA/logs/${base}_"*.log \
+        2>/dev/null | head -1)
+    [ -n "${f:-}" ] && [ -e "$f" ] && echo "$f"
+}
+
+resolve_source() {             # $1 stream, $2 setting(true|false|"") -> file:<path> | journal
+    local stream="$1" setting="$2" f
+    case "$setting" in
+        true)
+            f=$(existing_log_file "$stream"); [ -n "$f" ] || f=$(canonical_log_path "$stream")
+            echo "file:$f" ;;
+        false)
+            echo journal ;;
+        *)
+            f=$(existing_log_file "$stream")
+            if [ -n "$f" ]; then echo "file:$f"; else echo journal; fi ;;
+    esac
+}
+
+stream_upper() { case "$1" in zui) echo ZUI ;; zwjs) echo ZWJS ;; esac; }
+stream_color() { case "$1" in zui) echo cyan ;; zwjs) echo green ;; esac; }
+
+journal_label() {              # $@ streams -> "ZUI", "ZWJS", or "ZUI/ZWJS"
+    local out="" s
+    for s in "$@"; do out="${out:+$out/}$(stream_upper "$s")"; done
+    echo "$out"
+}
+
+ansi() { case "$1" in cyan) printf '\033[36m' ;; green) printf '\033[32m' ;; yellow) printf '\033[33m' ;; esac; }
+
+make_prefix() {                # $1 text, $2 color, $3 use_color(0|1) -> "[TEXT] " maybe colored
+    if [ "$3" = "1" ] && [ -n "$2" ]; then
+        printf '%b[%s]%b ' "$(ansi "$2")" "$1" '\033[0m'
+    else
+        printf '[%s] ' "$1"
+    fi
+}
+
+prefix_lines() {               # $1 prefix; prepends to each stdin line
+    local prefix="$1" line
+    while IFS= read -r line; do printf '%s%s\n' "$prefix" "$line"; done
+}
+
+journal_unit() { echo "snap.${SNAP_NAME}.${SNAP_NAME}.service"; }
+
+follower_cmd() {               # $1 source spec, $2 backlog -> a %q-quoted command string
+    local spec="$1" n="$2"
+    case "$spec" in
+        file:*)  printf 'tail -n %s -F %q' "$n" "${spec#file:}" ;;
+        journal) printf 'journalctl -u %q -n %s -f' "$(journal_unit)" "$n" ;;
+    esac
+}
+
+launch_follower() {            # $1 source spec, $2 prefix — backgrounds a subshell pipeline
+    # Wrap the pipeline in a subshell so $! is the subshell. Use `exec` inside the eval
+    # so the follower (tail/journalctl) REPLACES the intermediate shell and becomes a
+    # DIRECT child of the subshell — otherwise `pkill -P` only reaches the intermediate
+    # shell and tail/journalctl orphans (keeps running, root-owned) on Ctrl-C.
+    # follower_cmd always emits a single external-command invocation, so exec is safe.
+    # shellcheck disable=SC2294
+    ( eval "exec $(follower_cmd "$1" "$BACKLOG")" 2>&1 | prefix_lines "$2" ) &
+}
+
+main() {
+    # Help works without root and before arg validation. (Only -h/--help; no bare alias.)
+    case "${1:-}" in -h|--help) usage; exit 0 ;; esac
+
+    require_root
+
+    local target; target="$(parse_args "$@")" || { usage >&2; exit 2; }
+
+    local use_color=0; [ -t 1 ] && use_color=1
+
+    local streams=()
+    case "$target" in
+        both) streams=(zui zwjs) ;;
+        zui)  streams=(zui) ;;
+        zwjs) streams=(zwjs) ;;
+    esac
+
+    local sf; sf="$(settings_file)"
+    local BACKLOG=20
+    local pids=() journal_streams=() s setting src p other
+
+    # Register cleanup BEFORE launching anything, so a Ctrl-C mid-launch still reaps every
+    # follower subshell AND its children (tail/journalctl + prefixer). Empty pids = no-op.
+    trap 'for p in "${pids[@]}"; do pkill -P "$p" 2>/dev/null; kill "$p" 2>/dev/null; done' EXIT INT TERM
+
+    for s in "${streams[@]}"; do
+        setting="$(read_log_setting "$sf" "$(setting_key "$s")")"
+        src="$(resolve_source "$s" "$setting")"
+        if [ "$src" = journal ]; then
+            journal_streams+=("$s")
+        else
+            # If the file doesn't exist yet (e.g. logToFile just enabled), tail -F waits
+            # silently — tell the user what it's waiting for.
+            [ -e "${src#file:}" ] || lprint "Waiting for log file: ${src#file:}" >&2
+            launch_follower "$src" "$(make_prefix "$(stream_upper "$s")" "$(stream_color "$s")" "$use_color")"
+            pids+=("$!")
+        fi
+    done
+
+    if [ "${#journal_streams[@]}" -gt 0 ]; then
+        # Honesty notice: only when a single stream is requested AND the OTHER stream is
+        # also journal-backed — then the shared journald stream genuinely carries both. If
+        # the other stream logs to a file, its lines won't appear here, so don't cry wolf.
+        if [ "$target" != both ]; then
+            other=$([ "$target" = zui ] && echo zwjs || echo zui)
+            if [ "$(resolve_source "$other" "$(read_log_setting "$sf" "$(setting_key "$other")")")" = journal ]; then
+                lprint "Note: ${target} and ${other} share one journald stream; ${other} lines may also appear." >&2
+            fi
+        fi
+        # Probe journal access; on denial, point the user at the interface to connect.
+        if ! journalctl -u "$(journal_unit)" -n 0 >/dev/null 2>&1; then
+            lprint "Cannot read the journal (permission?). Connect the interface with:" >&2
+            lprint "  sudo snap connect ${SNAP_NAME}:log-observe" >&2
+        fi
+        launch_follower journal "$(make_prefix "$(journal_label "${journal_streams[@]}")" yellow "$use_color")"
+        pids+=("$!")
+    fi
+
+    # Defensive: with the current stream logic at least one follower is always launched.
+    if [ "${#pids[@]}" -eq 0 ]; then
+        lprint "No logs to follow yet. Start/configure ${SNAP_NAME} first (see ${SNAP_NAME}.help)." >&2
+        exit 1
+    fi
+
+    wait
+}
+
+# run main only when executed, not when sourced (enables unit tests)
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi
