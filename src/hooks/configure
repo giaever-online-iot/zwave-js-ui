@@ -24,7 +24,9 @@ fi
 
 test_default_config
 
-RUNNING=$(snapctl services | grep "${SNAP_NAME}" | grep -c inactive)
+# NB: keep `grep … | wc -l`, not `grep -c` — under `set -e`, grep -c exits 1 when the
+# count is 0 (service active, no inactive lines) and would abort the hook.
+RUNNING=$(snapctl services | grep "${SNAP_NAME}" | grep inactive | wc -l)
 if [ "${RUNNING}" -eq 0 ]; then
     echo "Restarting ${SNAP_NAME}"
     snapctl restart "${SNAP_NAME}"
