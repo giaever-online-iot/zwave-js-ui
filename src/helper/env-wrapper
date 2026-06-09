@@ -75,19 +75,19 @@ require_root
 plugs_connected || exit 1
 
 
-export HOST=$(snapctl get server.host)
-export PORT=$(snapctl get server.port)
+HOST=$(snapctl get server.host); export HOST
+PORT=$(snapctl get server.port); export PORT
 
-export SERVER_SSL=$(snapctl get server.ssl)
+SERVER_SSL=$(snapctl get server.ssl); export SERVER_SSL
 export HTTPS="${SERVER_SSL}"
 
-export FORCE_DISABLE_SSL=$(snapctl get server.force-disable-ssl)
+FORCE_DISABLE_SSL=$(snapctl get server.force-disable-ssl); export FORCE_DISABLE_SSL
 
 if [ "${FORCE_DISABLE_SSL}" != true ]; then
     unset FORCE_DISABLE_SSL
 fi
 
-export USE_SECURE_COOKIE=$(snapctl get session.cookie-secure)
+USE_SECURE_COOKIE=$(snapctl get session.cookie-secure); export USE_SECURE_COOKIE
 
 if [ "${HTTPS}" != true ] || [ "${FORCE_DISABLE_SSL}" == true ]; then
     unset HTTPS
@@ -97,16 +97,16 @@ elif [ "${USE_SECURE_COOKIE}" != true ]; then
     unset USE_SECURE_COOKIE
 fi
 
-export SESSION_SECRET=$(snapctl get session.secret)
+SESSION_SECRET=$(snapctl get session.secret); export SESSION_SECRET
 
-export MQTT_NAME=$(snapctl get mqtt.name)
+MQTT_NAME=$(snapctl get mqtt.name); export MQTT_NAME
 
 if [ -z "${MQTT_NAME}" ]; then
     unset MQTT_NAME
 fi
 
 if [ -n "$(snapctl get timezone)" ]; then
-    export TZ=$(snapctl get timezone)
+    TZ=$(snapctl get timezone); export TZ
 fi
 
 #export GIT_DIR="${SNAP}/lib/node_modules/zwave-js-ui/.git"

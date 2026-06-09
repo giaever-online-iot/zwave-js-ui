@@ -6,7 +6,7 @@ source "$HERE/lib/assert.sh"
 
 # Source the script under test with a stubbed snap runtime.
 export SNAP="$HERE/fixtures"
-export SNAP_DATA="$(mktemp -d)"
+SNAP_DATA="$(mktemp -d)"; export SNAP_DATA
 trap 'rm -rf "$SNAP_DATA"' EXIT
 # shellcheck source=/dev/null
 source "$ROOT/src/bin/logs"

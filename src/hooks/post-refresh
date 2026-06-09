@@ -8,5 +8,5 @@ test_device_priority_dir
 
 # Update references to the external config directory
 # Discussed with Al Calzone, lead dev of Zwavejs, can just be deleted and re-build
-EXT_CONFIG_DIR_INDEX="$(find "${SNAP_DATA}" -path *.ext-config/devices/index.json -print0 -quit)"
+EXT_CONFIG_DIR_INDEX="$(find "${SNAP_DATA}" -path '*.ext-config/devices/index.json' -print0 -quit)"
 rm -f "${EXT_CONFIG_DIR_INDEX}"
