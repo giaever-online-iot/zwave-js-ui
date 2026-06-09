@@ -7,3 +7,9 @@ Session.vim
 *~
 *.snap
 actionlint
+
+# Snap Store credentials — never commit (e.g. `snapcraft export-login` output)
+login
+
+# Claude Code local state (settings, worktrees, logs)
+.claude/
