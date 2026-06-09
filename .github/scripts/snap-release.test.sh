@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fixture-driven unit tests for snap-release.sh. No network.
-set -uo pipefail
+set -uo pipefail  # no -e: keep all tests running even if earlier ones fail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SR="$HERE/snap-release.sh"
@@ -34,9 +34,10 @@ check "channel-version absent"    ""         "$("$SR" channel-version v99.9/stab
 check "branch-has-revisions yes" "yes" "$("$SR" branch-has-revisions v11.19 42 <"$INFO")"
 check "branch-has-revisions no"  "no"  "$("$SR" branch-has-revisions v11.19 99 <"$INFO")"
 
-check "needs-stable-bump major" "yes" "$("$SR" needs-stable-bump v12.0.0 v11.20.3)"
-check "needs-stable-bump minor" "no"  "$("$SR" needs-stable-bump v11.20.0 v11.19.1)"
-check "needs-stable-bump empty" "no"  "$("$SR" needs-stable-bump v11.19.1 "")"
+check "needs-stable-bump major"      "yes" "$("$SR" needs-stable-bump v12.0.0 v11.20.3)"
+check "needs-stable-bump minor"      "no"  "$("$SR" needs-stable-bump v11.20.0 v11.19.1)"
+check "needs-stable-bump empty-cand" "no"  "$("$SR" needs-stable-bump v11.19.1 "")"
+check "needs-stable-bump empty-new"  "no"  "$("$SR" needs-stable-bump "" v11.19.1)"
 
 check "is-at-least equal"        "yes" "$("$SR" is-at-least v11.19.1 v11.19.1)"
 check "is-at-least greater"      "yes" "$("$SR" is-at-least v11.20.0 v11.19.9)"

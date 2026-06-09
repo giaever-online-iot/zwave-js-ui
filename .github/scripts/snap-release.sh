@@ -6,7 +6,7 @@
 # Subcommands:
 #   version-to-track <ver>             v11.19.1|11.19.1 -> v11.19    (""->"")
 #   major <ver>                        v12.0.0 -> 12                 (""->"")
-#   channel-version <channel>          (stdin: `snap info`) -> version or ""
+#   channel-version <channel>          (stdin: `snap info`) -> version or "" (^/--/- -> "")
 #   branch-has-revisions <track> <pr>  (stdin: `snap info`) -> yes|no
 #   needs-stable-bump <new> <cand>     yes iff cand set & major(new)>major(cand)
 #   is-at-least <ver> <floor>          yes iff ver>=floor  (floor "" -> yes)
@@ -62,12 +62,13 @@ case "$cmd" in
     # stdin = `snap info`; args = track pr. Re-use channel-version via `bash "$0"`
     # so this works whether or not the script's exec bit is set.
     info="$(cat)"
-    ver="$(printf '%s\n' "$info" | bash "$0" channel-version "${1:-}/edge/${2:-}")"
+    ver="$(bash "$0" channel-version "${1:-}/edge/${2:-}" <<<"$info")"
     if [ -n "$ver" ]; then echo yes; else echo no; fi
     ;;
   needs-stable-bump)
     new="${1:-}"; cand="${2:-}"
     if [ -z "$cand" ]; then echo no; exit 0; fi
+    if [ -z "$new" ]; then echo no; exit 0; fi
     mn="${new#v}"; mn="${mn%%.*}"
     mc="${cand#v}"; mc="${mc%%.*}"
     if (( 10#$mn > 10#$mc )); then echo yes; else echo no; fi
