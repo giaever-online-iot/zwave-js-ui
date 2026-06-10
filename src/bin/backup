@@ -126,10 +126,22 @@ ensure_agent() {
     grep -qs allow-loopback-pinentry "$GNUPGHOME/gpg-agent.conf" 2>/dev/null \
         || echo "allow-loopback-pinentry" >> "$GNUPGHOME/gpg-agent.conf"
     "$SNAP/usr/bin/gpg-agent" --homedir "$GNUPGHOME" --daemon >/dev/null 2>&1 || true
+    # Verify the agent is actually reachable. On kernels with fine-grained AF_UNIX
+    # AppArmor mediation (6.17 / Ubuntu 25.10) snapd's policy silently denies unix
+    # listen() everywhere in the snap (verified: $SNAP_COMMON, /tmp, XDG_RUNTIME_DIR),
+    # so the agent can never come up. Callers must fail with actionable guidance.
+    if ! gpg-connect-agent --homedir "$GNUPGHOME" --no-autostart /bye >/dev/null 2>&1; then
+        lprint "gpg-agent cannot run here: this kernel's snap confinement blocks its socket (AF_UNIX listen mediation, e.g. kernel 6.17 / Ubuntu 25.10)." >&2
+        return 1
+    fi
 }
 
 cmd_create_key() {
-    ensure_agent
+    if ! ensure_agent; then
+        lprint "Cannot generate a key on this device (gpg needs its agent for secret keys)." >&2
+        lprint "Create one on another machine instead, then: ${SNAP_NAME}.backup pick-key <fpr> | sudo ${SNAP_NAME}.backup import-key" >&2
+        return 1
+    fi
     local name email comment pass uid
     # UID fields may be supplied as args ($1 name, $2 email, $3 comment) or prompted
     # interactively. Arg mode requires at least name + email; the passphrase is ALWAYS
@@ -174,7 +186,12 @@ cmd_create_key() {
 # snap (leaving the public key for backups). Delete prompt defaults to "no", and is only
 # offered after a verified, non-empty export so the only copy can't be lost on a failure.
 cmd_export_key() {
-    ensure_agent
+    # The agent is required both to export secret-key material and to reliably tell
+    # whether a secret key exists at all — so fail loud here rather than guess.
+    if ! ensure_agent; then
+        lprint "Cannot export a private key on this device (gpg needs its agent for secret keys)." >&2
+        exit 1
+    fi
     local fpr; fpr="$(cfg encrypt-key)"
     [ -n "$fpr" ] || { lprint "backup.encrypt-key not set; nothing to export." >&2; exit 1; }
     if ! gpg --no-autostart --homedir "$GNUPGHOME" --list-secret-keys "$fpr" >/dev/null 2>&1; then
@@ -300,7 +317,12 @@ main() {
             if encryption_args 2>/dev/null | grep -q -- '--no-encryption'; then
                 lprint "Restoring into ${dest} (no encryption)." >&2
             else
-                ensure_agent   # decryption needs the staged gpg-agent (see build_restore_cmd)
+                # Decryption needs the staged gpg-agent (see build_restore_cmd).
+                if ! ensure_agent; then
+                    lprint "Cannot decrypt on this device. Restore on another machine instead:" >&2
+                    lprint "  duplicity restore $(cfg target) <dest-dir>   # with your private key in that machine's keyring" >&2
+                    exit 1
+                fi
                 lprint "Restoring into ${dest}; you may be prompted for your GPG key passphrase." >&2
             fi
             # shellcheck disable=SC2294
