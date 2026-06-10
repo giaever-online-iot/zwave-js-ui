@@ -1,3 +1,16 @@
 #!/usr/bin/env bash
+# backup — ship ZUI's backup directory off-box via duplicity
+: "${SNAP:?SNAP must be set}"
+source "$SNAP/helper/functions"
 
+ARCHIVE_DIR="${SNAP_COMMON:-/tmp}/duplicity-cache"
 
+# ---- pure helpers (unit-tested) added by later tasks ----
+
+main() {
+    : # assembled in a later task
+}
+
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi
