@@ -116,6 +116,25 @@ apps:
     command: bin/logs
     plugs:
       - log-observe
+  backup:
+    command: bin/backup
+    plugs:
+      - network
+      - home
+      - removable-media
+      - gpg-public-keys
+      - gpg-keys
+  backup-timer:
+    command: bin/backup
+    daemon: oneshot
+    timer: "00:00"
+    environment:
+      DAEMONIZED: 1
+    plugs:
+      - network
+      - home
+      - removable-media
+      - gpg-public-keys
 
 layout:
   # Cache is set to (env) something outside the rw mount, to prevent storing it inside the store dir.
@@ -179,3 +198,13 @@ parts:
       - uuid
     organize:
       hooks: snap/hooks
+
+  backup-deps:
+    plugin: nil
+    stage-packages:
+      - duplicity
+      - gnupg
+      - python3-boto3
+      - python3-b2sdk
+      - python3-paramiko
+      - python3-requests
