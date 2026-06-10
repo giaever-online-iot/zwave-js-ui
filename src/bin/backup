@@ -125,12 +125,18 @@ ensure_agent() {
     mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
     grep -qs allow-loopback-pinentry "$GNUPGHOME/gpg-agent.conf" 2>/dev/null \
         || echo "allow-loopback-pinentry" >> "$GNUPGHOME/gpg-agent.conf"
+    # Stale socket FILES survive failed launches (bind succeeds before listen is
+    # denied) and even snap reinstalls ($SNAP_COMMON persists) — clear them so they
+    # can't confuse the liveness check below.
+    rm -f "$GNUPGHOME"/S.gpg-agent "$GNUPGHOME"/S.gpg-agent.*
     "$SNAP/usr/bin/gpg-agent" --homedir "$GNUPGHOME" --daemon >/dev/null 2>&1 || true
-    # Verify the agent is actually reachable. On kernels with fine-grained AF_UNIX
-    # AppArmor mediation (6.17 / Ubuntu 25.10) snapd's policy silently denies unix
+    # Verify the agent is actually ALIVE: only a live agent answers GETINFO pid with a
+    # "D <pid>" line — gpg-connect-agent's exit code is NOT reliable on connect failure
+    # (observed returning success against a dead socket). On kernels with fine-grained
+    # AF_UNIX AppArmor mediation (6.17 / Ubuntu 25.10) snapd silently denies unix
     # listen() everywhere in the snap (verified: $SNAP_COMMON, /tmp, XDG_RUNTIME_DIR),
     # so the agent can never come up. Callers must fail with actionable guidance.
-    if ! gpg-connect-agent --homedir "$GNUPGHOME" --no-autostart /bye >/dev/null 2>&1; then
+    if ! gpg-connect-agent --homedir "$GNUPGHOME" --no-autostart 'GETINFO pid' /bye 2>/dev/null | grep -q '^D '; then
         lprint "gpg-agent cannot run here: this kernel's snap confinement blocks its socket (AF_UNIX listen mediation, e.g. kernel 6.17 / Ubuntu 25.10)." >&2
         return 1
     fi
