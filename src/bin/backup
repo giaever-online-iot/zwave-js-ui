@@ -87,6 +87,26 @@ cmd_pick_key() {  # $1 = optional fingerprint to export
     fi
 }
 
+# ROOT-context: import an armored PUBLIC key (stdin) into the snap keyring, then set
+# backup.encrypt-key to its fingerprint so backups encrypt to it immediately.
+cmd_import_key() {
+    mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
+    local tmp; tmp="$(mktemp "${SNAP_COMMON:-/tmp}/.import-key.XXXXXX")"
+    trap 'rm -f "$tmp"' RETURN
+    cat > "$tmp"
+    local fpr; fpr="$(gpg --homedir "$GNUPGHOME" --show-keys --with-colons "$tmp" 2>/dev/null | first_fpr)"
+    if ! gpg --homedir "$GNUPGHOME" --import "$tmp"; then
+        lprint "Key import failed — backup.encrypt-key not changed." >&2
+        return 1
+    fi
+    if [ -n "$fpr" ]; then
+        snapctl set backup.encrypt-key="$fpr"
+        lprint "Imported ${fpr} and set backup.encrypt-key=${fpr}." >&2
+    else
+        lprint "Imported key, but could not read its fingerprint — set backup.encrypt-key manually." >&2
+    fi
+}
+
 cfg() { snapctl get "backup.$1" 2>/dev/null; }    # $1 = key suffix, e.g. target, encrypt-key
 
 encryption_args() {            # echoes "--encrypt-key X" or "--no-encryption"; status 2 if neither
@@ -197,14 +217,7 @@ main() {
         status)
             lprint "target=$(cfg target) dir=$(backup_dir) encrypt-key=$(cfg encrypt-key)"
             ;;
-        import-key)
-            # Read an armored public key from stdin into the snap-local keyring.
-            # Asymmetric encryption keeps any decryption secret OFF the device, so
-            # we only ever import a *public* key here.
-            mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
-            lprint "Importing armored GPG public key from stdin into ${GNUPGHOME} …" >&2
-            gpg --homedir "$GNUPGHOME" --import
-            ;;
+        import-key) cmd_import_key ;;
     esac
 }
 
