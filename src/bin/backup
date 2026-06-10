@@ -220,13 +220,20 @@ encryption_args() {            # echoes "--encrypt-key X" or "--no-encryption"; 
 full_if_older() { local v; v=$(cfg full-if-older-than); echo "${v:-7D}"; }
 
 build_backup_cmd() {           # $1 source dir -> duplicity backup command string
-    printf 'duplicity %s --full-if-older-than %s --archive-dir %q %q %q' \
+    # --allow-source-mismatch: the source is $SNAP_DATA/backups, whose path embeds the
+    # snap revision (e.g. .../x4/backups). snapd copies it forward on refresh, so the
+    # path changes between revisions for the SAME logical backup; without this flag
+    # duplicity aborts with "Backup source directory has changed" after every refresh.
+    printf 'duplicity %s --allow-source-mismatch --full-if-older-than %s --archive-dir %q %q %q' \
         "$(encryption_args)" "$(full_if_older)" "$ARCHIVE_DIR" "$1" "$(cfg target)"
 }
 
 build_restore_cmd() {          # $1 dest dir [$2 time] -> duplicity restore command string
+    # --gpg-options=--no-autostart: decryption needs the (secret-key) agent; we launch
+    # the staged one via ensure_agent and tell duplicity's gpg not to autostart the
+    # base-path agent (which doesn't exist in the snap) — it connects via the socket.
     local timearg=""; [ -n "${2:-}" ] && timearg=$(printf -- '--time %q' "${2}")
-    printf 'duplicity restore %s %s --archive-dir %q %q %q' \
+    printf 'duplicity restore %s %s --gpg-options=--no-autostart --archive-dir %q %q %q' \
         "$timearg" "$(encryption_args)" "$ARCHIVE_DIR" "$(cfg target)" "$1"
 }
 
@@ -293,6 +300,7 @@ main() {
             if encryption_args 2>/dev/null | grep -q -- '--no-encryption'; then
                 lprint "Restoring into ${dest} (no encryption)." >&2
             else
+                ensure_agent   # decryption needs the staged gpg-agent (see build_restore_cmd)
                 lprint "Restoring into ${dest}; you may be prompted for your GPG key passphrase." >&2
             fi
             # shellcheck disable=SC2294
