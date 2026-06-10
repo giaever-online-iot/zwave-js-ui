@@ -46,7 +46,7 @@ zwave-js-ui.disable    # de-daemonize
 zwave-js-ui.restart
 zwave-js-ui.exec       # run the app in the foreground (debug boot issues before enabling)
 zwave-js-ui.logs       # unified, terminal-friendly live log view; append zui|zwjs to filter
-zwave-js-ui.backup     # ship ZUI's backups off-box via duplicity (restore|list|status)
+zwave-js-ui.backup     # ship ZUI's backups off-box via duplicity (restore|list|status|pick-key|import-key|create-key|export-key)
 snap logs zwave-js-ui -f                  # manual fallback when "log to file" is OFF (syslog/journal)
 tail -f $SNAP_DATA/*.log                  # manual fallback when "log to file" is ON
 ```

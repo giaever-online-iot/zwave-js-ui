@@ -71,7 +71,7 @@ cmd_pick_key() {  # $1 = optional fingerprint to export
     local home; home="$(gpg_host_homedir)"
     if [ ! -d "$home" ]; then
         lprint "No host GPG keyring at ${home}." >&2
-        lprint "Create one with 'gpg --full-generate-key', or use 'sudo ${SNAP_NAME}.backup create-key'." >&2
+        lprint "Create one with 'gpg --full-generate-key' then pipe it to 'sudo ${SNAP_NAME}.backup import-key', or use 'sudo ${SNAP_NAME}.backup create-key'." >&2
         exit 1
     fi
     if [ -z "${1:-}" ]; then
@@ -113,9 +113,16 @@ cmd_import_key() {
 cmd_create_key() {
     mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
     local name email comment pass uid
-    read -rp "Real name: " name
-    read -rp "Email: " email
-    read -rp "Comment (optional): " comment
+    # UID fields may be supplied as args ($1 name, $2 email, $3 comment) or prompted
+    # interactively. Arg mode requires at least name + email; the passphrase is ALWAYS
+    # prompted (never an argument, to keep it out of the process list).
+    if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
+        name="$1"; email="$2"; comment="${3:-}"
+    else
+        read -rp "Real name: " name
+        read -rp "Email: " email
+        read -rp "Comment (optional): " comment
+    fi
     read -rsp "Passphrase for the new private key: " pass; echo >&2
     [ -n "$name" ]  || { lprint "Real name must not be empty." >&2; return 1; }
     [ -n "$email" ] || { lprint "Email must not be empty." >&2; return 1; }
@@ -289,7 +296,7 @@ main() {
             lprint "target=$(cfg target) dir=$(backup_dir) encrypt-key=$(cfg encrypt-key)"
             ;;
         import-key) cmd_import_key ;;
-        create-key) cmd_create_key ;;
+        create-key) cmd_create_key "${2:-}" "${3:-}" "${4:-}" ;;
         export-key) cmd_export_key ;;
     esac
 }
