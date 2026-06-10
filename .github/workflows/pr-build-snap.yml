@@ -4,12 +4,13 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
-    paths-ignore:
-      - '.github/**'
-      - '**/*.md'
-      - '**/*.txt'
-      - 'renovate.json'
-      - '.vscode/**'
+    # Only the snap recipe and its bundled source affect the built artifact, so
+    # build + publish to v<MM>/edge/<PR> ONLY when those change. Everything else
+    # (docs, LICENSE, .gitignore, .github/**, renovate.json, editor config) is
+    # intentionally excluded — a doc/config edit must not mint a store revision.
+    paths:
+      - 'snap/**'
+      - 'src/**'
   workflow_dispatch:
 
 permissions:
@@ -29,6 +30,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # snapcraft remote-build refuses shallow clones ("Remote builds for
+          # shallow cloned git repos are not supported"), so fetch full history.
+          fetch-depth: 0
 
       - name: Install snapcraft
         run: sudo snap install snapcraft --classic
