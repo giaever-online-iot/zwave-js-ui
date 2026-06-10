@@ -137,3 +137,8 @@ function test_default_config {
 
     testnset_config "timezone" "Europe/Oslo"
 }
+
+function backup_dir {
+    local d; d=$(snapctl get backup.dir 2>/dev/null)
+    echo "${d:-$SNAP_DATA/backups}"
+}

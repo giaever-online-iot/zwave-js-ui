@@ -19,4 +19,7 @@ source "$ROOT/src/helper/functions"    # REAL shared helpers (e.g. backup_dir), 
 
 # --- tests appended by later tasks ---
 
+assert_eq "$(backup_dir)" "$SNAP_DATA/backups" "default backup dir"
+assert_eq "$(SNAPCTL_backup_dir=/srv/zui-backups backup_dir)" "/srv/zui-backups" "configured backup dir"
+
 finish
