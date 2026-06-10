@@ -42,7 +42,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ~/.local/share/snapcraft
-          printf '%s' "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
+          # Trailing newline matters: the pre-#191 working version used `echo` (which
+          # appends one); `printf '%s'` dropped it and Launchpad auth/push then failed.
+          # `%s\n` keeps printf's literal-safety AND restores the newline.
+          printf '%s\n' "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
 
       - name: Resolve version / track / archs
         id: meta
