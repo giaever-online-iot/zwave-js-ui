@@ -75,6 +75,10 @@ main() {
 
     mkdir -p "$ARCHIVE_DIR"
     export GNUPGHOME="${SNAP_COMMON:-/tmp}/.gnupg"   # snap-local keyring (confirmed by the GPG spike)
+    # duplicity is a Python app staged under $SNAP; core24's interpreter does not
+    # search $SNAP for modules, so its `import duplicity` fails without this
+    # (verified on-device: import works only with dist-packages on PYTHONPATH).
+    export PYTHONPATH="$SNAP/usr/lib/python3/dist-packages${PYTHONPATH:+:$PYTHONPATH}"
 
     local target; target="$(cfg target)"
     case "$sub" in
@@ -93,7 +97,10 @@ main() {
                 exit 1
             fi
             # shellcheck disable=SC2294
-            eval "$(build_backup_cmd "$(backup_dir)")"
+            if ! eval "$(build_backup_cmd "$(backup_dir)")"; then
+                lprint "Backup failed (duplicity exited non-zero)." >&2
+                exit 1
+            fi
             local keep; keep="$(cfg retention)"; keep="${keep:-3}"
             duplicity remove-all-but-n-full "$keep" --force --archive-dir "$ARCHIVE_DIR" "$target" || true
             ;;
@@ -110,7 +117,10 @@ main() {
                 lprint "Restoring into ${dest}; you may be prompted for your GPG key passphrase." >&2
             fi
             # shellcheck disable=SC2294
-            eval "$(build_restore_cmd "$dest" "${2:-}")"
+            if ! eval "$(build_restore_cmd "$dest" "${2:-}")"; then
+                lprint "Restore failed (duplicity exited non-zero)." >&2
+                exit 1
+            fi
             lprint "Done. Now use ZUI's in-app restore (NVM / store) to recover." >&2
             ;;
         list)
