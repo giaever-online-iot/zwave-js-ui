@@ -7,6 +7,28 @@ ARCHIVE_DIR="${SNAP_COMMON:-/tmp}/duplicity-cache"
 
 # ---- pure helpers (unit-tested) added by later tasks ----
 
+usage() {
+    cat <<EOF
+Usage: ${SNAP_NAME}.backup [restore [<time>] | list | status]
+
+  (no arg)   ship ZUI's backups now (incremental; full if older than threshold)
+  restore    fetch+decrypt the latest backup back into the backup dir
+  list       show available backup sets
+  status     show config + last run
+  -h|--help  this help
+EOF
+}
+
+parse_sub() {                  # $1 subcommand token -> backup|restore|list|status; status 2 if unknown
+    case "${1:-}" in
+        ""|backup) echo backup ;;
+        restore)   echo restore ;;
+        list)      echo list ;;
+        status)    echo status ;;
+        *)         return 2 ;;
+    esac
+}
+
 main() {
     : # assembled in a later task
 }
