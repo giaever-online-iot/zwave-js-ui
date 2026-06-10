@@ -104,7 +104,9 @@ Generates a **software** keypair directly in the snap keyring (root can write
   initially (YAGNI; revisit if an old-gpg restore target needs it).
 - **Passphrase-protected**: prompt for a passphrase interactively (root invocation, user
   present). The passphrase is never stored; restore will prompt for it.
-- UID: prompt for, or accept as args, a name/email for the key's UID.
+- UID: support the **full set** of UID fields — real name, email, and optional comment —
+  supplied either interactively (prompt) or as arguments (user decision: "every" — accept
+  all fields and both input modes).
 - On success: set `backup.encrypt-key=<fpr>`, then print next steps pointing at
   `export-key` ("your private key currently lives only in this snap; run
   `sudo zwave-js-ui.backup export-key` to copy it to your host keystore / offline and
@@ -215,4 +217,6 @@ gpg-command-string builders) are separate functions covered by `tests/backup_tes
 - `create-key` keeps the private key in the snap keyring until `export-key`; deletion is
   opt-in (prompt defaults to "no").
 - ed25519/cv25519, passphrase-protected.
+- `create-key` accepts all UID fields (name, email, optional comment) via prompt or args.
+- `export-key`'s delete-from-keyring prompt defaults to "no" (confirmed).
 - `gpg-keys` and the timer's `gpg-public-keys` are removed as unused.
