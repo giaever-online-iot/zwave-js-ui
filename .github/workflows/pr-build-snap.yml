@@ -36,7 +36,10 @@ jobs:
           fetch-depth: 0
 
       - name: Install snapcraft
-        run: sudo snap install snapcraft --classic
+        # Pinned to latest/edge to test whether a newer remote-build resolves the
+        # Launchpad recipe/git-ref scan race that latest/stable (8.14.x) hit
+        # ("git_ref: No such object .../+ref/main", BadRequest on recipe creation).
+        run: sudo snap install snapcraft --classic --channel=latest/edge
 
       - name: Configure Launchpad credentials
         run: |
