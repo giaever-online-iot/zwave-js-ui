@@ -29,6 +29,19 @@ parse_sub() {                  # $1 subcommand token -> backup|restore|list|stat
     esac
 }
 
+cfg() { snapctl get "backup.$1" 2>/dev/null; }    # $1 = key suffix, e.g. target, encrypt-key
+
+encryption_args() {            # echoes "--encrypt-key X" or "--no-encryption"; status 2 if neither
+    local key; key=$(cfg encrypt-key)
+    if [ -n "$key" ]; then
+        echo "--encrypt-key $key"
+    elif [ "$(cfg encrypt)" = false ]; then
+        echo "--no-encryption"
+    else
+        return 2
+    fi
+}
+
 main() {
     : # assembled in a later task
 }

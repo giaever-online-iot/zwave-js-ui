@@ -29,4 +29,9 @@ assert_eq "$(parse_sub 'list')"    "list"    "list"
 assert_eq "$(parse_sub 'status')"  "status"  "status"
 parse_sub bogus >/dev/null 2>&1; assert_status "$?" "2" "unknown -> 2"
 
+assert_eq "$(SNAPCTL_backup_encrypt_key=ABC123 encryption_args)" "--encrypt-key ABC123" "enc key"
+assert_eq "$(SNAPCTL_backup_encrypt=false encryption_args)"      "--no-encryption"       "no-encryption opt-out"
+encryption_args >/dev/null 2>&1; assert_status "$?" "2" "neither set -> refuse"
+assert_eq "$(SNAPCTL_backup_target=file:///b cfg target)" "file:///b" "cfg reads target"
+
 finish
