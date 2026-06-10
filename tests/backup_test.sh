@@ -27,6 +27,7 @@ assert_eq "$(parse_sub 'backup')"  "backup"  "backup"
 assert_eq "$(parse_sub 'restore')" "restore" "restore"
 assert_eq "$(parse_sub 'list')"    "list"    "list"
 assert_eq "$(parse_sub 'status')"  "status"  "status"
+assert_eq "$(parse_sub 'import-key')" "import-key" "import-key"
 parse_sub bogus >/dev/null 2>&1; assert_status "$?" "2" "unknown -> 2"
 
 assert_eq "$(SNAPCTL_backup_encrypt_key=ABC123 encryption_args)" "--encrypt-key ABC123" "enc key"

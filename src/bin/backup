@@ -9,13 +9,14 @@ ARCHIVE_DIR="${SNAP_COMMON:-/tmp}/duplicity-cache"
 
 usage() {
     cat <<EOF
-Usage: ${SNAP_NAME}.backup [restore [<time>] | list | status]
+Usage: ${SNAP_NAME}.backup [restore [<time>] | list | status | import-key]
 
-  (no arg)   ship ZUI's backups now (incremental; full if older than threshold)
-  restore    fetch+decrypt the latest backup back into the backup dir
-  list       show available backup sets
-  status     show config + last run
-  -h|--help  this help
+  (no arg)    ship ZUI's backups now (incremental; full if older than threshold)
+  restore     fetch+decrypt the latest backup back into the backup dir
+  list        show available backup sets
+  status      show current backup config
+  import-key  import a GPG public key (armored, read from stdin) into the snap keyring
+  -h|--help   this help
 EOF
 }
 
@@ -25,6 +26,7 @@ parse_sub() {                  # $1 subcommand token -> backup|restore|list|stat
         restore)   echo restore ;;
         list)      echo list ;;
         status)    echo status ;;
+        import-key) echo import-key ;;
         *)         return 2 ;;
     esac
 }
@@ -122,6 +124,14 @@ main() {
             ;;
         status)
             lprint "target=$(cfg target) dir=$(backup_dir) encrypt-key=$(cfg encrypt-key)"
+            ;;
+        import-key)
+            # Read an armored public key from stdin into the snap-local keyring.
+            # Asymmetric encryption keeps any decryption secret OFF the device, so
+            # we only ever import a *public* key here.
+            mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
+            lprint "Importing armored GPG public key from stdin into ${GNUPGHOME} …" >&2
+            gpg --homedir "$GNUPGHOME" --import
             ;;
     esac
 }
