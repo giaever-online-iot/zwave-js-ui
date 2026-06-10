@@ -13,3 +13,6 @@ login
 
 # Claude Code local state (settings, worktrees, logs)
 .claude/
+
+# Local on-device test scripts (one per PR, not part of the build)
+.test/
