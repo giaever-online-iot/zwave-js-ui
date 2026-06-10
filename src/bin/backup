@@ -107,6 +107,43 @@ cmd_import_key() {
     fi
 }
 
+# ROOT-context: generate an ed25519/cv25519 backup keypair in the snap keyring and set
+# backup.encrypt-key to it. The private key stays in the snap keyring until `export-key`
+# moves it off. Prompts for the full UID (name, email, optional comment) and a passphrase.
+cmd_create_key() {
+    mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
+    local name email comment pass uid
+    read -rp "Real name: " name
+    read -rp "Email: " email
+    read -rp "Comment (optional): " comment
+    read -rsp "Passphrase for the new private key: " pass; echo >&2
+    [ -n "$name" ]  || { lprint "Real name must not be empty." >&2; return 1; }
+    [ -n "$email" ] || { lprint "Email must not be empty." >&2; return 1; }
+    [ -n "$pass" ]  || { lprint "Passphrase must not be empty — the backup private key must be protected." >&2; return 1; }
+    uid="$name"
+    [ -n "$comment" ] && uid="$uid ($comment)"
+    uid="$uid <$email>"
+    if ! gpg --homedir "$GNUPGHOME" --batch --pinentry-mode loopback --passphrase "$pass" \
+        --quick-generate-key "$uid" ed25519 cert,sign never; then
+        lprint "Key generation failed — check the name/email are valid and gpg is working." >&2
+        return 1
+    fi
+    local fpr; fpr="$(gpg --homedir "$GNUPGHOME" --list-keys --with-colons "$email" 2>/dev/null | first_fpr)"
+    if [ -z "$fpr" ]; then
+        lprint "Key was generated but its fingerprint could not be read for '${email}'." >&2
+        return 1
+    fi
+    if ! gpg --homedir "$GNUPGHOME" --batch --pinentry-mode loopback --passphrase "$pass" \
+        --quick-add-key "$fpr" cv25519 encr never; then
+        lprint "Adding the encryption subkey failed; '${fpr}' is not usable for backups yet." >&2
+        return 1
+    fi
+    snapctl set backup.encrypt-key="$fpr"
+    lprint "Created ${fpr} and set backup.encrypt-key=${fpr}." >&2
+    lprint "The private key currently lives ONLY in this snap. Run 'sudo ${SNAP_NAME}.backup export-key'" >&2
+    lprint "to copy it to your host keyring / offline storage and remove it from this device." >&2
+}
+
 cfg() { snapctl get "backup.$1" 2>/dev/null; }    # $1 = key suffix, e.g. target, encrypt-key
 
 encryption_args() {            # echoes "--encrypt-key X" or "--no-encryption"; status 2 if neither
@@ -218,6 +255,7 @@ main() {
             lprint "target=$(cfg target) dir=$(backup_dir) encrypt-key=$(cfg encrypt-key)"
             ;;
         import-key) cmd_import_key ;;
+        create-key) cmd_create_key ;;
     esac
 }
 
