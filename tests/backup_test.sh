@@ -47,4 +47,11 @@ assert_contains "$r" "file:///tgt"             "restore: target"
 l="$(SNAPCTL_backup_target=file:///tgt build_list_cmd)"
 assert_contains "$l" "collection-status"       "list: verb"
 
+rm -rf "$SNAP_DATA/backups"
+has_backups; assert_status "$?" "1" "absent dir -> no backups"
+mkdir -p "$SNAP_DATA/backups"
+has_backups; assert_status "$?" "1" "empty dir -> no backups"
+: > "$SNAP_DATA/backups/x"
+has_backups; assert_status "$?" "0" "non-empty -> has backups"
+
 finish

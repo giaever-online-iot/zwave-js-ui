@@ -59,6 +59,11 @@ build_list_cmd() {             # -> duplicity collection-status command string
     printf 'duplicity collection-status --archive-dir %q %q' "$ARCHIVE_DIR" "$(cfg target)"
 }
 
+has_backups() {                # status 0 if backup_dir exists and is non-empty
+    local d; d="$(backup_dir)"
+    [ -d "$d" ] && [ -n "$(ls -A "$d" 2>/dev/null)" ]
+}
+
 main() {
     : # assembled in a later task
 }
