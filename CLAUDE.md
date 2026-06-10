@@ -79,7 +79,7 @@ Snap users set config with `snap set zwave-js-ui server.host=0.0.0.0` (namespace
 
 ### User commands (`src/bin/`)
 
-`daemonize`/`de-daemonize`/`restart` wrap `snapctl` service control and require root + connected plugs. `logs` is the unified, terminal-friendly log follower. `backup` ships ZUI's backup directory (`$BACKUPS_DIR`, default `$SNAP_DATA/backups`) off-box via **duplicity** — encrypted (asymmetric GPG), incremental, optional daily timer — and restores it back for ZUI's in-app recovery. It does **not** create backups itself: it requires ZUI's own scheduled backups to be enabled (off by default) and is configured via `snap set zwave-js-ui backup.*` (`backup.target`, `backup.dir`, `backup.encrypt-key`, `backup.schedule`, …). See `docs/superpowers/specs/2026-06-10-backup-design.md`.
+`daemonize`/`de-daemonize`/`restart` wrap `snapctl` service control and require root + connected plugs. `logs` is the unified, terminal-friendly log follower. `backup` ships ZUI's backup directory (`$BACKUPS_DIR`, default `$SNAP_DATA/backups`) off-box via **duplicity** — encrypted (asymmetric GPG), incremental, optional daily timer — and restores it back for ZUI's in-app recovery. It does **not** create backups itself: it requires ZUI's own scheduled backups to be enabled (off by default) and is configured via `snap set zwave-js-ui backup.*` (`backup.target`, `backup.dir`, `backup.encrypt-key`, …). A fixed daily timer runs it once `backup.target` is set. See `docs/superpowers/specs/2026-06-10-backup-design.md`.
 
 ### Paths & layout
 

@@ -74,7 +74,7 @@ A single `backup` app (root-required: it reads root-owned `$SNAP_DATA` and write
 zwave-js-ui.backup                 # ship $BACKUPS_DIR now (incremental; full if older than threshold)
 zwave-js-ui.backup restore [<time>]# fetch+decrypt latest (or at <time>) back into $BACKUPS_DIR
 zwave-js-ui.backup list            # duplicity collection-status (available backup sets)
-zwave-js-ui.backup status          # config + last-run summary
+zwave-js-ui.backup status          # show current backup config
 zwave-js-ui.backup --help
 ```
 
@@ -91,7 +91,6 @@ Namespace `backup.*` (snapd config — distinct from ZUI's `settings.json` `back
 | `backup.target` | duplicity target URL (`file://`, `scp://`, `sftp://`, `s3://`, `b2://`, `webdav://`, …). Empty = backup disabled. | (unset) |
 | `backup.encrypt-key` | GPG public-key fingerprint to encrypt to (non-secret) | (unset) |
 | `backup.encrypt` | `false` to disable encryption (plaintext, warns) | `true` |
-| `backup.schedule` | snapd timer spec (e.g. `00:00`, `mon,03:00`); enables the timer | (unset = off) |
 | `backup.full-if-older-than` | force a new full chain after this age | `7D` |
 | `backup.retention` | prune: keep this many full chains (`remove-all-but-n-full`) | `3` |
 | backend creds | e.g. `backup.aws-access-key`, `backup.aws-secret-key`, `backup.b2-*` → mapped to duplicity's env vars | (unset) |
@@ -103,7 +102,7 @@ Namespace `backup.*` (snapd config — distinct from ZUI's `settings.json` `back
 - **Plugs** on the `backup` app: `network` (remote backends), `home` + `removable-media` (`file://` to user dirs / USB), `gpg-public-keys` (encrypt at backup time), `gpg-keys` (decrypt at restore time). `network` is already declared; the gpg interfaces are not auto-connect and need `snap connect` (documented).
 - **`stage-packages`:** `duplicity`, `gnupg`, and the commonly-used backend libs (ssh/paramiko, `python3-boto3` for s3, `b2sdk` for b2, webdav). Exotic backends (Dropbox/gdocs/Azure) documented as addable later, not staged.
 - **`BACKUPS_DIR`** is set *dynamically* from `backup.dir` (via the shared `backup_dir` helper), **not** a static `environment:` entry — `env-wrapper` exports it for the `zwave-js-ui`/`exec` apps, and `bin/backup` resolves the same helper for its source. (Static `environment:` can't read `snapctl`.)
-- **Timer app** for the optional schedule (a `daemon: oneshot` + `timer:` entry), gated on `backup.schedule`.
+- **Timer app** `backup-timer` — a `daemon: oneshot` with a fixed daily `timer: "00:00"` running `bin/backup`. It is **gated in-script on `backup.target`**: unconfigured runs exit 0 quietly (`DAEMONIZED=1`). There is no configurable schedule in this version; the cadence is daily-incremental + weekly-full (via `--full-if-older-than`). A configurable `backup.schedule` is a possible future enhancement.
 
 ## Restore flow
 
@@ -129,7 +128,7 @@ This keeps the fiddly, app-specific recovery in ZUI (its supported path) and lim
 
 1. **duplicity on core24 via `stage-packages`** — confirm the package set (duplicity + GnuPG + backend libs) stages and runs under confinement; confirm the binary path and that `--archive-dir`/`GNUPGHOME`/`HOME` are pointed at writable snap dirs.
 2. **GPG keyring mechanics under confinement** — where the public key lives at backup time (snap-local keyring in `$SNAP_COMMON/.gnupg` that the user imports into, vs `gpg-public-keys` reading `~/.gnupg`), and how restore reaches the user's private key via `gpg-keys` as root vs the invoking user. Pick the simplest that works; document the import/connect steps.
-3. **snapd `timer:` syntax** for `backup.schedule`, and how the timer app maps a `snap set` value to the timer (timers are declared in `snapcraft.yaml`, so a configurable schedule likely means the `configure` hook toggles/uses `snapctl` rather than rewriting YAML — confirm the mechanism).
+3. **RESOLVED — timer model:** a static `timer: "00:00"` on a `daemon: oneshot` `backup-timer` app runs `bin/backup` daily; the script no-ops (exit 0, `DAEMONIZED=1`) until `backup.target` is configured. No configurable `backup.schedule` in this version (descoped); cadence is daily-incremental / weekly-full.
 4. **`gpg-keys`/`gpg-public-keys` auto-connect** — whether to request store auto-connect or document manual `snap connect`.
 
 ## Out of scope (YAGNI)
