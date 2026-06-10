@@ -111,5 +111,6 @@ fi
 
 #export GIT_DIR="${SNAP}/lib/node_modules/zwave-js-ui/.git"
 export ZWAVEJS_LOGS_DIR="${STORE_DIR}/logs/zwavejs"
+BACKUPS_DIR="$(backup_dir)"; export BACKUPS_DIR
 
 [ "$(basename "${1}")" == "npm" ] && cd "${SNAP}/lib/node_modules/zwave-js-ui" && exec "${@}" || exec "${@}"

@@ -22,6 +22,12 @@ if [ "${COOKIE_SECURE}" != true ] && [ "${COOKIE_SECURE}" != false ]; then
     exit 1
 fi
 
+BACKUP_DIR_CFG=$(snapctl get backup.dir)
+if [ -n "${BACKUP_DIR_CFG}" ] && [[ "${BACKUP_DIR_CFG}" != /* ]]; then
+    echo "!! backup.dir must be an absolute path, got ${BACKUP_DIR_CFG}" >&2
+    exit 1
+fi
+
 test_default_config
 
 # NB: keep `grep … | wc -l`, not `grep -c` — under `set -e`, grep -c exits 1 when the

@@ -22,4 +22,6 @@ jobs:
       - name: Install yq
         run: sudo snap install yq
       - name: Unit tests
-        run: bash tests/logs_test.sh
+        run: |
+          bash tests/logs_test.sh
+          bash tests/backup_test.sh
