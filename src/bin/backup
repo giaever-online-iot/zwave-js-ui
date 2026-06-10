@@ -60,6 +60,33 @@ parse_pubkey_list() {
 # the first `fpr:` line) and stops. Empty if there is none. Pure, unit-tested.
 first_fpr() { awk -F: '$1=="fpr"{print $10; exit}'; }
 
+# USER-context: list the invoking user's host public keys, or export one (armored) to
+# stdout. Refuses root (root can't read the user's keyring — owner-match fails). Pipe the
+# export into `sudo zwave-js-ui.backup import-key` to store it in the snap keyring.
+cmd_pick_key() {  # $1 = optional fingerprint to export
+    if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+        lprint "Run 'pick-key' WITHOUT sudo — it reads YOUR personal GPG keyring." >&2
+        exit 1
+    fi
+    local home; home="$(gpg_host_homedir)"
+    if [ ! -d "$home" ]; then
+        lprint "No host GPG keyring at ${home}." >&2
+        lprint "Create one with 'gpg --full-generate-key', or use 'sudo ${SNAP_NAME}.backup create-key'." >&2
+        exit 1
+    fi
+    if [ -z "${1:-}" ]; then
+        lprint "Your GPG public keys (use a fingerprint with: pick-key <fpr> | sudo ${SNAP_NAME}.backup import-key):" >&2
+        local keys
+        keys="$(gpg --homedir "$home" --list-keys --with-colons 2>/dev/null)" || {
+            lprint "Failed to list keys in ${home} (gpg exited non-zero)." >&2
+            exit 1
+        }
+        printf '%s\n' "$keys" | parse_pubkey_list
+    else
+        gpg --homedir "$home" --export --armor "$1"
+    fi
+}
+
 cfg() { snapctl get "backup.$1" 2>/dev/null; }    # $1 = key suffix, e.g. target, encrypt-key
 
 encryption_args() {            # echoes "--encrypt-key X" or "--no-encryption"; status 2 if neither
@@ -98,10 +125,16 @@ has_backups() {                # status 0 if backup_dir exists and is non-empty
 main() {
     case "${1:-}" in -h|--help) usage; exit 0 ;; esac
 
-    require_root
-
     local sub; sub="$(parse_sub "${1:-}")" || { usage >&2; exit 2; }
 
+    # pick-key runs as the INVOKING USER against the host keyring — never root, and it
+    # touches none of the root/duplicity/snap-keyring setup below.
+    if [ "$sub" = "pick-key" ]; then
+        cmd_pick_key "${2:-}"
+        exit $?
+    fi
+
+    require_root
     mkdir -p "$ARCHIVE_DIR"
     export GNUPGHOME="${SNAP_COMMON:-/tmp}/.gnupg"   # snap-local keyring (confirmed by the GPG spike)
     # duplicity is a Python app staged under $SNAP; core24's interpreter does not
