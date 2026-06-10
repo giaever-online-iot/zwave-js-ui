@@ -71,6 +71,23 @@ jobs:
           count=$(ls -1 ./*.snap 2>/dev/null | wc -l | tr -d ' ')
           echo "snaps=$count" >> "$GITHUB_OUTPUT"
 
+      # remote-build writes its detailed error (e.g. the BadRequest reason) only to a
+      # log file on the runner, which is otherwise lost. Surface it when no snap built.
+      - name: Dump snapcraft log on build failure
+        if: ${{ always() && steps.build.outputs.snaps == '0' }}
+        run: |
+          shopt -s nullglob
+          logs=( ~/.local/state/snapcraft/log/*.log ~/.cache/snapcraft/log/*.log )
+          if [ ${#logs[@]} -eq 0 ]; then
+            echo "(no snapcraft log files found)"
+          else
+            for f in "${logs[@]}"; do
+              echo "::group::${f}"
+              cat "$f"
+              echo "::endgroup::"
+            done
+          fi
+
       - name: Ensure version track exists
         if: ${{ steps.build.outputs.snaps != '0' && github.event_name == 'pull_request' }}
         env:
