@@ -93,12 +93,14 @@ function set_device_priority_dir {
 }
 
 function test_device_priority_dir {
-    set -x
-    ZUI_SETTINGS=$(zui_settings_file "w")
-    
-    if [ $? -ne 0 ]; then
-        echo "Cannot read/write to settings"
-        exit 1
+    # snapd copies $SNAP_DATA forward on every refresh, so settings.json is carried
+    # between revisions automatically — this function does NOT move config. Its only
+    # job is to rewrite a stale, revision-pinned deviceConfigPriorityDir (see below).
+    # If there's no settings.json yet (fresh install, or ZUI never started), there is
+    # nothing to migrate: no-op instead of aborting the hook with exit 1.
+    if ! ZUI_SETTINGS=$(zui_settings_file "w"); then
+        lprint "No writable settings.json yet; skipping deviceConfigPriorityDir migration."
+        return 0
     fi
 
     DEV_DIR=$(yq -re '.zwave.deviceConfigPriorityDir' "${ZUI_SETTINGS}" 2>&-)
