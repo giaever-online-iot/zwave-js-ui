@@ -40,6 +40,11 @@ parse_sub() {                  # $1 subcommand token -> backup|restore|list|stat
     esac
 }
 
+# Path to the invoking user's REAL gpg home. Inside the snap, $HOME is remapped to the
+# sandbox; $SNAP_REAL_HOME points at the actual home (e.g. /home/joachimmgg). pick-key
+# must read THIS, not $HOME/.gnupg (which is the empty sandbox keyring).
+gpg_host_homedir() { echo "${SNAP_REAL_HOME:-$HOME}/.gnupg"; }
+
 cfg() { snapctl get "backup.$1" 2>/dev/null; }    # $1 = key suffix, e.g. target, encrypt-key
 
 encryption_args() {            # echoes "--encrypt-key X" or "--no-encryption"; status 2 if neither

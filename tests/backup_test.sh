@@ -72,4 +72,7 @@ assert_contains "$_u" "pick-key"   "usage lists pick-key"
 assert_contains "$_u" "create-key" "usage lists create-key"
 assert_contains "$_u" "export-key" "usage lists export-key"
 
+# --- key-management: host keyring path ---
+assert_eq "$(SNAP_REAL_HOME=/home/u gpg_host_homedir)" "/home/u/.gnupg" "host homedir from SNAP_REAL_HOME"
+
 finish
