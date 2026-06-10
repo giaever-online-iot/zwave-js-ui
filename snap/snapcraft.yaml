@@ -123,7 +123,6 @@ apps:
       - home
       - removable-media
       - gpg-public-keys
-      - gpg-keys
   backup-timer:
     command: bin/backup
     daemon: oneshot
@@ -134,7 +133,6 @@ apps:
       - network
       - home
       - removable-media
-      - gpg-public-keys
 
 layout:
   # Cache is set to (env) something outside the rw mount, to prevent storing it inside the store dir.
