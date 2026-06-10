@@ -1,0 +1,27 @@
+name: Helper tests
+
+# Guards the CI helper that all the snap version/channel math depends on.
+# Runs only when the helper, its tests, or its fixtures change.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/scripts/**'
+      - '.github/workflows/helper-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Shellcheck the release helper + tests
+        run: shellcheck .github/scripts/snap-release.sh .github/scripts/snap-release.test.sh
+
+      - name: Run helper unit tests
+        run: bash .github/scripts/snap-release.test.sh
