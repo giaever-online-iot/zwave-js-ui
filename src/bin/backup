@@ -144,6 +144,40 @@ cmd_create_key() {
     lprint "to copy it to your host keyring / offline storage and remove it from this device." >&2
 }
 
+# ROOT-context: export the snap keyring's PRIVATE key (defaults to backup.encrypt-key) so
+# the user can move it to their host keyring / offline, then offer to delete it from the
+# snap (leaving the public key for backups). Delete prompt defaults to "no", and is only
+# offered after a verified, non-empty export so the only copy can't be lost on a failure.
+cmd_export_key() {
+    local fpr; fpr="$(cfg encrypt-key)"
+    [ -n "$fpr" ] || { lprint "backup.encrypt-key not set; nothing to export." >&2; exit 1; }
+    if ! gpg --homedir "$GNUPGHOME" --list-secret-keys "$fpr" >/dev/null 2>&1; then
+        lprint "No private key on this device for ${fpr} (public-only or card key); nothing to export." >&2
+        exit 0
+    fi
+    lprint "# To add this key to your workstation keyring, run on the HOST (not in the snap):" >&2
+    lprint "#     gpg --import   # paste/redirect the block below" >&2
+    lprint "# Also store it OFFLINE — it is the ONLY way to decrypt your backups." >&2
+    local exported
+    if ! exported="$(gpg --homedir "$GNUPGHOME" --export-secret-keys --armor "$fpr")" || [ -z "$exported" ]; then
+        lprint "Export failed or produced no output — aborting. The private key has NOT been deleted." >&2
+        exit 1
+    fi
+    printf '%s\n' "$exported"
+    local ans
+    read -rp "Delete the private key from THIS device now? [y/N] " ans
+    case "${ans:-N}" in
+        y|Y|yes|YES)
+            if ! gpg --homedir "$GNUPGHOME" --batch --yes --delete-secret-keys "$fpr"; then
+                lprint "Failed to delete the private key — it may still be present in the snap keyring." >&2
+                exit 1
+            fi
+            lprint "Private key deleted from the snap keyring; the public key is retained for backups." >&2 ;;
+        *)
+            lprint "Kept the private key in the snap keyring." >&2 ;;
+    esac
+}
+
 cfg() { snapctl get "backup.$1" 2>/dev/null; }    # $1 = key suffix, e.g. target, encrypt-key
 
 encryption_args() {            # echoes "--encrypt-key X" or "--no-encryption"; status 2 if neither
@@ -256,6 +290,7 @@ main() {
             ;;
         import-key) cmd_import_key ;;
         create-key) cmd_create_key ;;
+        export-key) cmd_export_key ;;
     esac
 }
 
