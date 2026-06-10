@@ -1,0 +1,96 @@
+name: Release on merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Serialize ALL merge releases so two near-simultaneous merges can't race on the
+# shared latest/* channels + default track. Never cancel an in-flight promotion.
+concurrency:
+  group: snap-release
+  cancel-in-progress: false
+
+env:
+  SNAP_NAME: zwave-js-ui
+
+jobs:
+  promote:
+    if: ${{ github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install snapcraft
+        run: sudo snap install snapcraft --classic
+
+      - name: Resolve version / track
+        id: meta
+        run: |
+          set -euo pipefail
+          V="$(yq '.version' snap/snapcraft.yaml)"
+          TRACK="$(.github/scripts/snap-release.sh version-to-track "$V")"
+          {
+            echo "version=$V"
+            echo "track=$TRACK"
+            echo "pr=${{ github.event.pull_request.number }}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Promote PR revisions to release channels
+        run: |
+          set -euo pipefail
+          SR=.github/scripts/snap-release.sh
+          SNAP="$SNAP_NAME"
+          V="${{ steps.meta.outputs.version }}"
+          TRACK="${{ steps.meta.outputs.track }}"
+          PR="${{ steps.meta.outputs.pr }}"
+          BRANCH="$TRACK/edge/$PR"
+
+          INFO="$(snap info "$SNAP")"
+
+          if [ "$("$SR" branch-has-revisions "$TRACK" "$PR" <<<"$INFO")" != "yes" ]; then
+            echo "No revisions in $BRANCH (docs-only merge / build failed / branch expired). Nothing to promote."
+            exit 0
+          fi
+
+          CAND="$("$SR" channel-version latest/candidate <<<"$INFO")"
+          echo "Merged $V; current latest/candidate=${CAND:-<none>}"
+
+          # 1) Major bump: move previous major's final to latest/stable BEFORE candidate is overwritten.
+          if [ "$("$SR" needs-stable-bump "$V" "$CAND")" = "yes" ]; then
+            echo ">> major bump: latest/candidate -> latest/stable"
+            snapcraft promote "$SNAP" --from-channel latest/candidate --to-channel latest/stable --yes
+          fi
+
+          # 2) The version track's own stable line (always; safe for backports).
+          echo ">> $BRANCH -> $TRACK/stable"
+          snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel "$TRACK/stable" --yes
+
+          # 3) Shared latest/* only if this isn't a backport.
+          if [ "$("$SR" is-at-least "$V" "$CAND")" = "yes" ]; then
+            echo ">> $BRANCH -> latest/candidate, latest/edge"
+            snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel latest/candidate --yes
+            snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel latest/edge --yes
+          else
+            echo ">> backport ($V < $CAND): leaving latest/* unchanged"
+          fi
+
+          # 4) Close the PR branch (auto-expires anyway; this is tidy-up).
+          echo ">> closing $BRANCH"
+          snapcraft close "$SNAP" "$BRANCH" --yes || echo "close failed (already gone?); ignoring"
+
+          # 5) Default track follows the merged line; never regresses or jumps to stray tracks.
+          CAND_TRACK=""
+          if [ -n "$CAND" ]; then CAND_TRACK="$("$SR" version-to-track "$CAND")"; fi
+          if [ "$TRACK" != "$CAND_TRACK" ] && [ "$("$SR" is-at-least "$TRACK" "$CAND_TRACK")" = "yes" ]; then
+            echo ">> set default track -> $TRACK"
+            snapcraft set-default-track "$SNAP" "$TRACK"
+          else
+            echo ">> default track unchanged (line=${CAND_TRACK:-<none>})"
+          fi

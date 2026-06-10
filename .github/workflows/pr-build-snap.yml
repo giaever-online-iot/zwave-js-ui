@@ -1,370 +1,159 @@
 name: PR Build Snap
 
-# JOBs
-# 19299607540: a*64= success, armhf=failed
-
-env:
-  # DEV can be overridden when manually running this workflow via workflow_dispatch inputs.
-  # Default is 'true' to preserve previous behavior.
-  DEV: ${{ github.event.inputs.run_id != '' }}
-  RUN_ID: ${{ github.event.inputs.run_id }}
-  RETENTION_ALL_ARTS: ${{ github.event.inputs.run_id == '' && 1 || 30 }}
-  RETENTION_PER_ARTS: ${{ github.event.inputs.run_id == '' && 90 || 1 }}
-
 on:
   pull_request:
-    branches:
-      - main
+    branches: [main]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/**'
-      - '.git/**'
-      - '.vscode/**'
       - '**/*.md'
       - '**/*.txt'
       - 'renovate.json'
-  workflow_run:
-    branches:
-      - main
-    workflows:
-      - "Block non-conforming PRs (auto-close + label)"
-    types:
-      - completed
+      - '.vscode/**'
   workflow_dispatch:
-    inputs:
-      run_id: 
-        description: "The id of the workflow run where the desired download artifact was uploaded from."
-        required: false
-        default: ""
-      platforms:
-        description: "Platforms to build for. If «all», platforms will be defined by snapcraft.yaml. If «from artifact» is selected but run_id is not specified, it will use «all»."
-        type: choice
-        required: false
-        default: "all"
-        options:
-          - all
-          - artifact
-          - amd64
-          - amd64 arm64
-          - amd64 armhf
-          - amd64 arm64 armhf
-          - arm64
-          - arm64 amd64
-          - arm64 amd64 armhf
-          - armhf
-          - armhf arm64
-          - armhf arm64 amd64
-      # environment:
-      #   description: 'Environment to run tests against'
-      #   type: environment
-      #   required: true
-      
 
 permissions:
   contents: read
-  actions: read
-  pull-requests: read
+  pull-requests: write
+
+concurrency:
+  group: pr-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  SNAP_NAME: zwave-js-ui
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run == null || github.event.workflow_run.conclusion == 'success' }}
-    permissions:
-      contents: read
-      actions: write
-    outputs:
-      platforms: ${{ steps.extract.outputs.platforms }}
-      artifacts-url: ${{ steps.upload-artifacts.outputs.artifact-url }}
-      snapcraft-logs: ${{ steps.build.outputs.snapcraft-log || 'succeeded' }}
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v6
-        with:
-          #ref: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.ref }}
-          fetch-depth: 0
 
-      - name: "Download build artifacts for all platforms"
-        uses: actions/download-artifact@v8
-        continue-on-error: true
-        id: download-artifacts
-        # explicit comparison is clearer and avoids edge-cases
-        if: ${{ env.DEV == 'true' }}
-        with:
-          name: snap-build-artifacts
-          run-id: ${{ env.RUN_ID || github.run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: .
+      - name: Install snapcraft
+        run: sudo snap install snapcraft --classic
 
-      - name: Extract platforms from snapcraft.yaml
-        id: extract
+      - name: Configure Launchpad credentials
         run: |
           set -euo pipefail
-          archs="$(echo "${{ github.event.inputs.platforms }}" | yq '. | split(" ")' -oj -I0)"
-
-          if [[ "${archs}" == *'artifact'* ]]; then
-            if [ "${{ steps.download-artifacts.outcome }}" != "success" ]; then
-              archs=
-            else
-              archs="$(find . -type d \( -name 'arm*' -o -name 'amd*' \) -exec basename {} \; | xargs | yq '. | split(" ")' -oj -I0)"
-            fi
-          fi
-
-          if [[ -z "${archs}" ]] || [[ "${archs}" == *'all'* ]]; then
-            # Output a compact JSON array of platform keys, e.g. ["amd64","arm64"]
-            archs=$(yq '.platforms | keys' -oj -I0 snap/snapcraft.yaml)
-          fi
-          printf 'platforms=%s\n' "$(echo "${archs}" | yq '.' -oj -I0)" >> "$GITHUB_OUTPUT"
-          
-      - name: Build for ${{ steps.extract.outputs.platforms }}
-        id: build
-        # if not DEV, or if DEV but download did not succeed
-        if: ${{ success() && (env.DEV != 'true' || (env.DEV == 'true' && steps.download-artifacts.outcome != 'success')) }}
-        # env:
-        #   SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-        run: |
-          set -exuo pipefail
-          
-          echo "Run-id: ${{ github.run_id }}"
-          echo "Workspace: ${GITHUB_WORKSPACE}, ${HOME}"
-          # Read platforms JSON array from previous step
-          platforms="$(echo "${{ steps.extract.outputs.platforms }}" | yq '.' -oj -I0)"
-
-          sudo snap install snapcraft --classic
-          export SNAPCRAFT_STORE_CREDENTIALS="${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}" 
-          snapcraft whoami || true
-          
           mkdir -p ~/.local/share/snapcraft
-          echo "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
-          
-          set +e
-          # Build for comma-separated list of arches
-          snapcraft remote-build -v --launchpad-accept-public-upload \
-            --build-for=$(yq '. | join(",")' <<< "$platforms")
-          ret=$?
-          set -e
-          
-          find ~ -name "snapcraft-*.log"
-          logs=$(find ~ -name "snapcraft*.log" -exec cat {} \;)
+          printf '%s' "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
 
-          if [ -n "${logs}" ]; then
-            set +x
-            {
-              echo "snapcraft-logs<<EOF"
-              echo "${logs}"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-            set -x
-          fi
-          
-          exit ${ret}
-          
-      - name: Snapcraft remote log
-        if: ${{ steps.build.outcome == 'failure' }}
-        run: |
-          echo "LOG: ${{ steps.build.outputs.snapcraft-log || 'missing' }}"
-
-      - name: Normalize .snap/.txt artifact names
-        # Run if we actually built in this run
-        if: ${{ contains(fromJson('["success", "completed"]'), steps.build.outcome) }}
-        shell: bash
+      - name: Resolve version / track / archs
+        id: meta
         run: |
           set -euo pipefail
- 
-          sn=$(yq '.name' snap/snapcraft.yaml)
-          sv=$(yq '.version' snap/snapcraft.yaml)
-
-          # Build root directory
-          dst_root=~+/build
-          mkdir -p "${dst_root}"
-
-          # Parse platforms JSON array and iterate
-          echo '${{ steps.extract.outputs.platforms }}' | jq -r '.[]' | while read p; do
-            # Create per-platform directory under dst_root
-            platform_dir="${dst_root}/${p}"
-            mkdir -p "${platform_dir}"
-
-            find ./ -type f \( -name "${sn}*_${p}.snap" -o -name "*_${p}_*.txt" \) | while read src; do
-              ext="${src##*.}"
-              # Move files into dst_root with normalized names
-              dst="$platform_dir/${sn}_${sv}_${p}.$([[ $ext == "txt" ]] && echo "log" || echo "${ext}")"
-              if [ "$(readlink -f "$src")" = "$(readlink -f "$dst")" ]; then
-                echo "Source and destination are the same (skipping mv)."
-              else
-                mv "$src" "$dst"
-              fi
-            done
-          done
-          ls -al "$dst_root"
-          find "$dst_root" -type f
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v7
-        id: upload-artifacts
-        if: ${{ contains(fromJson('["success", "completed"]'), steps.build.outcome) }}
-        with:
-          name: snap-build-artifacts
-          path: build/
-          retention-days: ${{ env.RETENTION_ALL_ARTS }}
-
-  upload:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    strategy:
-      matrix:
-        platform: ${{ fromJson(needs.build.outputs.platforms) }}
-      fail-fast: true
-    env:
-      PLATFORM: ${{ matrix.platform }}
-    steps:
-      - name: "Download build artifacts for all platforms"
-        uses: actions/download-artifact@v8
-        id: download-artifacts
-        with:
-          run-id: ${{ env.RUN_ID || github.run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          name: snap-build-artifacts
-          path: .
-
-      - name: "Check dir/files for platform (${{ matrix.platform }})"
-        id: files
-        run: |
-          arch="${{ matrix.platform }}"
-          echo "Files in workspace (downloaded artifact contents):"
-          ls -al ~+/
-          ls -al ~+/"${arch}" || true
-          echo "dir=${arch}" >> $GITHUB_OUTPUT
-          echo "sfn=$(find ~+/"${arch}" -name "*.snap" -print -quit || true)" >> $GITHUB_OUTPUT
-          echo "lfn=$(find ~+/"${arch}" -name "*.log" -print -quit || true)" >> $GITHUB_OUTPUT
-
-      - name: "Upload snap for platform (${{ matrix.platform }})"
-        id: upload-snap-artifact
-        if: ${{ steps.files.outputs.sfn != '' }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: snap-${{ matrix.platform }}
-          path: ${{ steps.files.outputs.sfn }}
-          retention-days: ${{ env.RETENTION_PER_ARTS }}
-
-      - name: "Download URL snap for platform (${{ matrix.platform }})"
-        if: ${{ steps.upload-snap-artifact.outputs.artifact-url }}
-        id: snap-artifact
-        env:
-          URL: ${{ steps.upload-snap-artifact.outputs.artifact-url }}
-        run: |
-          echo "URL: ${URL}, ${{ steps.upload-snap-artifact.outputs.artifact-url }}"
-          echo "url=${URL}" >> $GITHUB_OUTPUT
-
-      - name: "Upload log for platform (${{ matrix.platform }})"
-        uses: actions/upload-artifact@v7
-        id: upload-log-artifact
-        if: ${{ steps.files.outputs.lfn != '' }}
-        with:
-          name: log-${{ matrix.platform }}
-          path: ${{ steps.files.outputs.lfn }}
-          retention-days: ${{ env.RETENTION_PER_ARTS }}
-
-      - name: "Download URL log for platform (${{ matrix.platform }})"
-        if: ${{ steps.upload-log-artifact.outputs.artifact-url }}
-        id: log-artifact
-        env:
-          URL: ${{ steps.upload-log-artifact.outputs.artifact-url }}
-        run: |
-          echo "URL: ${URL}, ${{ steps.upload-log-artifact.outputs.artifact-url }}"
-          echo "url=${URL}" >> $GITHUB_OUTPUT
-
-      - name: "Write result metadata for platform (${{ matrix.platform }})"
-        id: write-result
-        run: |
-          cat > "${{ matrix.platform }}.json" <<EOF
+          V="$(yq '.version' snap/snapcraft.yaml)"
+          TRACK="$(.github/scripts/snap-release.sh version-to-track "$V")"
+          ARCHS="$(yq '.platforms | keys | join(",")' snap/snapcraft.yaml)"
           {
-            "snap-url": "${{ steps.snap-artifact.outputs.url || '' }}",
-            "log-url": "${{ steps.log-artifact.outputs.url || '' }}"
-          }
-          EOF
+            echo "version=$V"
+            echo "track=$TRACK"
+            echo "archs=$ARCHS"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: "Upload result metadata for platform (${{ matrix.platform }})"
-        uses: actions/upload-artifact@v7
-        with:
-          name: urls-${{ matrix.platform }}
-          path: ${{ matrix.platform }}.json
-
-  build-status:
-    needs: [build, upload]
-    runs-on: ubuntu-latest
-    if: ${{ always() }}
-    permissions:
-      contents: write
-      issues: write
-    env:
-      UPLOAD_OK: ${{ needs.upload.outcome == 'success' && 'true' || 'false' }}
-    steps:
-      - name: "Download all URLS for"
-        if: ${{ env.UPLOAD_OK == 'true' }}
-        uses: actions/download-artifact@v8
-        with:
-          pattern: urls-*
-          merge-multiple: true
-          path: urls
-          
-      - name: "Download all logs"
-        if: ${{ env.UPLOAD_OK == 'true' }}
-        uses: actions/download-artifact@v8
-        with:
-          pattern: log-*
-          merge-multiple: true
-          path: logs
-
-      - name: Return build statuses
-        if: ${{ env.UPLOAD_OK == 'true' }}
+      - name: Remote-build all archs (tolerant of partial failure)
         id: build
-        env: 
-          PLATFORMS: ${{ needs.build.outputs.platforms }}
+        run: |
+          # Deliberately NOT 'set -e': a partial-arch build must not abort the step.
+          set -uo pipefail
+          echo "Building: ${{ steps.meta.outputs.archs }}"
+          snapcraft remote-build -v --launchpad-accept-public-upload --build-for="${{ steps.meta.outputs.archs }}" || true
+          ls -1 ./*.snap 2>/dev/null || echo "(no .snap files produced)"
+          count=$(ls -1 ./*.snap 2>/dev/null | wc -l | tr -d ' ')
+          echo "snaps=$count" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure version track exists
+        if: ${{ steps.build.outputs.snaps != '0' && github.event_name == 'pull_request' }}
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+          SNAPCRAFT_SESSION: ${{ secrets.SNAPCRAFT_SESSION }}
         run: |
           set -euo pipefail
-          status="{}"
-          for arch in $(echo "${PLATFORMS}" | yq '. | join(" ")'); do
-            echo "Processing architecture: $arch"
-            ajon=$(find "${PWD}" -name "*${arch}*.json" -print -quit)
+          TRACK="${{ steps.meta.outputs.track }}"
+          if snapcraft tracks "$SNAP_NAME" | awk 'NR>1{print $1}' | grep -qx "$TRACK"; then
+            echo "Track $TRACK already exists."
+            exit 0
+          fi
+          echo "Creating track $TRACK via dashboard API ..."
+          resp="$(curl -sS -w $'\n%{http_code}' \
+            -X POST "https://snapcraft.io/${SNAP_NAME}/create-track" \
+            -H "Cookie: session=${SNAPCRAFT_SESSION};" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -H "Origin: https://snapcraft.io" \
+            -H "Referer: https://snapcraft.io/${SNAP_NAME}/releases" \
+            --data-urlencode "track-name=${TRACK}")"
+          code="$(printf '%s' "$resp" | tail -n1)"
+          body="$(printf '%s' "$resp" | sed '$d')"
+          echo "HTTP $code"; echo "$body"
+          case "$code" in
+            2*) echo "Track $TRACK created." ;;
+            401|403) echo "::error::create-track unauthorized — refresh the SNAPCRAFT_SESSION secret or verify Track-Creation-Guardrails for $SNAP_NAME."; exit 1 ;;
+            *) echo "::error::create-track failed (HTTP $code)."; exit 1 ;;
+          esac
 
-            export built=false
-            export logged=false
-            if [[ -n "$ajon" ]]; then
-              built="$([[ -n "$(cat "$ajon" | yq '.snap-url')" ]] && echo true || echo false)"
-              logged="$([[ -n "$(cat "$ajon" | yq '.log-url')" ]] && echo true || echo false)"
-            fi
-            
-            export key=".${arch}"
-            status="$(echo "$status" | yq "eval(env(key)) = {\"built\": strenv(built), \"logged\": strenv(logged)}" -oj -I0)"
+      - name: Upload built archs to v<MM>/edge/<PR>
+        id: release
+        if: ${{ steps.build.outputs.snaps != '0' && github.event_name == 'pull_request' }}
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        run: |
+          set -uo pipefail
+          TRACK="${{ steps.meta.outputs.track }}"
+          PR="${{ github.event.pull_request.number }}"
+          CHAN="$TRACK/edge/$PR"
+          IFS=',' read -ra WANT <<< "${{ steps.meta.outputs.archs }}"
+          uploaded=(); missing=()
+          for arch in "${WANT[@]}"; do
+            # Matches name_version_arch.snap (snapcraft 8.x / core24) — '*' also tolerates name_arch.snap.
+            f="$(ls -1 "${SNAP_NAME}"*"${arch}".snap 2>/dev/null | head -n1 || true)"
+            if [ -z "$f" ]; then echo "missing snap for $arch"; missing+=("$arch"); continue; fi
+            echo "Uploading $f -> $CHAN"
+            if snapcraft upload "$f" --release="$CHAN"; then uploaded+=("$arch"); else echo "upload failed for $arch"; missing+=("$arch"); fi
           done
-          
-          echo "statuses<<EOF" >> $GITHUB_OUTPUT
-          echo "${status}" | yq '.' -oj >> $GITHUB_OUTPUT
-          echo EOF >> $GITHUB_OUTPUT
-    
-      - name: Print status
-        if: ${{ env.UPLOAD_OK == 'true' }}
-        run: |
-          echo "${{ steps.build.outputs.statuses }}"
+          {
+            echo "channel=$CHAN"
+            echo "missing=${missing[*]:-}"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "comment<<EOF"
+            if [ "${#uploaded[@]}" -gt 0 ]; then
+              printf '✅ Snap for this PR published to `%s`\n\n' "$CHAN"
+              printf '```bash\nsudo snap install %s --channel=%s   # or: sudo snap refresh %s --channel=%s\n```\n\n' "$SNAP_NAME" "$CHAN" "$SNAP_NAME" "$CHAN"
+              printf 'Built: %s\n' "${uploaded[*]}"
+            else
+              printf '❌ No architectures were published for this PR.\n'
+            fi
+            if [ "${#missing[@]}" -gt 0 ]; then printf '\n⚠️ Failed/missing arch(es): %s\n' "${missing[*]}"; fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: "Builds failed for ${{ needs.build.outputs.platforms }}"
-        id: archs-logs
-        if: ${{ env.UPLOAD_OK != 'true' }}
-        run: |
-          set -x
-          archs="$(echo "${{ needs.build.outputs.platforms }}" | yq '. | join("-")')"
-          archs_fn=~+/"snapcraft-${archs}.log"
-          echo "${{ needs.build.outputs.snapcraft-logs }}" > "${archs_fn}"
-          echo "fn=${archs_fn}" >> $GITHUB_OUTPUT
-
-      - name: "Upload result metadata for platform (${{ matrix.platform }})"
-        if: ${{ env.UPLOAD_OK != 'true' }}
-        uses: actions/upload-artifact@v7
+      - name: Sticky PR comment
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        uses: actions/github-script@v9
+        env:
+          BODY: ${{ steps.release.outputs.comment }}
+          BUILT: ${{ steps.build.outputs.snaps }}
         with:
-          name: snapcraft-archs-logs
-          path: ${{ steps.archs-logs.outputs.fn }}
+          script: |
+            const marker = '<!-- pr-build-snap -->';
+            const text = (!process.env.BUILT || process.env.BUILT === '0' || !process.env.BODY)
+              ? '❌ Build produced no snaps (or a preceding step failed). Check the Action logs.'
+              : process.env.BODY;
+            const body = `${marker}\n${text}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const issuesApi = (github.rest && github.rest.issues) ? github.rest.issues : github.issues;
+            const { data: comments } = await issuesApi.listComments({ owner, repo, issue_number, per_page: 100 });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await issuesApi.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await issuesApi.createComment({ owner, repo, issue_number, body });
+            }
 
-      - name: Statuses
-        id: statuses
+      - name: Fail if build/upload incomplete
+        if: ${{ steps.build.outputs.snaps == '0' || steps.release.outputs.missing != '' }}
         run: |
-          echo "statuses=${{ steps.build.outputs.statuses || '{"cmd-failed": true}' }}" >> $GITHUB_OUTPUT
+          echo "::error::Incomplete: snaps=${{ steps.build.outputs.snaps }} missing=[${{ steps.release.outputs.missing }}]"
+          exit 1

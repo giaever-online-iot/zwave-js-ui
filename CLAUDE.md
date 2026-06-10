@@ -87,6 +87,6 @@ Snap users set config with `snap set zwave-js-ui server.host=0.0.0.0` (namespace
 ## CI / contribution rules
 
 - **PRs must target `main` and originate from a branch in this repo. PRs from forks are auto-closed and labeled** by `.github/workflows/block-fork-prs.yml`.
-- `pr-build-snap.yml` builds the snap via Launchpad remote-build on PRs (skips doc/config-only changes), then uploads per-arch artifacts. It can be run manually via `workflow_dispatch` with platform selection or by reusing a prior run's artifacts (`run_id`).
-- `snap-create-track.yml` runs after a successful build to create version tracks and set the default track in the Snap Store.
+- `pr-build-snap.yml` builds the snap via Launchpad remote-build on PRs (skips doc/config-only changes), then **publishes each arch to the per-PR channel `v<major.minor>/edge/<PR#>`** in the Snap Store, creating the `v<MM>` track first if missing (dashboard `create-track` API via the `SNAPCRAFT_SESSION` secret). Partial-arch builds upload what succeeded and mark the check failed. A sticky PR comment shows the channel + install command.
+- `release-on-merge.yml` runs when a PR merges: it **promotes the PR's revisions** from `v<MM>/edge/<PR#>` to `v<MM>/stable` and `latest/candidate` + `latest/edge` (and bumps the previous major's final to `latest/stable` on a major release), closes the PR branch, and sets the newest `v<MM>` as the default track. All version/channel math lives in `.github/scripts/snap-release.sh` (unit-tested via `snap-release.test.sh`).
 - Release channels (`latest/stable`, `latest/candidate`, `latest/edge`) and version tracks (e.g. `v9.11`) are documented in `README.md`.
