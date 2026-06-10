@@ -84,4 +84,8 @@ fpr:::::::::AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555:'
 _want="$(printf '0E32DAF912C2645073A3DFFA8956E92F1A70C779\tJoachim <joachim@giaever.no>')"
 assert_eq "$(printf '%s\n' "$_colons" | parse_pubkey_list)" "$_want" "pubkey list: primary fpr+uid only (skips subkey fpr)"
 
+# --- key-management: first fingerprint ---
+assert_eq "$(printf '%s\n' "$_colons" | first_fpr)" "0E32DAF912C2645073A3DFFA8956E92F1A70C779" "first_fpr"
+assert_eq "$(printf 'tru::1:9:\n' | first_fpr)" "" "first_fpr: no fpr line -> empty"
+
 finish

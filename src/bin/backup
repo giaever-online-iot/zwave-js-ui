@@ -56,6 +56,10 @@ parse_pubkey_list() {
     '
 }
 
+# Reads `gpg --with-colons` output on stdin, prints the FIRST fingerprint (field 10 of
+# the first `fpr:` line) and stops. Empty if there is none. Pure, unit-tested.
+first_fpr() { awk -F: '$1=="fpr"{print $10; exit}'; }
+
 cfg() { snapctl get "backup.$1" 2>/dev/null; }    # $1 = key suffix, e.g. target, encrypt-key
 
 encryption_args() {            # echoes "--encrypt-key X" or "--no-encryption"; status 2 if neither
