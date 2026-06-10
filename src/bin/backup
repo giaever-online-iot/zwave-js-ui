@@ -117,8 +117,19 @@ cmd_import_key() {
 # ROOT-context: generate an ed25519/cv25519 backup keypair in the snap keyring and set
 # backup.encrypt-key to it. The private key stays in the snap keyring until `export-key`
 # moves it off. Prompts for the full UID (name, email, optional comment) and a passphrase.
-cmd_create_key() {
+# Ensure the snap-staged gpg-agent is running against $GNUPGHOME. gpg can't autostart it
+# (gpgconf reports bindir=/usr/bin — the core24 base, no agent there — not $SNAP), so we
+# launch the staged binary ourselves; gpg --no-autostart then connects via its socket.
+# Required for secret-key ops (generate, export-secret, decrypt). No-op if already up.
+ensure_agent() {
     mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
+    grep -qs allow-loopback-pinentry "$GNUPGHOME/gpg-agent.conf" 2>/dev/null \
+        || echo "allow-loopback-pinentry" >> "$GNUPGHOME/gpg-agent.conf"
+    "$SNAP/usr/bin/gpg-agent" --homedir "$GNUPGHOME" --daemon >/dev/null 2>&1 || true
+}
+
+cmd_create_key() {
+    ensure_agent
     local name email comment pass uid
     # UID fields may be supplied as args ($1 name, $2 email, $3 comment) or prompted
     # interactively. Arg mode requires at least name + email; the passphrase is ALWAYS
@@ -137,17 +148,17 @@ cmd_create_key() {
     uid="$name"
     [ -n "$comment" ] && uid="$uid ($comment)"
     uid="$uid <$email>"
-    if ! gpg --homedir "$GNUPGHOME" --batch --pinentry-mode loopback --passphrase "$pass" \
+    if ! gpg --no-autostart --homedir "$GNUPGHOME" --batch --pinentry-mode loopback --passphrase "$pass" \
         --quick-generate-key "$uid" ed25519 cert,sign never; then
         lprint "Key generation failed — check the name/email are valid and gpg is working." >&2
         return 1
     fi
-    local fpr; fpr="$(gpg --homedir "$GNUPGHOME" --list-keys --with-colons "$email" 2>/dev/null | first_fpr)"
+    local fpr; fpr="$(gpg --no-autostart --homedir "$GNUPGHOME" --list-keys --with-colons "$email" 2>/dev/null | first_fpr)"
     if [ -z "$fpr" ]; then
         lprint "Key was generated but its fingerprint could not be read for '${email}'." >&2
         return 1
     fi
-    if ! gpg --homedir "$GNUPGHOME" --batch --pinentry-mode loopback --passphrase "$pass" \
+    if ! gpg --no-autostart --homedir "$GNUPGHOME" --batch --pinentry-mode loopback --passphrase "$pass" \
         --quick-add-key "$fpr" cv25519 encr never; then
         lprint "Adding the encryption subkey failed; '${fpr}' is not usable for backups yet." >&2
         return 1
@@ -163,9 +174,10 @@ cmd_create_key() {
 # snap (leaving the public key for backups). Delete prompt defaults to "no", and is only
 # offered after a verified, non-empty export so the only copy can't be lost on a failure.
 cmd_export_key() {
+    ensure_agent
     local fpr; fpr="$(cfg encrypt-key)"
     [ -n "$fpr" ] || { lprint "backup.encrypt-key not set; nothing to export." >&2; exit 1; }
-    if ! gpg --homedir "$GNUPGHOME" --list-secret-keys "$fpr" >/dev/null 2>&1; then
+    if ! gpg --no-autostart --homedir "$GNUPGHOME" --list-secret-keys "$fpr" >/dev/null 2>&1; then
         lprint "No private key on this device for ${fpr} (public-only or card key); nothing to export." >&2
         exit 0
     fi
@@ -173,7 +185,7 @@ cmd_export_key() {
     lprint "#     gpg --import   # paste/redirect the block below" >&2
     lprint "# Also store it OFFLINE — it is the ONLY way to decrypt your backups." >&2
     local exported
-    if ! exported="$(gpg --homedir "$GNUPGHOME" --export-secret-keys --armor "$fpr")" || [ -z "$exported" ]; then
+    if ! exported="$(gpg --no-autostart --homedir "$GNUPGHOME" --export-secret-keys --armor "$fpr")" || [ -z "$exported" ]; then
         lprint "Export failed or produced no output — aborting. The private key has NOT been deleted." >&2
         exit 1
     fi
@@ -182,7 +194,7 @@ cmd_export_key() {
     read -rp "Delete the private key from THIS device now? [y/N] " ans
     case "${ans:-N}" in
         y|Y|yes|YES)
-            if ! gpg --homedir "$GNUPGHOME" --batch --yes --delete-secret-keys "$fpr"; then
+            if ! gpg --no-autostart --homedir "$GNUPGHOME" --batch --yes --delete-secret-keys "$fpr"; then
                 lprint "Failed to delete the private key — it may still be present in the snap keyring." >&2
                 exit 1
             fi
