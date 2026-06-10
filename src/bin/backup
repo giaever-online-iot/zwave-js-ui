@@ -45,6 +45,17 @@ parse_sub() {                  # $1 subcommand token -> backup|restore|list|stat
 # must read THIS, not $HOME/.gnupg (which is the empty sandbox keyring).
 gpg_host_homedir() { echo "${SNAP_REAL_HOME:-$HOME}/.gnupg"; }
 
+# Reads `gpg --with-colons` key listing on stdin, emits one "FPR<TAB>primary-uid" line
+# per key. Takes the first fpr after each `pub` (the primary key fingerprint) and the
+# first `uid` after it, ignoring subkey fpr lines. Pure: stdin -> stdout, unit-tested.
+parse_pubkey_list() {
+    awk -F: '
+        $1=="pub" { have=0 }
+        $1=="fpr" && !have { fpr=$10; have=1 }
+        $1=="uid" && have && !seen[fpr]++ { print fpr "\t" $10 }
+    '
+}
+
 cfg() { snapctl get "backup.$1" 2>/dev/null; }    # $1 = key suffix, e.g. target, encrypt-key
 
 encryption_args() {            # echoes "--encrypt-key X" or "--no-encryption"; status 2 if neither

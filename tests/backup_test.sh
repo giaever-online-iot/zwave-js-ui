@@ -75,4 +75,13 @@ assert_contains "$_u" "export-key" "usage lists export-key"
 # --- key-management: host keyring path ---
 assert_eq "$(SNAP_REAL_HOME=/home/u gpg_host_homedir)" "/home/u/.gnupg" "host homedir from SNAP_REAL_HOME"
 
+# --- key-management: pubkey list parser ---
+_colons='pub:u:255:22:KEYID:1730000000:::-:::scESC::::::ed25519:::0:
+fpr:::::::::0E32DAF912C2645073A3DFFA8956E92F1A70C779:
+uid:u::::1730000000::HASH::Joachim <joachim@giaever.no>::::::::::0:
+sub:u:255:18:SUBID:1730000000:::::e::::::cv25519::
+fpr:::::::::AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555:'
+_want="$(printf '0E32DAF912C2645073A3DFFA8956E92F1A70C779\tJoachim <joachim@giaever.no>')"
+assert_eq "$(printf '%s\n' "$_colons" | parse_pubkey_list)" "$_want" "pubkey list: primary fpr+uid only (skips subkey fpr)"
+
 finish
