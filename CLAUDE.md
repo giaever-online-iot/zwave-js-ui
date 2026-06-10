@@ -46,6 +46,7 @@ zwave-js-ui.disable    # de-daemonize
 zwave-js-ui.restart
 zwave-js-ui.exec       # run the app in the foreground (debug boot issues before enabling)
 zwave-js-ui.logs       # unified, terminal-friendly live log view; append zui|zwjs to filter
+zwave-js-ui.backup     # ship ZUI's backups off-box via duplicity (restore|list|status)
 snap logs zwave-js-ui -f                  # manual fallback when "log to file" is OFF (syslog/journal)
 tail -f $SNAP_DATA/*.log                  # manual fallback when "log to file" is ON
 ```
@@ -78,7 +79,7 @@ Snap users set config with `snap set zwave-js-ui server.host=0.0.0.0` (namespace
 
 ### User commands (`src/bin/`)
 
-`daemonize`/`de-daemonize`/`restart` wrap `snapctl` service control and require root + connected plugs. `logs` is the unified, terminal-friendly log follower (the `logs` app: merges the ZUI app + Z-Wave JS driver streams, auto-selecting file vs journal per stream). `backup` is present but minimal/WIP.
+`daemonize`/`de-daemonize`/`restart` wrap `snapctl` service control and require root + connected plugs. `logs` is the unified, terminal-friendly log follower. `backup` ships ZUI's backup directory (`$BACKUPS_DIR`, default `$SNAP_DATA/backups`) off-box via **duplicity** — encrypted (asymmetric GPG), incremental, optional daily timer — and restores it back for ZUI's in-app recovery. It does **not** create backups itself: it requires ZUI's own scheduled backups to be enabled (off by default) and is configured via `snap set zwave-js-ui backup.*` (`backup.target`, `backup.dir`, `backup.encrypt-key`, `backup.schedule`, …). See `docs/superpowers/specs/2026-06-10-backup-design.md`.
 
 ### Paths & layout
 
