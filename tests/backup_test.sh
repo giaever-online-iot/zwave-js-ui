@@ -44,7 +44,7 @@ assert_contains "$b" "file:///tgt"             "backup: target"
 r="$(SNAPCTL_backup_encrypt_key=KEY SNAPCTL_backup_target=file:///tgt build_restore_cmd "$SNAP_DATA/restore")"
 assert_contains "$r" "duplicity restore"       "restore: verb"
 assert_contains "$r" "file:///tgt"             "restore: target"
-l="$(SNAPCTL_backup_target=file:///tgt build_list_cmd)"
+l="$(SNAPCTL_backup_encrypt_key=KEY SNAPCTL_backup_target=file:///tgt build_list_cmd)"
 assert_contains "$l" "collection-status"       "list: verb"
 
 rm -rf "$SNAP_DATA/backups"
@@ -53,5 +53,8 @@ mkdir -p "$SNAP_DATA/backups"
 has_backups; assert_status "$?" "1" "empty dir -> no backups"
 : > "$SNAP_DATA/backups/x"
 has_backups; assert_status "$?" "0" "non-empty -> has backups"
+
+rt="$(SNAPCTL_backup_encrypt_key=KEY SNAPCTL_backup_target=file:///tgt build_restore_cmd "$SNAP_DATA/restore" 2026-01-02)"
+assert_contains "$rt" "--time 2026-01-02" "restore: time arg quoted"
 
 finish

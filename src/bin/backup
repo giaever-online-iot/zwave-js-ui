@@ -56,7 +56,7 @@ build_restore_cmd() {          # $1 dest dir [$2 time] -> duplicity restore comm
 }
 
 build_list_cmd() {             # -> duplicity collection-status command string
-    printf 'duplicity collection-status --archive-dir %q %q' "$ARCHIVE_DIR" "$(cfg target)"
+    printf 'duplicity collection-status %s --archive-dir %q %q' "$(encryption_args)" "$ARCHIVE_DIR" "$(cfg target)"
 }
 
 has_backups() {                # status 0 if backup_dir exists and is non-empty
@@ -83,7 +83,7 @@ main() {
                 if [ "${DAEMONIZED:-0}" -eq 1 ]; then exit 0; else exit 1; fi
             fi
             if ! has_backups; then
-                lprint "Nothing to back up in $(backup_dir) — enable ZUI's scheduled backups in its settings."
+                lprint "Nothing to back up in $(backup_dir) — enable ZUI's scheduled backups in its settings." >&2
                 exit 0
             fi
             if ! encryption_args >/dev/null 2>&1; then
@@ -97,6 +97,10 @@ main() {
             ;;
         restore)
             [ -n "$target" ] || { lprint "backup.target not set." >&2; exit 1; }
+            if ! encryption_args >/dev/null 2>&1; then
+                lprint "Set 'backup.encrypt-key=<gpg-fpr>' or opt out with 'backup.encrypt=false'." >&2
+                exit 1
+            fi
             local dest; dest="$(backup_dir)"; mkdir -p "$dest"
             if encryption_args 2>/dev/null | grep -q -- '--no-encryption'; then
                 lprint "Restoring into ${dest} (no encryption)." >&2
@@ -109,6 +113,10 @@ main() {
             ;;
         list)
             [ -n "$target" ] || { lprint "backup.target not set." >&2; exit 1; }
+            if ! encryption_args >/dev/null 2>&1; then
+                lprint "Set 'backup.encrypt-key=<gpg-fpr>' or opt out with 'backup.encrypt=false'." >&2
+                exit 1
+            fi
             # shellcheck disable=SC2294
             eval "$(build_list_cmd)"
             ;;
