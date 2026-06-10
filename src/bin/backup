@@ -50,7 +50,7 @@ build_backup_cmd() {           # $1 source dir -> duplicity backup command strin
 }
 
 build_restore_cmd() {          # $1 dest dir [$2 time] -> duplicity restore command string
-    local timearg=""; [ -n "${2:-}" ] && timearg="--time ${2}"
+    local timearg=""; [ -n "${2:-}" ] && timearg=$(printf -- '--time %q' "${2}")
     printf 'duplicity restore %s %s --archive-dir %q %q %q' \
         "$timearg" "$(encryption_args)" "$ARCHIVE_DIR" "$(cfg target)" "$1"
 }
@@ -72,14 +72,15 @@ main() {
     local sub; sub="$(parse_sub "${1:-}")" || { usage >&2; exit 2; }
 
     mkdir -p "$ARCHIVE_DIR"
-    export GNUPGHOME="${SNAP_COMMON}/.gnupg"   # snap-local keyring (confirmed by the GPG spike)
+    export GNUPGHOME="${SNAP_COMMON:-/tmp}/.gnupg"   # snap-local keyring (confirmed by the GPG spike)
 
     local target; target="$(cfg target)"
     case "$sub" in
         backup)
             if [ -z "$target" ]; then
                 lprint "Backup not configured: set 'snap set ${SNAP_NAME} backup.target=<duplicity-url>'." >&2
-                exit 1
+                # Quiet success for the scheduled (daemonized) timer; error for a manual run.
+                if [ "${DAEMONIZED:-0}" -eq 1 ]; then exit 0; else exit 1; fi
             fi
             if ! has_backups; then
                 lprint "Nothing to back up in $(backup_dir) — enable ZUI's scheduled backups in its settings."
@@ -97,12 +98,17 @@ main() {
         restore)
             [ -n "$target" ] || { lprint "backup.target not set." >&2; exit 1; }
             local dest; dest="$(backup_dir)"; mkdir -p "$dest"
-            lprint "Restoring into ${dest}; you'll be prompted for your GPG key passphrase." >&2
+            if encryption_args 2>/dev/null | grep -q -- '--no-encryption'; then
+                lprint "Restoring into ${dest} (no encryption)." >&2
+            else
+                lprint "Restoring into ${dest}; you may be prompted for your GPG key passphrase." >&2
+            fi
             # shellcheck disable=SC2294
             eval "$(build_restore_cmd "$dest" "${2:-}")"
             lprint "Done. Now use ZUI's in-app restore (NVM / store) to recover." >&2
             ;;
         list)
+            [ -n "$target" ] || { lprint "backup.target not set." >&2; exit 1; }
             # shellcheck disable=SC2294
             eval "$(build_list_cmd)"
             ;;
