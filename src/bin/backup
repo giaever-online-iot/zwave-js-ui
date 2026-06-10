@@ -42,6 +42,23 @@ encryption_args() {            # echoes "--encrypt-key X" or "--no-encryption"; 
     fi
 }
 
+full_if_older() { local v; v=$(cfg full-if-older-than); echo "${v:-7D}"; }
+
+build_backup_cmd() {           # $1 source dir -> duplicity backup command string
+    printf 'duplicity %s --full-if-older-than %s --archive-dir %q %q %q' \
+        "$(encryption_args)" "$(full_if_older)" "$ARCHIVE_DIR" "$1" "$(cfg target)"
+}
+
+build_restore_cmd() {          # $1 dest dir [$2 time] -> duplicity restore command string
+    local timearg=""; [ -n "${2:-}" ] && timearg="--time ${2}"
+    printf 'duplicity restore %s %s --archive-dir %q %q %q' \
+        "$timearg" "$(encryption_args)" "$ARCHIVE_DIR" "$(cfg target)" "$1"
+}
+
+build_list_cmd() {             # -> duplicity collection-status command string
+    printf 'duplicity collection-status --archive-dir %q %q' "$ARCHIVE_DIR" "$(cfg target)"
+}
+
 main() {
     : # assembled in a later task
 }

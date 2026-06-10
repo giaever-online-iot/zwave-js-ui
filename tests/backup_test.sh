@@ -34,4 +34,17 @@ assert_eq "$(SNAPCTL_backup_encrypt=false encryption_args)"      "--no-encryptio
 encryption_args >/dev/null 2>&1; assert_status "$?" "2" "neither set -> refuse"
 assert_eq "$(SNAPCTL_backup_target=file:///b cfg target)" "file:///b" "cfg reads target"
 
+src="$SNAP_DATA/backups"
+b="$(SNAPCTL_backup_encrypt_key=KEY SNAPCTL_backup_target=file:///tgt SNAPCTL_backup_full_if_older_than=7D build_backup_cmd "$src")"
+assert_contains "$b" "duplicity"               "backup: duplicity"
+assert_contains "$b" "--encrypt-key KEY"       "backup: enc key"
+assert_contains "$b" "--full-if-older-than 7D" "backup: full-if-older"
+assert_contains "$b" "--archive-dir"           "backup: archive-dir"
+assert_contains "$b" "file:///tgt"             "backup: target"
+r="$(SNAPCTL_backup_encrypt_key=KEY SNAPCTL_backup_target=file:///tgt build_restore_cmd "$SNAP_DATA/restore")"
+assert_contains "$r" "duplicity restore"       "restore: verb"
+assert_contains "$r" "file:///tgt"             "restore: target"
+l="$(SNAPCTL_backup_target=file:///tgt build_list_cmd)"
+assert_contains "$l" "collection-status"       "list: verb"
+
 finish
