@@ -30,6 +30,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # snapcraft remote-build refuses shallow clones ("Remote builds for
+          # shallow cloned git repos are not supported"), so fetch full history.
+          fetch-depth: 0
 
       - name: Install snapcraft
         run: sudo snap install snapcraft --classic
