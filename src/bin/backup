@@ -65,7 +65,51 @@ has_backups() {                # status 0 if backup_dir exists and is non-empty
 }
 
 main() {
-    : # assembled in a later task
+    case "${1:-}" in -h|--help) usage; exit 0 ;; esac
+
+    require_root
+
+    local sub; sub="$(parse_sub "${1:-}")" || { usage >&2; exit 2; }
+
+    mkdir -p "$ARCHIVE_DIR"
+    export GNUPGHOME="${SNAP_COMMON}/.gnupg"   # snap-local keyring (confirmed by the GPG spike)
+
+    local target; target="$(cfg target)"
+    case "$sub" in
+        backup)
+            if [ -z "$target" ]; then
+                lprint "Backup not configured: set 'snap set ${SNAP_NAME} backup.target=<duplicity-url>'." >&2
+                exit 1
+            fi
+            if ! has_backups; then
+                lprint "Nothing to back up in $(backup_dir) — enable ZUI's scheduled backups in its settings."
+                exit 0
+            fi
+            if ! encryption_args >/dev/null 2>&1; then
+                lprint "Set 'backup.encrypt-key=<gpg-fpr>' or opt out with 'backup.encrypt=false'." >&2
+                exit 1
+            fi
+            # shellcheck disable=SC2294
+            eval "$(build_backup_cmd "$(backup_dir)")"
+            local keep; keep="$(cfg retention)"; keep="${keep:-3}"
+            duplicity remove-all-but-n-full "$keep" --force --archive-dir "$ARCHIVE_DIR" "$target" || true
+            ;;
+        restore)
+            [ -n "$target" ] || { lprint "backup.target not set." >&2; exit 1; }
+            local dest; dest="$(backup_dir)"; mkdir -p "$dest"
+            lprint "Restoring into ${dest}; you'll be prompted for your GPG key passphrase." >&2
+            # shellcheck disable=SC2294
+            eval "$(build_restore_cmd "$dest" "${2:-}")"
+            lprint "Done. Now use ZUI's in-app restore (NVM / store) to recover." >&2
+            ;;
+        list)
+            # shellcheck disable=SC2294
+            eval "$(build_list_cmd)"
+            ;;
+        status)
+            lprint "target=$(cfg target) dir=$(backup_dir) encrypt-key=$(cfg encrypt-key)"
+            ;;
+    esac
 }
 
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
