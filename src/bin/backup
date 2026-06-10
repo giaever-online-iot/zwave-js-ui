@@ -94,8 +94,11 @@ cmd_import_key() {
     local tmp; tmp="$(mktemp "${SNAP_COMMON:-/tmp}/.import-key.XXXXXX")"
     trap 'rm -f "$tmp"' RETURN
     cat > "$tmp"
-    local fpr; fpr="$(gpg --homedir "$GNUPGHOME" --show-keys --with-colons "$tmp" 2>/dev/null | first_fpr)"
-    if ! gpg --homedir "$GNUPGHOME" --import "$tmp"; then
+    # --no-autostart: importing a PUBLIC key needs no gpg-agent; without this, gpg tries
+    # to autostart the (base-path, absent-in-snap) agent and exits non-zero even though
+    # the import succeeded. See the gpg-agent packaging note for the secret-key paths.
+    local fpr; fpr="$(gpg --no-autostart --homedir "$GNUPGHOME" --show-keys --with-colons "$tmp" 2>/dev/null | first_fpr)"
+    if ! gpg --no-autostart --homedir "$GNUPGHOME" --import "$tmp"; then
         lprint "Key import failed — backup.encrypt-key not changed." >&2
         return 1
     fi
