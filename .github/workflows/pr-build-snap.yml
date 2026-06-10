@@ -74,19 +74,25 @@ jobs:
       # remote-build writes its detailed error (e.g. the BadRequest reason) only to a
       # log file on the runner, which is otherwise lost. Surface it when no snap built.
       - name: Dump snapcraft log on build failure
+        id: sclog
         if: ${{ always() && steps.build.outputs.snaps == '0' }}
         run: |
           shopt -s nullglob
           logs=( ~/.local/state/snapcraft/log/*.log ~/.cache/snapcraft/log/*.log )
+          tail_file="${RUNNER_TEMP}/snapcraft-log-tail.txt"; : > "$tail_file"
           if [ ${#logs[@]} -eq 0 ]; then
-            echo "(no snapcraft log files found)"
+            echo "(no snapcraft log files found)" | tee -a "$tail_file"
           else
             for f in "${logs[@]}"; do
               echo "::group::${f}"
               cat "$f"
               echo "::endgroup::"
+              { echo "===== ${f} ====="; cat "$f"; } >> "$tail_file"
             done
           fi
+          # Keep only the last 50 KB for the PR comment (well under GitHub's ~65 KB limit).
+          tail -c 50000 "$tail_file" > "${tail_file}.cut" && mv "${tail_file}.cut" "$tail_file"
+          echo "tail_file=${tail_file}" >> "$GITHUB_OUTPUT"
 
       - name: Ensure version track exists
         if: ${{ steps.build.outputs.snaps != '0' && github.event_name == 'pull_request' }}
@@ -159,12 +165,20 @@ jobs:
         env:
           BODY: ${{ steps.release.outputs.comment }}
           BUILT: ${{ steps.build.outputs.snaps }}
+          SCLOG_FILE: ${{ steps.sclog.outputs.tail_file }}
         with:
           script: |
+            const fs = require('fs');
             const marker = '<!-- pr-build-snap -->';
-            const text = (!process.env.BUILT || process.env.BUILT === '0' || !process.env.BODY)
+            const failed = (!process.env.BUILT || process.env.BUILT === '0' || !process.env.BODY);
+            let text = failed
               ? '❌ Build produced no snaps (or a preceding step failed). Check the Action logs.'
               : process.env.BODY;
+            // On failure, fold the captured snapcraft log (last 50 KB) into the comment.
+            if (failed && process.env.SCLOG_FILE && fs.existsSync(process.env.SCLOG_FILE)) {
+              const log = fs.readFileSync(process.env.SCLOG_FILE, 'utf8');
+              text += `\n\n<details>\n<summary>snapcraft log (last 50 KB)</summary>\n\n\`\`\`text\n${log}\n\`\`\`\n\n</details>`;
+            }
             const body = `${marker}\n${text}`;
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
