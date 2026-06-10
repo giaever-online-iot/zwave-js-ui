@@ -3,9 +3,8 @@
 source $SNAP/helper/functions
 
 require_root
-plugs_connected
 
-if [ $? -ne 0 ]; then
+if ! plugs_connected; then
     echo "Failed to enable ${SNAP_NAME} service!" >&2
     echo ""
     echo "Consult the help command:" >&2
@@ -16,9 +15,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"
-
-if [ $? -eq 0 ]; then
+if snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"; then
     echo "Service enabled!"
     echo "- If you have turned OFF «log to file», follow logs with:"
     echo "  $ snap logs ${SNAP_NAME} -f"

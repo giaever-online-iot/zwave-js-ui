@@ -7,8 +7,8 @@ if [ -z "${DAEMONIZED}" ]; then
 fi
 
 function lprint {
-    if [ ${DAEMONIZED} -eq 0 ]; then
-        echo ${1}
+    if [ "${DAEMONIZED}" -eq 0 ]; then
+        echo "${1}"
     else
         logger "${SNAP_NAME}: ${1}"
     fi
@@ -37,18 +37,15 @@ function plugs_connected {
     SERIAL_OUT=$(plug_connected "serial-port")
     SERIAL_RES=$?
 
-    if [ $RAW_RES -ne 0 -a $SERIAL_RES -ne 0 ]; then
-        lprint $RAW_OUT
+    if [ "$RAW_RES" -ne 0 ] && [ "$SERIAL_RES" -ne 0 ]; then
+        lprint "$RAW_OUT"
         lprint "----- OR -----"
-        lprint $SERIAL_OUT
+        lprint "$SERIAL_OUT"
         lprint "See ${SNAP_NAME}.help for more info on the serial-port plug"
         MISSING=1
     fi
 
-    plug_connected "hardware-observe"
-    if [ $? -ne 0 ]; then
-        MISSING=1
-    fi
+    plug_connected "hardware-observe" || MISSING=1
 
     if [ $MISSING -ne 0 ]; then
         return 1
@@ -57,16 +54,8 @@ function plugs_connected {
     return 0
 }
 
-function is_root {
-    if [ ${EUID:-$(id -u)} -eq 0 ]; then
-        return 0
-    fi
-    return 1
-}
-
 function require_root {
-    is_root
-    if [ $? -eq 1 ]; then
+    if [ "${EUID:-$(id -u)}" -ne 0 ]; then
         lprint "Running as root is required." >&2
         lprint "Re-run with sudo."
         exit 1
@@ -94,8 +83,8 @@ function zui_settings_file {
 
 function test_perm {
     read -r F
-    test -${1:-r} "${F}" && (echo "${F}" && return 0) || (echo "${F}" && return 1)
-    return $?
+    echo "${F}"
+    test "-${1:-r}" "${F}"
 }
 
 function set_device_priority_dir {
@@ -141,8 +130,8 @@ function test_default_config {
     testnset_config "server.ssl" false
     testnset_config "server.force-disable-ssl" false
 
-    testnset_config "session.cookie-secure" $(snapctl get server.ssl)
-    testnset_config "session.secret" $(uuid)
+    testnset_config "session.cookie-secure" "$(snapctl get server.ssl)"
+    testnset_config "session.secret" "$(uuid)"
 
     testnset_config "mqtt.name" ""
 

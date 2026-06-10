@@ -4,9 +4,6 @@ source $SNAP/helper/functions
 
 require_root
 
-plugs_connected
-if [ $? -ne 0 ]; then
-    exit 1
-fi
+plugs_connected || exit 1
 
 snapctl restart "${SNAP_NAME}.${SNAP_NAME}"

@@ -13,13 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: shellcheck (logs command)
-        # Scoped to the new command at warning severity for now. The pre-existing
-        # scripts (functions/env-wrapper/hooks) carry known audit issues and get added
-        # to this lint in a later audit-cleanup PR.
+      - name: shellcheck
+        # All snap scripts + the test harness, at warning severity (-x follows sourced
+        # files). Verified clean after the simplification-audit cleanup.
         run: |
           sudo apt-get update && sudo apt-get install -y shellcheck
-          shellcheck --severity=warning src/bin/logs
+          shellcheck --severity=warning -x src/bin/* src/hooks/* src/helper/* tests/*.sh tests/lib/*.sh
       - name: Install yq
         run: sudo snap install yq
       - name: Unit tests

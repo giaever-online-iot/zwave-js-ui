@@ -73,9 +73,8 @@ Snap users set config with `snap set zwave-js-ui server.host=0.0.0.0` (namespace
 ### Snap lifecycle hooks (`src/hooks/`, organized into `snap/hooks` at build)
 
 - `configure` — validates `server.port`/`server.ssl`/`session.cookie-secure` types, seeds defaults, restarts the service. Runs on every `snap set`.
-- `install` / `post-refresh` — seed defaults; `install` honors a `$SNAP_DATA/.install.hook.service` sentinel file to decide enable/disable (defaults to disabled).
+- `install` / `post-refresh` — seed defaults; `install` then disables the daemon by default (the user enables it explicitly with `zwave-js-ui.enable`).
 - `pre-refresh` — runs `test_device_priority_dir` (rewrites stale `deviceConfigPriorityDir` paths that embedded the old revision number) and clears the external-config `devices/index.json` so it rebuilds.
-- `disconnect-slot-store-dir` — re-enables the service when the `store-dir` content slot is disconnected.
 
 ### User commands (`src/bin/`)
 

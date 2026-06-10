@@ -7,25 +7,27 @@ SERVER_SSL=$(snapctl get server.ssl)
 SERVER_PORT=$(snapctl get server.port)
 COOKIE_SECURE=$(snapctl get session.cookie-secure)
 
-if [ $(echo "${SERVER_PORT}" | grep -E "^\-?[0-9]+$") = "" ]; then
+if ! [[ "${SERVER_PORT}" =~ ^-?[0-9]+$ ]]; then
     echo "!! server.port must be numeric, got ${SERVER_PORT}" >&2
     exit 1
 fi
 
-if [ ${SERVER_SSL} != true -a ${SERVER_SSL} != false ]; then
+if [ "${SERVER_SSL}" != true ] && [ "${SERVER_SSL}" != false ]; then
     echo "!! server.ssl must be boolean value" >&2
     exit 1
 fi
 
-if [ ${COOKIE_SECURE} != true -a ${COOKIE_SECURE} != false ]; then
+if [ "${COOKIE_SECURE}" != true ] && [ "${COOKIE_SECURE}" != false ]; then
     echo "!! session.cookie-secure must be boolean value" >&2
     exit 1
 fi
 
 test_default_config
 
+# NB: keep `grep … | wc -l`, not `grep -c` — under `set -e`, grep -c exits 1 when the
+# count is 0 (service active, no inactive lines) and would abort the hook.
 RUNNING=$(snapctl services | grep "${SNAP_NAME}" | grep inactive | wc -l)
-if [ ${RUNNING} -eq 0 ]; then
+if [ "${RUNNING}" -eq 0 ]; then
     echo "Restarting ${SNAP_NAME}"
     snapctl restart "${SNAP_NAME}"
 fi
