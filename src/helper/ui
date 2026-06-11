@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# ui — gum-backed uniform terminal UI library. The ONLY place gum is invoked.
+# Source AFTER helper/functions (needs lprint). Rendering degrades by context:
+#   syslog: DAEMONIZED=1                           -> lprint only, never styled
+#   plain:  no TTY / NO_COLOR / TERM=dumb / no gum -> plain text, zero ANSI bytes
+#   styled: TTY + gum                              -> gum rendering, widgets allowed
+# Wording is identical across contexts; only the prefix glyphs differ
+# (styled ✓/!/✗ vs plain OK:/WARN:/ERROR:) so docs can quote one canonical text.
+# Test overrides: UI_GUM (gum path), UI_ASSUME_TTY=1 (treat stdin+stdout as TTY).
+
+UI_GUM="${UI_GUM:-${SNAP:-}/bin/gum}"
+
+ui_ctx() {                     # -> syslog | plain | styled
+    if [ "${DAEMONIZED:-0}" -eq 1 ]; then echo syslog; return; fi
+    if [ -n "${NO_COLOR:-}" ] || [ "${TERM:-}" = dumb ]; then echo plain; return; fi
+    if [ "${UI_ASSUME_TTY:-0}" -ne 1 ] && [ ! -t 1 ]; then echo plain; return; fi
+    if [ ! -x "$UI_GUM" ]; then echo plain; return; fi
+    echo styled
+}
+
+ui_interactive() {             # widgets additionally need stdin to be a terminal
+    [ "$(ui_ctx)" = styled ] && { [ "${UI_ASSUME_TTY:-0}" -eq 1 ] || [ -t 0 ]; }
+}
+
+ui_print() {                   # one plain line, routed per context
+    if [ "$(ui_ctx)" = syslog ]; then lprint "$*"; else printf '%s\n' "$*"; fi
+}
+
+ui_header() {                  # $1 title, $2 optional subtitle
+    local text="$1${2:+ · $2}"
+    case "$(ui_ctx)" in
+        styled) "$UI_GUM" style --border rounded --padding "0 2" --border-foreground 6 "$text" ;;
+        *)      ui_print "== $text ==" ;;
+    esac
+}
+
+ui_ok() {
+    case "$(ui_ctx)" in
+        styled) "$UI_GUM" style --foreground 2 "✓ $*" ;;
+        *)      ui_print "OK: $*" ;;
+    esac
+}
+
+ui_warn() {
+    case "$(ui_ctx)" in
+        styled) "$UI_GUM" style --foreground 3 "! $*" >&2 ;;
+        *)      ui_print "WARN: $*" >&2 ;;
+    esac
+}
+
+ui_err() {
+    case "$(ui_ctx)" in
+        styled) "$UI_GUM" style --foreground 1 "✗ $*" >&2 ;;
+        *)      ui_print "ERROR: $*" >&2 ;;
+    esac
+}

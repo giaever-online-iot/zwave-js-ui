@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Test shim: bin scripts `source "$SNAP/helper/ui"`; under test $SNAP is tests/fixtures,
+# so load the REAL library from src/.
+source "$(dirname "${BASH_SOURCE[0]}")/../../../src/helper/ui"

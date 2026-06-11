@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Fake gum for unit tests: records argv to $GUM_LOG, emits canned results via GUM_* env.
+[ -n "${GUM_LOG:-}" ] && printf '%s\n' "$*" >> "$GUM_LOG"
+cmd="${1:-}"; shift || true
+case "$cmd" in
+    choose)  printf '%s\n' "${GUM_CHOOSE:?GUM_CHOOSE not set}" ;;
+    input)   printf '%s\n' "${GUM_INPUT:?GUM_INPUT not set}" ;;
+    confirm) exit "${GUM_CONFIRM:-0}" ;;
+    spin)    while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do shift; done; shift; "$@" ;;
+    table)   sed 's/^/[table] /' ;;
+    format)  sed 's/^/[format] /' ;;
+    style)   for a in "$@"; do :; done; printf '[style] %s\n' "${a:-}" ;;
+    *)       exit 64 ;;
+esac
