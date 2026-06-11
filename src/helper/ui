@@ -111,3 +111,47 @@ ui_usage() {                   # stdin: usage text (readable raw; light markdown
         *)      cat ;;
     esac
 }
+
+ui_choose() {                  # $1 prompt, $2 no-TTY hint, $3.. items -> echoes selection; 2 if not interactive
+    local prompt="$1" hint="$2"; shift 2
+    if ui_interactive; then
+        "$UI_GUM" choose --header "$prompt" "$@"
+    else
+        ui_err "no TTY — $hint"
+        return 2
+    fi
+}
+
+ui_input() {                   # [--password] $1 prompt -> echoes value; piped stdin honored; 2 if nothing to read
+    local pw=()
+    if [ "${1:-}" = "--password" ]; then pw=(--password); shift; fi
+    if ui_interactive; then
+        "$UI_GUM" input "${pw[@]}" --header "$1"
+    elif [ ! -t 0 ]; then
+        local v; IFS= read -r v || return 2
+        printf '%s\n' "$v"
+    else
+        return 2
+    fi
+}
+
+ui_confirm() {                 # $1 question -> 0 yes / 1 no / 2 cannot ask. Default is NO everywhere.
+    if ui_interactive; then
+        "$UI_GUM" confirm --default=false "$1"
+    elif [ ! -t 0 ]; then
+        local a; IFS= read -r a || a=""
+        case "$a" in y|Y|yes|YES) return 0 ;; *) return 1 ;; esac
+    else
+        return 2
+    fi
+}
+
+ui_spin() {                    # $1 title, rest: command — spinner when styled, plain title otherwise
+    local title="$1"; shift
+    if [ "$(ui_ctx)" = styled ]; then
+        "$UI_GUM" spin --spinner dot --title "$title" --show-output -- "$@"
+    else
+        ui_print "$title"
+        "$@"
+    fi
+}

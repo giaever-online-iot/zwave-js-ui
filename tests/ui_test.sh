@@ -79,4 +79,34 @@ assert_contains "$out" "2"     "kv: last value"
 assert_eq "$(printf 'Usage: x\n' | ui_usage)" "Usage: x" "usage plain: cat"
 assert_contains "$(printf 'Usage: x\n' | UI_ASSUME_TTY=1 ui_usage)" "[format] Usage: x" "usage styled via gum format"
 
+# --- ui_choose --------------------------------------------------------------
+export GUM_CHOOSE=zui      # exported: the stub gum runs as a child process
+sel="$(UI_ASSUME_TTY=1 ui_choose 'Follow which logs?' 'pass a stream' all zui zwjs)"
+assert_eq "$sel" "zui" "choose returns gum selection"
+assert_contains "$(tail -1 "$GUM_LOG")" "choose --header Follow which logs? all zui zwjs" "choose argv recorded"
+
+ui_choose 'P' 'pass a stream: x.logs zui' a b >/dev/null 2>&1
+assert_status "$?" "2" "choose without TTY -> exit 2"
+assert_contains "$(ui_choose 'P' 'pass a stream: x.logs zui' a b 2>&1 >/dev/null)" "pass a stream: x.logs zui" "choose no-TTY hint"
+
+# --- ui_input ----------------------------------------------------------------
+export GUM_INPUT=Joachim   # exported: the stub gum runs as a child process
+assert_eq "$(UI_ASSUME_TTY=1 ui_input 'Real name')" "Joachim" "input via gum"
+assert_eq "$(printf 'piped-val\n' | ui_input 'Real name')" "piped-val" "input reads piped stdin without TTY"
+assert_eq "$(printf 'sec\n' | ui_input --password 'Passphrase')" "sec" "password input reads piped stdin"
+
+# --- ui_confirm ----------------------------------------------------------------
+GUM_CONFIRM=0 UI_ASSUME_TTY=1 ui_confirm 'Sure?'; assert_status "$?" "0" "confirm yes via gum"
+GUM_CONFIRM=1 UI_ASSUME_TTY=1 ui_confirm 'Sure?'; assert_status "$?" "1" "confirm no via gum"
+printf 'y\n' | ui_confirm 'Sure?'; assert_status "$?" "0" "piped y -> yes"
+printf 'nah\n' | ui_confirm 'Sure?'; assert_status "$?" "1" "piped other -> no"
+ui_confirm 'Sure?' < /dev/null; assert_status "$?" "1" "EOF stdin -> no (safe default)"
+
+# --- ui_spin ----------------------------------------------------------------
+out="$(ui_spin 'Working…' echo ran)"
+assert_contains "$out" "Working…" "spin plain prints title"
+assert_contains "$out" "ran"      "spin plain runs command"
+assert_eq "$(UI_ASSUME_TTY=1 ui_spin 'W' echo ran)" "ran" "spin styled execs via stub"
+ui_spin 'W' false; assert_status "$?" "1" "spin propagates command status"
+
 finish
