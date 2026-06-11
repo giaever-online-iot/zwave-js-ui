@@ -136,7 +136,7 @@ jobs:
           IFS=',' read -ra WANT <<< "${{ steps.meta.outputs.archs }}"
           uploaded=(); missing=()
           for arch in "${WANT[@]}"; do
-            # Matches name_version_arch.snap (snapcraft 8.x / core24) — '*' also tolerates name_arch.snap.
+            # Matches name_version_arch.snap (snapcraft 8.14+ / core26) — '*' also tolerates name_arch.snap.
             f="$(ls -1 "${SNAP_NAME}"*"${arch}".snap 2>/dev/null | head -n1 || true)"
             if [ -z "$f" ]; then echo "missing snap for $arch"; missing+=("$arch"); continue; fi
             echo "Uploading $f -> $CHAN"
