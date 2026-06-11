@@ -67,6 +67,7 @@ ui_err() {
 }
 
 ui_align() {                   # stdin: TAB-separated rows -> two-space aligned columns (pure)
+                               # column width is byte-based (mawk length) — ASCII-only alignment
     awk -F'\t' '
         { for (i=1; i<=NF; i++) { if (length($i) > w[i]) w[i] = length($i); c[NR,i] = $i } n[NR] = NF }
         END { for (r=1; r<=NR; r++) { line = ""
@@ -76,6 +77,7 @@ ui_align() {                   # stdin: TAB-separated rows -> two-space aligned 
 
 # shellcheck disable=SC2120  # called with args from ui_kv and external scripts
 ui_table() {                   # stdin: TAB-separated rows; args: optional column headers
+                               # headers must not contain commas (gum --columns delimiter)
     local cols
     case "$(ui_ctx)" in
         styled)
@@ -94,6 +96,7 @@ ui_table() {                   # stdin: TAB-separated rows; args: optional colum
 }
 
 ui_kv() {                      # args: key value [key value]... -> 2-column table
+                               # an odd trailing argument is ignored
     local out="" k v
     while [ "$#" -ge 2 ]; do
         k="$1"; v="$2"; shift 2
