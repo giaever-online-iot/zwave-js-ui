@@ -30,7 +30,11 @@ ui_ctx() {                     # [$1 output fd, default 1] -> syslog | plain | s
 # Returns non-zero when not interactive — under `set -e` call it ONLY as a
 # condition (`if ui_interactive`, `ui_interactive || …`), never as a bare statement.
 ui_interactive() {             # widgets additionally need stdin to be a terminal
-    [ "$(ui_ctx)" = styled ] && { [ "${UI_ASSUME_TTY:-0}" -eq 1 ] || [ -t 0 ]; }
+    [ "$(ui_ctx)" = styled ] || return 1
+    if [ -n "${UI_TTY_FDS:-}" ]; then
+        case " ${UI_TTY_FDS} " in *" 0 "*) return 0 ;; *) return 1 ;; esac
+    fi
+    [ "${UI_ASSUME_TTY:-0}" = 1 ] || [ -t 0 ]
 }
 
 ui_print() {                   # one plain line, routed per context
@@ -112,21 +116,29 @@ ui_usage() {                   # stdin: usage text (readable raw; light markdown
     esac
 }
 
-ui_choose() {                  # $1 prompt, $2 no-TTY hint, $3.. items -> echoes selection; 2 if not interactive
+ui_choose() {                  # $1 prompt, $2 no-TTY hint, $3.. items -> echoes selection; 2 if not interactive/Ctrl-C/abort
     local prompt="$1" hint="$2"; shift 2
     if ui_interactive; then
         "$UI_GUM" choose --header "$prompt" "$@"
+        local rc=$?
+        [ "$rc" = 130 ] && return 2
+        return "$rc"
     else
         ui_err "no TTY — $hint"
         return 2
     fi
 }
 
-ui_input() {                   # [--password] $1 prompt -> echoes value; piped stdin honored; 2 if nothing to read
+ui_input() {                   # [--password] $1 prompt -> echoes value; piped stdin honored; 2 if nothing to read/Ctrl-C/abort
+                               # non-interactive path consumes ONE line of stdin — never call it in a
+                               # pipeline whose stdin carries data for a later command
     local pw=()
     if [ "${1:-}" = "--password" ]; then pw=(--password); shift; fi
     if ui_interactive; then
         "$UI_GUM" input "${pw[@]}" --header "$1"
+        local rc=$?
+        [ "$rc" = 130 ] && return 2
+        return "$rc"
     elif [ ! -t 0 ]; then
         local v; IFS= read -r v || return 2
         printf '%s\n' "$v"
@@ -135,9 +147,12 @@ ui_input() {                   # [--password] $1 prompt -> echoes value; piped s
     fi
 }
 
-ui_confirm() {                 # $1 question -> 0 yes / 1 no / 2 cannot ask. Default is NO everywhere.
+ui_confirm() {                 # $1 question -> 0 yes / 1 no / 2 cannot ask/Ctrl-C/abort. Default is NO everywhere.
     if ui_interactive; then
         "$UI_GUM" confirm --default=false "$1"
+        local rc=$?
+        [ "$rc" = 130 ] && return 2
+        return "$rc"
     elif [ ! -t 0 ]; then
         local a; IFS= read -r a || a=""
         case "$a" in y|Y|yes|YES) return 0 ;; *) return 1 ;; esac

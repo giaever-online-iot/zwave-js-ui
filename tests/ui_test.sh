@@ -109,4 +109,14 @@ assert_contains "$out" "ran"      "spin plain runs command"
 assert_eq "$(UI_ASSUME_TTY=1 ui_spin 'W' echo ran)" "ran" "spin styled execs via stub"
 ui_spin 'W' false; assert_status "$?" "1" "spin propagates command status"
 
+# --- ui_interactive: UI_TTY_FDS must list fd 0 for widgets -------------------
+assert_eq "$(UI_TTY_FDS='0 1' ui_interactive; echo $?)" "0" "UI_TTY_FDS with fd 0 -> interactive"
+assert_eq "$(UI_TTY_FDS='1' ui_interactive; echo $?)" "1" "UI_TTY_FDS without fd 0 -> not interactive"
+
+# --- Ctrl-C (gum exit 130) is normalized to the library's "2 = cannot ask/aborted"
+GUM_ABORT=1 UI_ASSUME_TTY=1 ui_choose 'P' 'hint' a b >/dev/null 2>&1; assert_status "$?" "2" "choose: ctrl-c -> 2"
+GUM_ABORT=1 UI_ASSUME_TTY=1 ui_input 'P' >/dev/null 2>&1;            assert_status "$?" "2" "input: ctrl-c -> 2"
+GUM_ABORT=1 UI_ASSUME_TTY=1 ui_confirm 'P' >/dev/null 2>&1;          assert_status "$?" "2" "confirm: ctrl-c -> 2"
+GUM_CONFIRM=1 UI_ASSUME_TTY=1 ui_confirm 'P'; assert_status "$?" "1" "confirm: plain no still 1"
+
 finish

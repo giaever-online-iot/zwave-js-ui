@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Fake gum for unit tests: records argv to $GUM_LOG, emits canned results via GUM_* env.
 [ -n "${GUM_LOG:-}" ] && printf '%s\n' "$*" >> "$GUM_LOG"
+[ -n "${GUM_ABORT:-}" ] && exit 130
 cmd="${1:-}"; shift || true
 case "$cmd" in
     choose)  printf '%s\n' "${GUM_CHOOSE:?GUM_CHOOSE not set}" ;;
