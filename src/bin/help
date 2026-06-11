@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# help — uniform overview: status, settings, commands. Replaces env-wrapper --help.
+: "${SNAP:?SNAP must be set}"
+source "$SNAP/helper/functions"
+source "$SNAP/helper/ui"
+source "$SNAP/helper/catalog"
+
+snap_version() { yq eval '.version' "$SNAP/meta/snap.yaml"; }
+
+service_state() {              # "enabled active", "disabled inactive", or "unknown"
+    local line
+    line="$(snapctl services "$SNAP_NAME.$SNAP_NAME" 2>/dev/null | awk 'NR==2 { print $2 " " $3 }')"
+    echo "${line:-unknown}"
+}
+
+settings_rows() {              # catalog + live values -> TSV: key, value, default, description
+    local key def desc cur
+    while IFS=$'\t' read -r key _ def desc; do
+        cur="$(snapctl get "$key" 2>/dev/null)"
+        [ "$key" = "session.secret" ] && [ -n "$cur" ] && cur="(hidden)"
+        printf '%s\t%s\t%s\t%s\n' "$key" "${cur:-(unset)}" "$def" "$desc"
+    done < <(settings_catalog)
+}
+
+commands_rows() {
+    printf '%s\n' \
+        "$SNAP_NAME.enable	daemonize the service (autostart)" \
+        "$SNAP_NAME.disable	stop + de-daemonize the service" \
+        "$SNAP_NAME.restart	restart the service" \
+        "$SNAP_NAME.exec	run the app in the foreground (debug boot issues)" \
+        "$SNAP_NAME.logs [zui|zwjs]	follow live logs (merged by default)" \
+        "$SNAP_NAME.backup …	ship backups off-box; see $SNAP_NAME.backup --help" \
+        "$SNAP_NAME.help	this overview"
+}
+
+main() {
+    plugs_connected || ui_warn "Required interfaces are not connected — see the commands above."
+    ui_header "$SNAP_NAME" "$(snap_version) · $(service_state)"
+    echo
+    ui_print "The daemon is DISABLED by default after install. Enable it with:"
+    ui_print "  sudo $SNAP_NAME.enable"
+    echo
+    settings_rows | ui_table "setting" "value" "default" "description"
+    echo
+    ui_print "Set options with:  sudo snap set $SNAP_NAME <key>=<value>"
+    ui_print "Other settings live in the web UI after start."
+    echo
+    commands_rows | ui_table "command" "description"
+    echo
+    ui_print "serial-port plug (needs snapd's experimental hotplug):"
+    ui_print "  sudo snap set system experimental.hotplug=true && sudo systemctl restart snapd"
+    ui_print "  sudo snap interface serial-port            # list available slots"
+    ui_print "  sudo snap connect $SNAP_NAME:serial-port <slot name>"
+}
+
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi

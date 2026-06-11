@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# catalog — single source of truth for user-settable snap config.
+# TAB-separated rows: key, type, default, description. Drives the help settings
+# table now and the phase-2 navigator later. Defaults must stay in sync with
+# test_default_config (helper/functions) and the backup defaults (bin/backup).
+settings_catalog() {
+	cat <<'EOF'
+server.host	string	0.0.0.0	IP address the web UI binds to
+server.port	int	8091	Port for the web UI
+server.ssl	bool	false	Serve the web UI over HTTPS
+server.force-disable-ssl	bool	false	Force-disable SSL even when enabled
+session.secret	string	(generated)	Session secret (a UUID is generated on install)
+session.cookie-secure	bool	(= server.ssl)	Secure session cookie (see expressjs/session#cookiesecure)
+mqtt.name	string	(empty)	Client name when connecting to the MQTT broker
+timezone	string	Europe/Oslo	Timezone exported to the app as TZ
+backup.target	string	(unset)	Duplicity target URL for off-box backups
+backup.dir	string	$SNAP_DATA/backups	Directory shipped by the backup command
+backup.encrypt	bool	(unset)	Set false to opt out of backup encryption
+backup.encrypt-key	string	(unset)	GPG fingerprint backups are encrypted to
+backup.full-if-older-than	string	7D	Force a full backup after this age
+backup.retention	int	3	Full backup chains kept on the target
+EOF
+}
+
+catalog_keys() { settings_catalog | cut -f1; }
