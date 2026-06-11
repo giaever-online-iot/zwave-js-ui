@@ -4,6 +4,9 @@
 source "$SNAP/helper/functions"
 
 ARCHIVE_DIR="${SNAP_COMMON:-/tmp}/duplicity-cache"
+# core26 ships no Python in the base: duplicity is pip-installed into the snap and runs
+# on the snap-staged interpreter, invoked explicitly with -m so no shebang is consulted.
+DUP_PY="$SNAP/usr/bin/python3"
 
 # ---- pure helpers (unit-tested) added by later tasks ----
 
@@ -118,7 +121,7 @@ cmd_import_key() {
 # backup.encrypt-key to it. The private key stays in the snap keyring until `export-key`
 # moves it off. Prompts for the full UID (name, email, optional comment) and a passphrase.
 # Ensure the snap-staged gpg-agent is running against $GNUPGHOME. gpg can't autostart it
-# (gpgconf reports bindir=/usr/bin — the core24 base, no agent there — not $SNAP), so we
+# (gpgconf reports bindir=/usr/bin — the base, no agent there — not $SNAP), so we
 # launch the staged binary ourselves; gpg --no-autostart then connects via its socket.
 # Required for secret-key ops (generate, export-secret, decrypt). No-op if already up.
 ensure_agent() {
@@ -247,8 +250,8 @@ build_backup_cmd() {           # $1 source dir -> duplicity backup command strin
     # snap revision (e.g. .../x4/backups). snapd copies it forward on refresh, so the
     # path changes between revisions for the SAME logical backup; without this flag
     # duplicity aborts with "Backup source directory has changed" after every refresh.
-    printf 'duplicity %s --allow-source-mismatch --full-if-older-than %s --archive-dir %q %q %q' \
-        "$(encryption_args)" "$(full_if_older)" "$ARCHIVE_DIR" "$1" "$(cfg target)"
+    printf '%q -m duplicity backup %s --allow-source-mismatch --full-if-older-than %s --archive-dir %q %q %q' \
+        "$DUP_PY" "$(encryption_args)" "$(full_if_older)" "$ARCHIVE_DIR" "$1" "$(cfg target)"
 }
 
 build_restore_cmd() {          # $1 dest dir [$2 time] -> duplicity restore command string
@@ -256,12 +259,13 @@ build_restore_cmd() {          # $1 dest dir [$2 time] -> duplicity restore comm
     # the staged one via ensure_agent and tell duplicity's gpg not to autostart the
     # base-path agent (which doesn't exist in the snap) — it connects via the socket.
     local timearg=""; [ -n "${2:-}" ] && timearg=$(printf -- '--time %q' "${2}")
-    printf 'duplicity restore %s %s --gpg-options=--no-autostart --archive-dir %q %q %q' \
-        "$timearg" "$(encryption_args)" "$ARCHIVE_DIR" "$(cfg target)" "$1"
+    printf '%q -m duplicity restore %s %s --gpg-options=--no-autostart --archive-dir %q %q %q' \
+        "$DUP_PY" "$timearg" "$(encryption_args)" "$ARCHIVE_DIR" "$(cfg target)" "$1"
 }
 
 build_list_cmd() {             # -> duplicity collection-status command string
-    printf 'duplicity collection-status %s --archive-dir %q %q' "$(encryption_args)" "$ARCHIVE_DIR" "$(cfg target)"
+    printf '%q -m duplicity collection-status %s --archive-dir %q %q' \
+        "$DUP_PY" "$(encryption_args)" "$ARCHIVE_DIR" "$(cfg target)"
 }
 
 has_backups() {                # status 0 if backup_dir exists and is non-empty
@@ -284,9 +288,9 @@ main() {
     require_root
     mkdir -p "$ARCHIVE_DIR"
     export GNUPGHOME="${SNAP_COMMON:-/tmp}/.gnupg"   # snap-local keyring (confirmed by the GPG spike)
-    # duplicity is a Python app staged under $SNAP; core24's interpreter does not
-    # search $SNAP for modules, so its `import duplicity` fails without this
-    # (verified on-device: import works only with dist-packages on PYTHONPATH).
+    # duplicity is pip-installed (--no-deps) into $SNAP/usr/lib/python3/dist-packages,
+    # next to its deb-staged runtime deps. The staged interpreter finds that path via
+    # its own prefix; keep PYTHONPATH as belt-and-braces for any other entry point.
     export PYTHONPATH="$SNAP/usr/lib/python3/dist-packages${PYTHONPATH:+:$PYTHONPATH}"
 
     local target; target="$(cfg target)"
@@ -311,7 +315,7 @@ main() {
                 exit 1
             fi
             local keep; keep="$(cfg retention)"; keep="${keep:-3}"
-            duplicity remove-all-but-n-full "$keep" --force --archive-dir "$ARCHIVE_DIR" "$target" || true
+            "$DUP_PY" -m duplicity remove-all-but-n-full "$keep" --force --archive-dir "$ARCHIVE_DIR" "$target" || true
             ;;
         restore)
             [ -n "$target" ] || { lprint "backup.target not set." >&2; exit 1; }
