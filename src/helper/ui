@@ -87,10 +87,7 @@ ui_table() {                   # stdin: TAB-separated rows; args: optional colum
             fi ;;
         *)
             {
-                if [ "$#" -gt 0 ]; then
-                    local hdr_ifs=$'\t'
-                    IFS="$hdr_ifs" printf '%s\n' "$*"
-                fi
+                if [ "$#" -gt 0 ]; then local IFS=$'\t'; printf '%s\n' "$*"; fi
                 cat
             } | ui_align ;;
     esac

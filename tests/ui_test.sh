@@ -65,6 +65,10 @@ assert_contains "$out" "k2"    "table plain: data row"
 printf '%s' "$out" | grep -q "$(printf '\033')"
 assert_status "$?" "1" "table plain: zero ANSI"
 
+# Header must be TAB-joined so ui_align sees N columns: with data wider than
+# the header, the header's second column must align with the data's second.
+assert_eq "$(printf 'wide-key\tv\n' | ui_table k h)" "$(printf 'k         h\nwide-key  v')" "table plain: header is tab-joined and aligned"
+
 assert_contains "$(printf 'k\tv\n' | UI_ASSUME_TTY=1 ui_table key value)" "[table]" "table styled via gum"
 
 out="$(ui_kv alpha 1 beta 2)"
