@@ -12,14 +12,15 @@ DUP_PY="$SNAP/usr/bin/python3"
 
 usage() {
     cat <<EOF
-Usage: ${SNAP_NAME}.backup [restore [<time>] | list | status | pick-key [<fpr>] | import-key | create-key | export-key]
+Usage: ${SNAP_NAME}.backup [restore [<time>] | list | status | list-keys | pick-key [<fpr>] | import-key | create-key | export-key]
 
   (no arg)    ship ZUI's backups now (incremental; full if older than threshold)
   restore     fetch+decrypt the latest backup back into the backup dir
   list        show available backup sets
   status      show current backup config
-  pick-key    YOUR host GPG keys (no sudo): lists them on a terminal; when piped it
-              offers an interactive picker and exports the chosen key armored
+  list-keys   list YOUR host GPG public keys (no sudo)
+  pick-key    export one of YOUR host keys, armored, for the pipe below (no sudo);
+              without <fpr> it asks you to pick — bare/unpiped runs are refused
   import-key  import a GPG public key (armored, on stdin) into the snap keyring + set encrypt-key (sudo)
   create-key  generate a backup keypair in the snap keyring + set encrypt-key (sudo)
   export-key  export the snap keyring's private key to move it to your host/offline (sudo)
@@ -38,6 +39,7 @@ parse_sub() {                  # $1 subcommand token -> backup|restore|list|stat
         status)    echo status ;;
         import-key) echo import-key ;;
         pick-key)   echo pick-key ;;
+        list-keys)  echo list-keys ;;
         create-key) echo create-key ;;
         export-key) echo export-key ;;
         *)         return 2 ;;
@@ -78,9 +80,11 @@ nth_fpr() {
 # USER-context: list the invoking user's host public keys, or export one (armored) to
 # stdout. Refuses root (root can't read the user's keyring — owner-match fails). Pipe the
 # export into `sudo zwave-js-ui.backup import-key` to store it in the snap keyring.
-cmd_pick_key() {  # $1 = optional fingerprint to export
+# USER-context guard shared by list-keys/pick-key: they read the invoking user's
+# host keyring, which root cannot (owner-match fails). Echoes the homedir.
+require_host_keyring() {  # $1 = subcommand name for the message
     if [ "${EUID:-$(id -u)}" -eq 0 ]; then
-        lprint "Run 'pick-key' WITHOUT sudo — it reads YOUR personal GPG keyring." >&2
+        lprint "Run '${1}' WITHOUT sudo — it reads YOUR personal GPG keyring." >&2
         exit 1
     fi
     local home; home="$(gpg_host_homedir)"
@@ -89,33 +93,57 @@ cmd_pick_key() {  # $1 = optional fingerprint to export
         lprint "Create one with 'gpg --full-generate-key' then pipe it to 'sudo ${SNAP_NAME}.backup import-key', or use 'sudo ${SNAP_NAME}.backup create-key'." >&2
         exit 1
     fi
+    echo "$home"
+}
+
+host_pubkeys() {  # $1 = homedir -> parse_pubkey_list lines (FPR<tab>uid); fails loudly
+    local raw
+    raw="$(gpg --homedir "$1" --list-keys --with-colons 2>/dev/null)" || {
+        lprint "Failed to list keys in ${1} (gpg exited non-zero)." >&2
+        exit 1
+    }
+    local keys; keys="$(printf '%s\n' "$raw" | parse_pubkey_list)"
+    [ -n "$keys" ] || { lprint "No public keys in ${1}." >&2; exit 1; }
+    printf '%s\n' "$keys"
+}
+
+# USER-context: list the host keys. Humans get the numbered picker format; scripts
+# (stdout not a tty) get machine-readable FPR<tab>uid lines.
+cmd_list_keys() {
+    local home keys
+    home="$(require_host_keyring list-keys)" || exit 1
+    keys="$(host_pubkeys "$home")" || exit 1
+    if [ -t 1 ]; then
+        printf '%s\n' "$keys" | number_pubkey_list
+        lprint "Import one into the snap (interactive picker when piped):" >&2
+        lprint "  ${SNAP_NAME}.backup pick-key | sudo ${SNAP_NAME}.backup import-key" >&2
+    else
+        printf '%s\n' "$keys"
+    fi
+}
+
+# USER-context: export one host public key, armored, on stdout — pipe-only by design
+# (the export's consumer is import-key). With no <fpr> and a terminal on stdin, it
+# asks the user to pick; listing without exporting lives in 'list-keys'.
+cmd_pick_key() {  # $1 = optional fingerprint to export
+    local home keys
+    home="$(require_host_keyring pick-key)" || exit 1
+    if [ -t 1 ]; then
+        lprint "pick-key exports a key for a pipe; to just see your keys: '${SNAP_NAME}.backup list-keys'." >&2
+        lprint "  ${SNAP_NAME}.backup pick-key | sudo ${SNAP_NAME}.backup import-key" >&2
+        exit 1
+    fi
     if [ -n "${1:-}" ]; then
         gpg --homedir "$home" --export --armor "$1"
         return $?
     fi
-    local raw keys
-    raw="$(gpg --homedir "$home" --list-keys --with-colons 2>/dev/null)" || {
-        lprint "Failed to list keys in ${home} (gpg exited non-zero)." >&2
-        exit 1
-    }
-    keys="$(printf '%s\n' "$raw" | parse_pubkey_list)"
-    [ -n "$keys" ] || { lprint "No public keys in ${home}." >&2; exit 1; }
-    if [ -t 1 ]; then
-        # stdout is a terminal: the armored export has no consumer — just list the
-        # keys (same numbered format as the piped picker) and say how to import one.
-        printf '%s\n' "$keys" | number_pubkey_list
-        lprint "Import one into the snap (interactive picker when piped):" >&2
-        lprint "  ${SNAP_NAME}.backup pick-key | sudo ${SNAP_NAME}.backup import-key" >&2
-        return 0
-    fi
+    keys="$(host_pubkeys "$home")" || exit 1
     if [ ! -t 0 ]; then
-        # No terminal to ask on (scripted): keep the machine-readable listing.
-        lprint "Your GPG public keys (use a fingerprint with: pick-key <fpr> | sudo ${SNAP_NAME}.backup import-key):" >&2
-        printf '%s\n' "$keys"
-        return 0
+        lprint "No terminal to pick on — pass a fingerprint: pick-key <fpr> ('${SNAP_NAME}.backup list-keys' shows them)." >&2
+        exit 1
     fi
-    # Piped + interactive: select a key. The prompt/menu ride on stderr so stdout
-    # stays clean for the armored export flowing into import-key.
+    # Interactive pick: the prompt/menu ride on stderr so stdout stays clean for
+    # the armored export flowing into import-key.
     local n fpr choice; n="$(printf '%s\n' "$keys" | wc -l)"
     if [ "$n" -eq 1 ]; then
         fpr="$(printf '%s\n' "$keys" | nth_fpr 1)"
@@ -319,12 +347,12 @@ main() {
 
     local sub; sub="$(parse_sub "${1:-}")" || { usage >&2; exit 2; }
 
-    # pick-key runs as the INVOKING USER against the host keyring — never root, and it
-    # touches none of the root/duplicity/snap-keyring setup below.
-    if [ "$sub" = "pick-key" ]; then
-        cmd_pick_key "${2:-}"
-        exit $?
-    fi
+    # pick-key/list-keys run as the INVOKING USER against the host keyring — never
+    # root, and they touch none of the root/duplicity/snap-keyring setup below.
+    case "$sub" in
+        pick-key)  cmd_pick_key "${2:-}"; exit $? ;;
+        list-keys) cmd_list_keys;         exit $? ;;
+    esac
 
     require_root
     mkdir -p "$ARCHIVE_DIR"

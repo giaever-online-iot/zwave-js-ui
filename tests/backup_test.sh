@@ -65,6 +65,7 @@ assert_contains "$rt" "--time 2026-01-02" "restore: time arg quoted"
 
 # --- key-management: parse_sub + usage ---
 assert_eq "$(parse_sub 'pick-key')"   "pick-key"   "pick-key"
+assert_eq "$(parse_sub 'list-keys')"  "list-keys"  "list-keys"
 assert_eq "$(parse_sub 'create-key')" "create-key" "create-key"
 assert_eq "$(parse_sub 'export-key')" "export-key" "export-key"
 parse_sub 'pick-key'   >/dev/null; assert_status "$?" "0" "pick-key -> status 0"
@@ -74,6 +75,7 @@ parse_sub 'export-key' >/dev/null; assert_status "$?" "0" "export-key -> status 
 SNAP_NAME="${SNAP_NAME:-zwave-js-ui}"   # usage heredoc references ${SNAP_NAME}; set under `set -u`
 _u="$(usage)"
 assert_contains "$_u" "pick-key"   "usage lists pick-key"
+assert_contains "$_u" "list-keys"  "usage lists list-keys"
 assert_contains "$_u" "create-key" "usage lists create-key"
 assert_contains "$_u" "export-key" "usage lists export-key"
 
