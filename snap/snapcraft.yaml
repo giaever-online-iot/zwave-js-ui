@@ -234,7 +234,11 @@ parts:
       # --no-build-isolation: the armhf sdist build uses the deb toolchain (resolute
       # setuptools 78.1.1 satisfies duplicity's >=78.1.0). --break-system-packages:
       # pip 25 applies PEP 668 even to --target installs into the part dir.
-      python3 -m pip install \
+      # /usr/bin/python3 (build VM, has pip via build-packages) and NOT bare python3:
+      # stage-packages are unpacked into CRAFT_PART_INSTALL before this scriptlet and
+      # its usr/bin precedes /usr/bin on PATH, so bare python3 is the pip-less staged
+      # interpreter. Same 3.14 either way — the cp314 wheel ABI matches the staged runtime.
+      /usr/bin/python3 -m pip install \
         --no-deps --no-build-isolation --require-hashes --break-system-packages \
         --target "${CRAFT_PART_INSTALL}/usr/lib/python3/dist-packages" \
         --requirement "${CRAFT_PROJECT_DIR}/requirements-duplicity.txt"
