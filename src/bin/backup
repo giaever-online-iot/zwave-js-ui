@@ -81,7 +81,9 @@ cmd_status() {                 # render current backup config as a table
         onbox="yes"
     fi
     retention="$(cfg retention)"
-    timer="$(snapctl services "$SNAP_NAME.backup-timer" 2>/dev/null | awk 'NR==2 { print $3 }')"
+    # Startup ("enabled") matters more than Current for a timer that is normally
+    # inactive between firings — show both so "inactive" doesn't read as broken.
+    timer="$(snapctl services "$SNAP_NAME.backup-timer" 2>/dev/null | awk 'NR==2 { print $2 "/" $3 }')"
     ui_kv \
         "target"                     "${target:-(unset)}" \
         "dir"                        "$(backup_dir)" \
@@ -252,7 +254,7 @@ cmd_export_key() {
                 ui_err "Failed to delete the private key — it may still be present in the snap keyring."
                 exit 1
             fi
-            ui_ok "Private key deleted from the snap keyring; the public key is retained for backups." ;;
+            ui_ok "Private key deleted from the snap keyring; the public key is retained for backups." >&2 ;;
         *)
             ui_print "Kept the private key in the snap keyring." >&2 ;;
     esac
