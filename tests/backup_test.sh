@@ -104,4 +104,14 @@ assert_eq "$(printf '%s\n' "$_colons2" | parse_pubkey_list)" "$_want2" "pubkey l
 assert_eq "$(printf '%s\n' "$_colons" | first_fpr)" "0E32DAF912C2645073A3DFFA8956E92F1A70C779" "first_fpr"
 assert_eq "$(printf 'tru::1:9:\n' | first_fpr)" "" "first_fpr: no fpr line -> empty"
 
+# --- pick-key interactive helpers (menu render + selection resolve) ---
+_two="$(printf '1111111111111111111111111111111111111111\tAlice <alice@example.com>\n2222222222222222222222222222222222222222\tBob <bob@example.com>')"
+_menu="$(printf ' 1) Alice <alice@example.com>  [1111111111111111111111111111111111111111]\n 2) Bob <bob@example.com>  [2222222222222222222222222222222222222222]')"
+assert_eq "$(printf '%s\n' "$_two" | number_pubkey_list)" "$_menu" "menu: numbered 'N) uid  [fpr]' lines"
+assert_eq "$(printf '%s\n' "$_two" | nth_fpr 1)" "1111111111111111111111111111111111111111" "nth_fpr: first"
+assert_eq "$(printf '%s\n' "$_two" | nth_fpr 2)" "2222222222222222222222222222222222222222" "nth_fpr: second"
+printf '%s\n' "$_two" | nth_fpr 3 >/dev/null 2>&1; assert_status "$?" "1" "nth_fpr: out of range -> 1"
+printf '%s\n' "$_two" | nth_fpr x >/dev/null 2>&1; assert_status "$?" "1" "nth_fpr: non-numeric -> 1"
+printf '%s\n' "$_two" | nth_fpr '' >/dev/null 2>&1; assert_status "$?" "1" "nth_fpr: empty -> 1"
+
 finish

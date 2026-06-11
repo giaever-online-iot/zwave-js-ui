@@ -18,14 +18,15 @@ Usage: ${SNAP_NAME}.backup [restore [<time>] | list | status | pick-key [<fpr>] 
   restore     fetch+decrypt the latest backup back into the backup dir
   list        show available backup sets
   status      show current backup config
-  pick-key    list YOUR host GPG public keys (no sudo); 'pick-key <fpr>' exports one to stdout
+  pick-key    pick one of YOUR host GPG keys (no sudo). Without <fpr>: interactive menu
+              (exports the chosen key when piped; on a terminal it prints the command to run)
   import-key  import a GPG public key (armored, on stdin) into the snap keyring + set encrypt-key (sudo)
   create-key  generate a backup keypair in the snap keyring + set encrypt-key (sudo)
   export-key  export the snap keyring's private key to move it to your host/offline (sudo)
   -h|--help   this help
 
-Typical setup with an existing key:
-  ${SNAP_NAME}.backup pick-key <fpr> | sudo ${SNAP_NAME}.backup import-key
+Typical setup with an existing key (interactive picker):
+  ${SNAP_NAME}.backup pick-key | sudo ${SNAP_NAME}.backup import-key
 EOF
 }
 
@@ -63,6 +64,17 @@ parse_pubkey_list() {
 # the first `fpr:` line) and stops. Empty if there is none. Pure, unit-tested.
 first_fpr() { awk -F: '$1=="fpr"{print $10; exit}'; }
 
+# Renders a parse_pubkey_list stream (FPR<tab>uid) as a numbered human menu,
+# " N) uid  [fpr]". Pure: stdin -> stdout, unit-tested; the caller sends it to stderr.
+number_pubkey_list() { awk -F'\t' '{printf "%2d) %s  [%s]\n", NR, $2, $1}'; }
+
+# Echoes the fingerprint on line $1 (1-based) of a parse_pubkey_list stream.
+# Status 1 on empty/non-numeric/out-of-range input. Pure, unit-tested.
+nth_fpr() {
+    case "${1:-}" in ''|*[!0-9]*) return 1 ;; esac
+    awk -F'\t' -v n="$1" 'NR==n{print $1; f=1; exit} END{exit !f}'
+}
+
 # USER-context: list the invoking user's host public keys, or export one (armored) to
 # stdout. Refuses root (root can't read the user's keyring — owner-match fails). Pipe the
 # export into `sudo zwave-js-ui.backup import-key` to store it in the snap keyring.
@@ -77,16 +89,44 @@ cmd_pick_key() {  # $1 = optional fingerprint to export
         lprint "Create one with 'gpg --full-generate-key' then pipe it to 'sudo ${SNAP_NAME}.backup import-key', or use 'sudo ${SNAP_NAME}.backup create-key'." >&2
         exit 1
     fi
-    if [ -z "${1:-}" ]; then
-        lprint "Your GPG public keys (use a fingerprint with: pick-key <fpr> | sudo ${SNAP_NAME}.backup import-key):" >&2
-        local keys
-        keys="$(gpg --homedir "$home" --list-keys --with-colons 2>/dev/null)" || {
-            lprint "Failed to list keys in ${home} (gpg exited non-zero)." >&2
-            exit 1
-        }
-        printf '%s\n' "$keys" | parse_pubkey_list
-    else
+    if [ -n "${1:-}" ]; then
         gpg --homedir "$home" --export --armor "$1"
+        return $?
+    fi
+    local raw keys
+    raw="$(gpg --homedir "$home" --list-keys --with-colons 2>/dev/null)" || {
+        lprint "Failed to list keys in ${home} (gpg exited non-zero)." >&2
+        exit 1
+    }
+    keys="$(printf '%s\n' "$raw" | parse_pubkey_list)"
+    [ -n "$keys" ] || { lprint "No public keys in ${home}." >&2; exit 1; }
+    if [ ! -t 0 ]; then
+        # No terminal to ask on (scripted): keep the machine-readable listing.
+        lprint "Your GPG public keys (use a fingerprint with: pick-key <fpr> | sudo ${SNAP_NAME}.backup import-key):" >&2
+        printf '%s\n' "$keys"
+        return 0
+    fi
+    # Interactive: select a key. The prompt/menu ride on stderr so stdout stays
+    # clean for the armored export when we are the left side of a pipe.
+    local n fpr choice; n="$(printf '%s\n' "$keys" | wc -l)"
+    if [ "$n" -eq 1 ]; then
+        fpr="$(printf '%s\n' "$keys" | nth_fpr 1)"
+        lprint "One key found — using ${fpr}." >&2
+    else
+        printf '%s\n' "$keys" | number_pubkey_list >&2
+        read -rp "Select key [1-${n}]: " choice
+        if ! fpr="$(printf '%s\n' "$keys" | nth_fpr "$choice")"; then
+            lprint "Invalid selection '${choice}'." >&2
+            exit 1
+        fi
+    fi
+    if [ -t 1 ]; then
+        # Not piped: don't dump an armor block at a human — say what to run instead.
+        lprint "Selected ${fpr}." >&2
+        lprint "Store it in the snap keyring and enable encrypted backups with:" >&2
+        lprint "  ${SNAP_NAME}.backup pick-key ${fpr} | sudo ${SNAP_NAME}.backup import-key" >&2
+    else
+        gpg --homedir "$home" --export --armor "$fpr"
     fi
 }
 
