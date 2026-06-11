@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
+# restart — restart the service (zwave-js-ui.restart)
+: "${SNAP:?SNAP must be set}"
+source "$SNAP/helper/functions"
+source "$SNAP/helper/ui"
 
-source $SNAP/helper/functions
+main() {
+    require_root
+    plugs_connected || return 1
+    if ui_spin "Restarting $SNAP_NAME…" snapctl restart "$SNAP_NAME.$SNAP_NAME"; then
+        ui_ok "Service restarted"
+        return 0
+    fi
+    ui_err "Failed restarting service"
+    return 1
+}
 
-require_root
-
-plugs_connected || exit 1
-
-snapctl restart "${SNAP_NAME}.${SNAP_NAME}"
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi
