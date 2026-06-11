@@ -49,6 +49,7 @@ assert_contains "$r" "file:///tgt"             "restore: target"
 assert_contains "$r" "--gpg-options=--no-autostart" "restore: no-autostart gpg-option"
 l="$(SNAPCTL_backup_encrypt_key=KEY SNAPCTL_backup_target=file:///tgt build_list_cmd)"
 assert_contains "$l" "$(printf '%q' "$SNAP/usr/bin/python3") -m duplicity collection-status " "list: staged python -m, collection-status verb"
+# shellcheck disable=SC2034  # DUP_PY is consumed inside build_backup_cmd (sourced)
 hb="$( (DUP_PY='/tmp/evil path/python3'; SNAPCTL_backup_encrypt_key=KEY SNAPCTL_backup_target=file:///tgt build_backup_cmd "$src") )"
 assert_contains "$hb" "/tmp/evil\\ path/python3 -m duplicity backup " "backup: interpreter %q-escaped (hostile path)"
 
