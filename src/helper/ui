@@ -13,7 +13,16 @@ UI_GUM="${UI_GUM:-${SNAP:-}/bin/gum}"
 ui_ctx() {                     # [$1 output fd, default 1] -> syslog | plain | styled
     if [ "${DAEMONIZED:-0}" = 1 ]; then echo syslog; return; fi
     if [ -n "${NO_COLOR:-}" ] || [ "${TERM:-}" = dumb ]; then echo plain; return; fi
-    if [ "${UI_ASSUME_TTY:-0}" -ne 1 ] && [ ! -t "${1:-1}" ]; then echo plain; return; fi
+    # TTY check, per requested fd. Test overrides: UI_TTY_FDS="1 2" lists fds to
+    # treat as TTYs (others NOT); UI_ASSUME_TTY=1 treats every fd as a TTY.
+    if [ -n "${UI_TTY_FDS:-}" ]; then
+        case " ${UI_TTY_FDS} " in
+            *" ${1:-1} "*) : ;;
+            *) echo plain; return ;;
+        esac
+    elif [ "${UI_ASSUME_TTY:-0}" != 1 ] && [ ! -t "${1:-1}" ]; then
+        echo plain; return
+    fi
     if [ ! -x "$UI_GUM" ]; then echo plain; return; fi
     echo styled
 }

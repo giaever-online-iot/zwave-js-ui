@@ -50,8 +50,10 @@ out="$(ui_header T; ui_ok a; ui_warn b 2>&1; ui_err c 2>&1)"
 printf '%s' "$out" | grep -q "$(printf '\033')"
 assert_status "$?" "1" "plain mode emits zero ANSI bytes"
 
-# styled stdout context must NOT style stderr when fd 2 is redirected:
-# ui_err checks fd 2, which inside $() with 2>... is a pipe/file -> plain.
-assert_eq "$(UI_ASSUME_TTY=0 ui_err leak 2>&1 1>/dev/null)" "ERROR: leak" "err keys context on fd 2"
+# Real fd-2 regression: UI_TTY_FDS=1 says ONLY fd 1 is a TTY. Buggy code keying
+# ui_err on fd 1 would emit styled output here; correct code sees fd 2 is not a
+# TTY and stays plain.
+assert_eq "$(UI_TTY_FDS=1 ui_err leak 2>&1 1>/dev/null)" "ERROR: leak" "err keys context on fd 2"
+assert_contains "$(UI_TTY_FDS='1 2' ui_err leak 2>&1 1>/dev/null)" "[style] ✗ leak" "err styles when fd 2 is a TTY"
 
 finish
