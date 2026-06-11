@@ -50,4 +50,8 @@ out="$(ui_header T; ui_ok a; ui_warn b 2>&1; ui_err c 2>&1)"
 printf '%s' "$out" | grep -q "$(printf '\033')"
 assert_status "$?" "1" "plain mode emits zero ANSI bytes"
 
+# styled stdout context must NOT style stderr when fd 2 is redirected:
+# ui_err checks fd 2, which inside $() with 2>... is a pipe/file -> plain.
+assert_eq "$(UI_ASSUME_TTY=0 ui_err leak 2>&1 1>/dev/null)" "ERROR: leak" "err keys context on fd 2"
+
 finish

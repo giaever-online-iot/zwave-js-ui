@@ -9,6 +9,6 @@ case "$cmd" in
     spin)    while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do shift; done; shift; "$@" ;;
     table)   sed 's/^/[table] /' ;;
     format)  sed 's/^/[format] /' ;;
-    style)   for a in "$@"; do :; done; printf '[style] %s\n' "${a:-}" ;;
+    style)   printf '[style] %s\n' "${*: -1}" ;;   # assumes text is the LAST arg — true for all ui_* call shapes
     *)       exit 64 ;;
 esac

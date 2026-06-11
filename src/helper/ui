@@ -10,14 +10,16 @@
 
 UI_GUM="${UI_GUM:-${SNAP:-}/bin/gum}"
 
-ui_ctx() {                     # -> syslog | plain | styled
-    if [ "${DAEMONIZED:-0}" -eq 1 ]; then echo syslog; return; fi
+ui_ctx() {                     # [$1 output fd, default 1] -> syslog | plain | styled
+    if [ "${DAEMONIZED:-0}" = 1 ]; then echo syslog; return; fi
     if [ -n "${NO_COLOR:-}" ] || [ "${TERM:-}" = dumb ]; then echo plain; return; fi
-    if [ "${UI_ASSUME_TTY:-0}" -ne 1 ] && [ ! -t 1 ]; then echo plain; return; fi
+    if [ "${UI_ASSUME_TTY:-0}" -ne 1 ] && [ ! -t "${1:-1}" ]; then echo plain; return; fi
     if [ ! -x "$UI_GUM" ]; then echo plain; return; fi
     echo styled
 }
 
+# Returns non-zero when not interactive — under `set -e` call it ONLY as a
+# condition (`if ui_interactive`, `ui_interactive || …`), never as a bare statement.
 ui_interactive() {             # widgets additionally need stdin to be a terminal
     [ "$(ui_ctx)" = styled ] && { [ "${UI_ASSUME_TTY:-0}" -eq 1 ] || [ -t 0 ]; }
 }
@@ -42,14 +44,14 @@ ui_ok() {
 }
 
 ui_warn() {
-    case "$(ui_ctx)" in
+    case "$(ui_ctx 2)" in
         styled) "$UI_GUM" style --foreground 3 "! $*" >&2 ;;
         *)      ui_print "WARN: $*" >&2 ;;
     esac
 }
 
 ui_err() {
-    case "$(ui_ctx)" in
+    case "$(ui_ctx 2)" in
         styled) "$UI_GUM" style --foreground 1 "✗ $*" >&2 ;;
         *)      ui_print "ERROR: $*" >&2 ;;
     esac
