@@ -8,6 +8,9 @@
 #   curl -s https://pypi.org/pypi/duplicity/<version>/json | python3 -c \
 #     "import json,sys; [print(u['filename'], u['digests']['sha256']) for u in json.load(sys.stdin)['urls']]"
 # and keep: the .tar.gz hash + the cp3XX (= resolute python) x86_64 and aarch64 wheel hashes.
+# (python-gettext: keep the .tar.gz + the py3-none-any wheel hashes — same curl, its name/version.)
+# After editing this file run `snapcraft clean backup-deps` before a local incremental
+# rebuild — the backup-deps part has no `source:` watching this file.
 duplicity==3.0.7 \
     --hash=sha256:464245217285012e8e0c74ad3edf16be7ff4801caa5272745f10d93a2a7de44e \
     --hash=sha256:874b8496dda49eb755eca9230dd73b03ff52e0d1bb316b1b189d2af0da4b3751 \

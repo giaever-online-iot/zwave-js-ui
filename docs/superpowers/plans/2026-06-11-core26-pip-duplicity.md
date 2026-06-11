@@ -8,6 +8,8 @@
 
 **Tech Stack:** snapcraft (core26, `nil` plugin + `override-build`), pip 25 (`--no-deps --no-build-isolation --require-hashes --break-system-packages --target`), duplicity 3.0.7 (PyPI), bash, existing `tests/` harness + shellcheck.
 
+> **As-built deviations (2026-06-11):** three review-driven fixes landed after this plan was written — `422d7c7` (pip must run via the build VM's `/usr/bin/python3`: stage-packages unpack into `CRAFT_PART_INSTALL` before `override-build` and its `usr/bin` shadows PATH, so bare `python3` is the staged, pip-less interpreter — do NOT copy Task 2's original snippet verbatim), `9fbfac7` (strip pip's broken-shebang `dist-packages/bin` console script + dead `share/` data_files), `2189497` (`export PYTHONSAFEPATH=1`: `-m` puts the caller's cwd on `sys.path`; plus interpreter-pinned test needles). The suite is 43 tests after the fixes (not 42), the built amd64 snap measured 101 MB (not ~110 MB), and both CI workflows' `paths:` filters gained `requirements-duplicity.txt` so Renovate bump PRs actually build.
+
 ---
 
 ## Context (research findings — verified 2026-06-11)
