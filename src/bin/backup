@@ -292,6 +292,11 @@ main() {
     # next to its deb-staged runtime deps. The staged interpreter finds that path via
     # its own prefix; keep PYTHONPATH as belt-and-braces for any other entry point.
     export PYTHONPATH="$SNAP/usr/lib/python3/dist-packages${PYTHONPATH:+:$PYTHONPATH}"
+    # -m puts the CALLER's cwd at sys.path[0] (the console script did not). Run as
+    # root from an arbitrary admin cwd (home/removable-media are plugged), that would
+    # import a planted/shadowing module into the process holding the GPG keyring —
+    # refuse it. PYTHONPATH above is unaffected (3.11+).
+    export PYTHONSAFEPATH=1
 
     local target; target="$(cfg target)"
     case "$sub" in
