@@ -51,6 +51,8 @@ assert_contains "$out" "serial-port" "serial footnote present"
 # --- drift guard ----------------------------------------------------------------
 # The catalog duplicates defaults that test_default_config (helper/functions)
 # seeds; this converts the catalog's "keep in sync" comment into a CI check.
+# Deliberately only the keys with literal defaults — mqtt.name/session.* use
+# placeholder defaults ("(unset)", "(generated)") that have no literal match.
 for key in server.host server.port server.ssl timezone; do
     def="$(settings_catalog | awk -F'\t' -v k="$key" '$1 == k { print $3 }')"
     grep -Eq "testnset_config \"$key\" \"?$def\"?" "$ROOT/src/helper/functions"

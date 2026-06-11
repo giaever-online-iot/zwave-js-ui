@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 set -u
+# Pin a clean rendering baseline: GitHub Actions runners export no TERM, and
+# bash then defaults TERM=dumb — which forces plain ctx and overrides
+# UI_ASSUME_TTY, failing every styled assertion. The per-assertion
+# NO_COLOR=1 / TERM=dumb matrix checks below set their own values inline.
+export TERM=xterm-256color
+unset NO_COLOR
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 source "$HERE/lib/assert.sh"
@@ -107,7 +113,7 @@ out="$(ui_spin 'Working…' echo ran)"
 assert_contains "$out" "Working…" "spin plain prints title"
 assert_contains "$out" "ran"      "spin plain runs command"
 assert_eq "$(UI_ASSUME_TTY=1 ui_spin 'W' echo ran)" "ran" "spin styled execs via stub"
-ui_spin 'W' false; assert_status "$?" "1" "spin propagates command status"
+ui_spin 'W' false >/dev/null; assert_status "$?" "1" "spin propagates command status"
 
 # --- ui_interactive: UI_TTY_FDS must list fd 0 for widgets -------------------
 assert_eq "$(UI_TTY_FDS='0 1' ui_interactive; echo $?)" "0" "UI_TTY_FDS with fd 0 -> interactive"
