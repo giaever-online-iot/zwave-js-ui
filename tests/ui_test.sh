@@ -56,4 +56,23 @@ assert_status "$?" "1" "plain mode emits zero ANSI bytes"
 assert_eq "$(UI_TTY_FDS=1 ui_err leak 2>&1 1>/dev/null)" "ERROR: leak" "err keys context on fd 2"
 assert_contains "$(UI_TTY_FDS='1 2' ui_err leak 2>&1 1>/dev/null)" "[style] ✗ leak" "err styles when fd 2 is a TTY"
 
+# --- ui_align / ui_table / ui_kv -----------------------------------------
+assert_eq "$(printf 'a\tbb\nccc\td\n' | ui_align)" "$(printf 'a    bb\nccc  d')" "align pads columns"
+
+out="$(printf 'k1\tv1\nk2\tv2\n' | ui_table key value)"
+assert_contains "$out" "key"   "table plain: header row"
+assert_contains "$out" "k2"    "table plain: data row"
+printf '%s' "$out" | grep -q "$(printf '\033')"
+assert_status "$?" "1" "table plain: zero ANSI"
+
+assert_contains "$(printf 'k\tv\n' | UI_ASSUME_TTY=1 ui_table key value)" "[table]" "table styled via gum"
+
+out="$(ui_kv alpha 1 beta 2)"
+assert_contains "$out" "alpha" "kv: first key"
+assert_contains "$out" "2"     "kv: last value"
+
+# --- ui_usage --------------------------------------------------------------
+assert_eq "$(printf 'Usage: x\n' | ui_usage)" "Usage: x" "usage plain: cat"
+assert_contains "$(printf 'Usage: x\n' | UI_ASSUME_TTY=1 ui_usage)" "[format] Usage: x" "usage styled via gum format"
+
 finish

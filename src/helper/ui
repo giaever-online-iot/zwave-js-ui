@@ -65,3 +65,49 @@ ui_err() {
         *)      ui_print "ERROR: $*" >&2 ;;
     esac
 }
+
+ui_align() {                   # stdin: TAB-separated rows -> two-space aligned columns (pure)
+    awk -F'\t' '
+        { for (i=1; i<=NF; i++) { if (length($i) > w[i]) w[i] = length($i); c[NR,i] = $i } n[NR] = NF }
+        END { for (r=1; r<=NR; r++) { line = ""
+                for (i=1; i<=n[r]; i++) line = line sprintf("%-*s", (i < n[r] ? w[i]+2 : 0), c[r,i])
+                sub(/[ \t]+$/, "", line); print line } }'
+}
+
+# shellcheck disable=SC2120  # called with args from ui_kv and external scripts
+ui_table() {                   # stdin: TAB-separated rows; args: optional column headers
+    local cols
+    case "$(ui_ctx)" in
+        styled)
+            if [ "$#" -gt 0 ]; then
+                cols="$(IFS=,; printf '%s' "$*")"
+                "$UI_GUM" table --print --separator "$(printf '\t')" --columns "$cols"
+            else
+                "$UI_GUM" table --print --separator "$(printf '\t')"
+            fi ;;
+        *)
+            {
+                if [ "$#" -gt 0 ]; then
+                    local hdr_ifs=$'\t'
+                    IFS="$hdr_ifs" printf '%s\n' "$*"
+                fi
+                cat
+            } | ui_align ;;
+    esac
+}
+
+ui_kv() {                      # args: key value [key value]... -> 2-column table
+    local out="" k v
+    while [ "$#" -ge 2 ]; do
+        k="$1"; v="$2"; shift 2
+        out="${out}${k}"$'\t'"${v}"$'\n'
+    done
+    printf '%s' "$out" | ui_table
+}
+
+ui_usage() {                   # stdin: usage text (readable raw; light markdown when styled)
+    case "$(ui_ctx)" in
+        styled) "$UI_GUM" format ;;
+        *)      cat ;;
+    esac
+}
