@@ -34,7 +34,7 @@ commands_rows() {
 }
 
 main() {
-    plugs_connected || ui_warn "Required interfaces are not connected — see the commands above."
+    plugs_connected || ui_warn "Required interfaces are not connected — see the connect instructions above."
     ui_header "$SNAP_NAME" "$(snap_version) · $(service_state)"
     echo
     ui_print "The daemon is DISABLED by default after install. Enable it with:"

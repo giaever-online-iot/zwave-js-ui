@@ -48,4 +48,13 @@ assert_contains "$out" "snap set zwave-js-ui" "set-hint present"
 assert_contains "$out" "zwave-js-ui.logs" "commands table present"
 assert_contains "$out" "serial-port" "serial footnote present"
 
+# --- drift guard ----------------------------------------------------------------
+# The catalog duplicates defaults that test_default_config (helper/functions)
+# seeds; this converts the catalog's "keep in sync" comment into a CI check.
+for key in server.host server.port server.ssl timezone; do
+    def="$(settings_catalog | awk -F'\t' -v k="$key" '$1 == k { print $3 }')"
+    grep -Eq "testnset_config \"$key\" \"?$def\"?" "$ROOT/src/helper/functions"
+    assert_status "$?" "0" "catalog default for $key matches test_default_config"
+done
+
 finish

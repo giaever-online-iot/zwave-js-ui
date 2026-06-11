@@ -11,7 +11,7 @@ server.ssl	bool	false	Serve the web UI over HTTPS
 server.force-disable-ssl	bool	false	Force-disable SSL even when enabled
 session.secret	string	(generated)	Session secret (a UUID is generated on install)
 session.cookie-secure	bool	(= server.ssl)	Secure session cookie (see expressjs/session#cookiesecure)
-mqtt.name	string	(empty)	Client name when connecting to the MQTT broker
+mqtt.name	string	(unset)	Client name when connecting to the MQTT broker
 timezone	string	Europe/Oslo	Timezone exported to the app as TZ
 backup.target	string	(unset)	Duplicity target URL for off-box backups
 backup.dir	string	$SNAP_DATA/backups	Directory shipped by the backup command
