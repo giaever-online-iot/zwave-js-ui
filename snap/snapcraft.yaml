@@ -216,3 +216,6 @@ parts:
       - go/1.24/stable
     build-environment:
       - CGO_ENABLED: "0"
+      # Fail fast if the go snap channel ever lags gum's toolchain directive,
+      # instead of attempting a network toolchain download (blocked on Launchpad).
+      - GOTOOLCHAIN: local
