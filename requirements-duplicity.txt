@@ -1,0 +1,20 @@
+# Duplicity, pinned + hash-locked. Installed by snap/snapcraft.yaml (backup-deps part)
+# with `pip install --no-deps`: runtime deps come from deb stage-packages instead
+# (the resolute duplicity deb's Depends is the authoritative list). python-gettext has
+# no resolute deb, so it rides here. Hashes cover the sdist (armhf builds from source)
+# plus the cp314 manylinux wheels (amd64, arm64).
+#
+# To bump: change the version, then list the new artifacts + hashes with
+#   curl -s https://pypi.org/pypi/duplicity/<version>/json | python3 -c \
+#     "import json,sys; [print(u['filename'], u['digests']['sha256']) for u in json.load(sys.stdin)['urls']]"
+# and keep: the .tar.gz hash + the cp3XX (= resolute python) x86_64 and aarch64 wheel hashes.
+# (python-gettext: keep the .tar.gz + the py3-none-any wheel hashes — same curl, its name/version.)
+# After editing this file run `snapcraft clean backup-deps` before a local incremental
+# rebuild — the backup-deps part has no `source:` watching this file.
+duplicity==3.0.7 \
+    --hash=sha256:464245217285012e8e0c74ad3edf16be7ff4801caa5272745f10d93a2a7de44e \
+    --hash=sha256:874b8496dda49eb755eca9230dd73b03ff52e0d1bb316b1b189d2af0da4b3751 \
+    --hash=sha256:7ddfa3902b43e7fd4dab268a49aad8c321b4853f9122000691a1be636a2fcc5d
+python-gettext==5.0 \
+    --hash=sha256:083d4c72c5e72a6bd83b0570770792b9a1e572d8ab3e9cba554e0cd4781aa84a \
+    --hash=sha256:869af1ea45e3dab6180557259824c2a62f1800e1286226af912431fe75c5084c

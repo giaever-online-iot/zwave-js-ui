@@ -33,7 +33,7 @@ sudo snap connect zwave-js-ui:raw-usb
 sudo snap connect zwave-js-ui:hardware-observe
 ```
 
-`yq` is used pervasively (build step, CI, helper scripts). The build pins Node `22.20.0` and `core24` as the snap base.
+`yq` is used pervasively (build step, CI, helper scripts). The build pins Node `22.20.0` and `core26` as the snap base.
 
 ### Inspecting / running the installed snap
 
@@ -58,7 +58,7 @@ tail -f $SNAP_DATA/*.log                  # manual fallback when "log to file" i
 1. `snap/snapcraft.yaml` has `version: vX.Y.Z` matching an upstream GitHub release tag.
 2. `src/node/package.json` is a stub package named `zui-snap` with **no** `zwave-js-ui` dependency in the file.
 3. The `zwave-js-ui` part's `override-build` strips the leading `v` and uses `yq` to write the version into both `.version` and `.dependencies.zwave-js-ui` of `package.json` before `craftctl default` runs the npm plugin — so the correct upstream release is pulled at build time.
-4. Renovate (`renovate.json`) watches `zwave-js/zwave-js-ui` GitHub releases and opens PRs bumping `version:` in `snapcraft.yaml`. **When changing the packaged app version, edit `snapcraft.yaml` `version:` only** — do not hand-edit `package.json`.
+4. Renovate (`renovate.json`) watches `zwave-js/zwave-js-ui` GitHub releases and opens PRs bumping `version:` in `snapcraft.yaml`. **When changing the packaged app version, edit `snapcraft.yaml` `version:` only** — do not hand-edit `package.json`. Renovate's `pip_requirements` manager also opens duplicity bump PRs for `requirements-duplicity.txt`; those build via CI (the workflows' `paths:` filters include the file) but fail closed until the hash refresh described in the file's header is applied.
 
 ### Config translation layer (the core abstraction)
 
@@ -79,8 +79,8 @@ Snap users set config with `snap set zwave-js-ui server.host=0.0.0.0` (namespace
 
 ### User commands (`src/bin/`)
 
-`daemonize`/`de-daemonize`/`restart` wrap `snapctl` service control and require root + connected plugs. `logs` is the unified, terminal-friendly log follower. `backup` ships ZUI's backup directory (`$BACKUPS_DIR`, default `$SNAP_DATA/backups`) off-box via **duplicity** — encrypted (asymmetric GPG), incremental, optional daily timer — and restores it back for ZUI's in-app recovery. It does **not** create backups itself: it requires ZUI's own scheduled backups to be enabled (off by default) and is configured via `snap set zwave-js-ui backup.*` (`backup.target`, `backup.dir`, `backup.encrypt-key`, …). A fixed daily timer runs it once `backup.target` is set. See `docs/superpowers/specs/2026-06-10-backup-design.md`.
-  Key management for the encryption key lives in `backup` subcommands: `pick-key` (run **without** sudo — lists/exports a public key from the *user's* `~/.gnupg`, since root can't read it), piped into `import-key` (root: store the public key in the snap keyring at `$SNAP_COMMON/.gnupg` and set `backup.encrypt-key`); `create-key` (root: generate an ed25519/cv25519 keypair in the snap keyring); and `export-key` (root: export the private key to move it to the host/offline, with an opt-in delete). Only `gpg-public-keys` is needed (on the `backup` app, for `pick-key`); `gpg-keys` and the timer's `gpg-public-keys` were removed as unused. See `docs/superpowers/specs/2026-06-10-backup-key-management-design.md`.
+`daemonize`/`de-daemonize`/`restart` wrap `snapctl` service control and require root + connected plugs. `logs` is the unified, terminal-friendly log follower. `backup` ships ZUI's backup directory (`$BACKUPS_DIR`, default `$SNAP_DATA/backups`) off-box via **duplicity** — encrypted (asymmetric GPG), incremental, optional daily timer — and restores it back for ZUI's in-app recovery. It does **not** create backups itself: it requires ZUI's own scheduled backups to be enabled (off by default) and is configured via `snap set zwave-js-ui backup.*` (`backup.target`, `backup.dir`, `backup.encrypt-key`, …). duplicity itself is pip-installed at build time from `requirements-duplicity.txt` (pinned + hash-locked, `--no-deps` — bump version AND hashes together) and runs on the snap-staged Python (`$SNAP/usr/bin/python3 -m duplicity`); its runtime deps are archive debs in the `backup-deps` part (except pure-Python `python-gettext`, which has no resolute deb and rides in the requirements file). A fixed daily timer runs it once `backup.target` is set. See `docs/superpowers/specs/2026-06-10-backup-design.md`.
+  Key management for the encryption key lives in `backup` subcommands: `list-keys` and `pick-key` (both run **without** sudo — they read the *user's* `~/.gnupg`, which root can't; `list-keys` lists, `pick-key` exports for a pipe and interactively asks which key when no `<fpr>` is given, refusing bare/unpiped runs), `pick-key` piped into `import-key` (root: store the public key in the snap keyring at `$SNAP_COMMON/.gnupg` and set `backup.encrypt-key`); `create-key` (root: generate an ed25519/cv25519 keypair in the snap keyring); and `export-key` (root: export the private key to move it to the host/offline, with an opt-in delete). Only `gpg-public-keys` is needed (on the `backup` app, for `pick-key`); `gpg-keys` and the timer's `gpg-public-keys` were removed as unused. See `docs/superpowers/specs/2026-06-10-backup-key-management-design.md`.
 
 ### Paths & layout
 
