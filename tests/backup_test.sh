@@ -111,6 +111,18 @@ _ck="$( (ensure_agent() { return 1; }; cmd_create_key 2>&1) )"; _ckrc=$?
 assert_status "$_ckrc" "1" "create-key blocked -> status 1"
 assert_contains "$_ck" "pick-key | sudo ${SNAP_NAME}.backup import-key" "create-key blocked: suggests pick-key | import-key (interactive picker)"
 
+# --- multi-uid keys: parse appends the EXTRA-uid count; menu renders it ---
+_colons3='pub:u:255:22:KEYID:1730000000:::-:::scESC::::::ed25519:::0:
+fpr:::::::::3333333333333333333333333333333333333333:
+uid:u::::1730000000::H1::Joachim (Private) <j@priv.no>::::::::::0:
+uid:u::::1730000000::H2::Joachim (Vertskap) <j@vert.no>::::::::::0:
+uid:u::::1730000000::H3::Joachim (Online) <j@onl.no>::::::::::0:
+sub:u:255:18:SUBID:1730000000:::::e::::::cv25519::'
+_want3="$(printf '3333333333333333333333333333333333333333\tJoachim (Private) <j@priv.no>\t2')"
+assert_eq "$(printf '%s\n' "$_colons3" | parse_pubkey_list)" "$_want3" "multi-uid: primary uid + extra-uid count"
+assert_eq "$(printf '%s\n' "$_want3" | number_pubkey_list)" " 1) Joachim (Private) <j@priv.no>  [3333333333333333333333333333333333333333]  (+2 more identities)" "menu: plural extra-identities suffix"
+assert_eq "$(printf 'F\tU\t1' | number_pubkey_list)" " 1) U  [F]  (+1 more identity)" "menu: singular extra-identity suffix"
+
 # --- pick-key interactive helpers (menu render + selection resolve) ---
 _two="$(printf '1111111111111111111111111111111111111111\tAlice <alice@example.com>\n2222222222222222222222222222222222222222\tBob <bob@example.com>')"
 _menu="$(printf ' 1) Alice <alice@example.com>  [1111111111111111111111111111111111111111]\n 2) Bob <bob@example.com>  [2222222222222222222222222222222222222222]')"

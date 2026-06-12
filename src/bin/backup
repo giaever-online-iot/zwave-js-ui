@@ -51,14 +51,18 @@ parse_sub() {                  # $1 subcommand token -> backup|restore|list|stat
 # must read THIS, not $HOME/.gnupg (which is the empty sandbox keyring).
 gpg_host_homedir() { echo "${SNAP_REAL_HOME:-$HOME}/.gnupg"; }
 
-# Reads `gpg --with-colons` key listing on stdin, emits one "FPR<TAB>primary-uid" line
-# per key. Takes the first fpr after each `pub` (the primary key fingerprint) and the
-# first `uid` after it, ignoring subkey fpr lines. Pure: stdin -> stdout, unit-tested.
+# Reads `gpg --with-colons` key listing on stdin, emits one line per key:
+# "FPR<TAB>primary-uid" — plus "<TAB><n>" when the key carries n EXTRA uids beyond
+# the primary (one key, several identities; encryption targets the key, so we list
+# one row and disclose the rest). Subkey fpr lines are ignored. Pure, unit-tested.
 parse_pubkey_list() {
     awk -F: '
-        $1=="pub" { have=0 }
+        function flush() { if (have && !seen[fpr]++) {
+            if (n > 1) print fpr "\t" uid "\t" n-1; else print fpr "\t" uid } }
+        $1=="pub" { flush(); have=0; n=0 }
         $1=="fpr" && !have { fpr=$10; have=1 }
-        $1=="uid" && have && !seen[fpr]++ { print fpr "\t" $10 }
+        $1=="uid" && have { n++; if (n==1) uid=$10 }
+        END { flush() }
     '
 }
 
@@ -66,9 +70,15 @@ parse_pubkey_list() {
 # the first `fpr:` line) and stops. Empty if there is none. Pure, unit-tested.
 first_fpr() { awk -F: '$1=="fpr"{print $10; exit}'; }
 
-# Renders a parse_pubkey_list stream (FPR<tab>uid) as a numbered human menu,
-# " N) uid  [fpr]". Pure: stdin -> stdout, unit-tested; the caller sends it to stderr.
-number_pubkey_list() { awk -F'\t' '{printf "%2d) %s  [%s]\n", NR, $2, $1}'; }
+# Renders a parse_pubkey_list stream (FPR<tab>uid[<tab>extra]) as a numbered human
+# menu, " N) uid  [fpr]  (+n more identities)" — the suffix only for multi-uid keys.
+# Pure: stdin -> stdout, unit-tested; the caller sends it to stderr.
+number_pubkey_list() {
+    awk -F'\t' '{
+        extra = ($3 != "") ? sprintf("  (+%d more identit%s)", $3, $3==1 ? "y" : "ies") : ""
+        printf "%2d) %s  [%s]%s\n", NR, $2, $1, extra
+    }'
+}
 
 # Echoes the fingerprint on line $1 (1-based) of a parse_pubkey_list stream.
 # Status 1 on empty/non-numeric/out-of-range input. Pure, unit-tested.
@@ -170,8 +180,12 @@ cmd_import_key() {
     # to autostart the (base-path, absent-in-snap) agent and exits non-zero even though
     # the import succeeded. See the gpg-agent packaging note for the secret-key paths.
     local fpr; fpr="$(gpg --no-autostart --homedir "$GNUPGHOME" --show-keys --with-colons "$tmp" 2>/dev/null | first_fpr)"
-    if ! gpg --no-autostart --homedir "$GNUPGHOME" --import "$tmp"; then
-        lprint "Key import failed — backup.encrypt-key not changed." >&2
+    # gpg's import chatter (incl. host-agent version warnings) confuses more than it
+    # informs — keep it for the failure path only, where it is the diagnostic.
+    local gpgout
+    if ! gpgout="$(gpg --no-autostart --homedir "$GNUPGHOME" --import "$tmp" 2>&1)"; then
+        lprint "Key import failed — backup.encrypt-key not changed. gpg said:" >&2
+        printf '%s\n' "$gpgout" >&2
         return 1
     fi
     if [ -n "$fpr" ]; then
