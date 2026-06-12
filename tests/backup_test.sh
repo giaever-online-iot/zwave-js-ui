@@ -106,6 +106,11 @@ assert_eq "$(printf '%s\n' "$_colons2" | parse_pubkey_list)" "$_want2" "pubkey l
 assert_eq "$(printf '%s\n' "$_colons" | first_fpr)" "0E32DAF912C2645073A3DFFA8956E92F1A70C779" "first_fpr"
 assert_eq "$(printf 'tru::1:9:\n' | first_fpr)" "" "first_fpr: no fpr line -> empty"
 
+# --- create-key blocked (no agent): must suggest the interactive pick-key pipe ---
+_ck="$( (ensure_agent() { return 1; }; cmd_create_key 2>&1) )"; _ckrc=$?
+assert_status "$_ckrc" "1" "create-key blocked -> status 1"
+assert_contains "$_ck" "pick-key | sudo ${SNAP_NAME}.backup import-key" "create-key blocked: suggests pick-key | import-key (interactive picker)"
+
 # --- pick-key interactive helpers (menu render + selection resolve) ---
 _two="$(printf '1111111111111111111111111111111111111111\tAlice <alice@example.com>\n2222222222222222222222222222222222222222\tBob <bob@example.com>')"
 _menu="$(printf ' 1) Alice <alice@example.com>  [1111111111111111111111111111111111111111]\n 2) Bob <bob@example.com>  [2222222222222222222222222222222222222222]')"

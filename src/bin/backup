@@ -217,7 +217,8 @@ ensure_agent() {
 cmd_create_key() {
     if ! ensure_agent; then
         lprint "Cannot generate a key on this device (gpg needs its agent for secret keys)." >&2
-        lprint "Create one on another machine instead, then: ${SNAP_NAME}.backup pick-key <fpr> | sudo ${SNAP_NAME}.backup import-key" >&2
+        lprint "Use an existing key from your keyring instead (interactive picker, no sudo for pick-key):" >&2
+        lprint "  ${SNAP_NAME}.backup pick-key | sudo ${SNAP_NAME}.backup import-key" >&2
         return 1
     fi
     local name email comment pass uid
