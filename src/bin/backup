@@ -253,9 +253,12 @@ cmd_create_key() {
     uid="$name"
     [ -n "$comment" ] && uid="$uid ($comment)"
     uid="$uid <$email>"
-    if ! gpg --no-autostart --homedir "$GNUPGHOME" --batch --pinentry-mode loopback --passphrase "$pass" \
-        --quick-generate-key "$uid" ed25519 cert,sign never; then
-        lprint "Key generation failed — check the name/email are valid and gpg is working." >&2
+    # gpg chatter (trustdb, revocation-cert notes) only on failure, where it explains.
+    local gpgout
+    if ! gpgout="$(gpg --no-autostart --homedir "$GNUPGHOME" --batch --pinentry-mode loopback --passphrase "$pass" \
+        --quick-generate-key "$uid" ed25519 cert,sign never 2>&1)"; then
+        lprint "Key generation failed — check the name/email are valid. gpg said:" >&2
+        printf '%s\n' "$gpgout" >&2
         return 1
     fi
     local fpr; fpr="$(gpg --no-autostart --homedir "$GNUPGHOME" --list-keys --with-colons "$email" 2>/dev/null | first_fpr)"
@@ -263,9 +266,10 @@ cmd_create_key() {
         lprint "Key was generated but its fingerprint could not be read for '${email}'." >&2
         return 1
     fi
-    if ! gpg --no-autostart --homedir "$GNUPGHOME" --batch --pinentry-mode loopback --passphrase "$pass" \
-        --quick-add-key "$fpr" cv25519 encr never; then
-        lprint "Adding the encryption subkey failed; '${fpr}' is not usable for backups yet." >&2
+    if ! gpgout="$(gpg --no-autostart --homedir "$GNUPGHOME" --batch --pinentry-mode loopback --passphrase "$pass" \
+        --quick-add-key "$fpr" cv25519 encr never 2>&1)"; then
+        lprint "Adding the encryption subkey failed; '${fpr}' is not usable for backups yet. gpg said:" >&2
+        printf '%s\n' "$gpgout" >&2
         return 1
     fi
     snapctl set backup.encrypt-key="$fpr"
@@ -294,18 +298,24 @@ cmd_export_key() {
     lprint "# To add this key to your workstation keyring, run on the HOST (not in the snap):" >&2
     lprint "#     gpg --import   # paste/redirect the block below" >&2
     lprint "# Also store it OFFLINE — it is the ONLY way to decrypt your backups." >&2
-    local exported
-    if ! exported="$(gpg --no-autostart --homedir "$GNUPGHOME" --export-secret-keys --armor "$fpr")" || [ -z "$exported" ]; then
-        lprint "Export failed or produced no output — aborting. The private key has NOT been deleted." >&2
+    # stderr to a scratch file: it must not pollute the armored stdout, and gpg's
+    # notes only help when the export FAILS (pinentry itself draws on the tty).
+    local exported gpgerr; gpgerr="$(mktemp "${SNAP_COMMON:-/tmp}/.export-key-err.XXXXXX")"
+    if ! exported="$(gpg --no-autostart --homedir "$GNUPGHOME" --export-secret-keys --armor "$fpr" 2>"$gpgerr")" || [ -z "$exported" ]; then
+        lprint "Export failed or produced no output — aborting. The private key has NOT been deleted. gpg said:" >&2
+        cat "$gpgerr" >&2; rm -f "$gpgerr"
         exit 1
     fi
+    rm -f "$gpgerr"
     printf '%s\n' "$exported"
     local ans
     read -rp "Delete the private key from THIS device now? [y/N] " ans
     case "${ans:-N}" in
         y|Y|yes|YES)
-            if ! gpg --no-autostart --homedir "$GNUPGHOME" --batch --yes --delete-secret-keys "$fpr"; then
-                lprint "Failed to delete the private key — it may still be present in the snap keyring." >&2
+            local delout
+            if ! delout="$(gpg --no-autostart --homedir "$GNUPGHOME" --batch --yes --delete-secret-keys "$fpr" 2>&1)"; then
+                lprint "Failed to delete the private key — it may still be present in the snap keyring. gpg said:" >&2
+                printf '%s\n' "$delout" >&2
                 exit 1
             fi
             lprint "Private key deleted from the snap keyring; the public key is retained for backups." >&2 ;;
