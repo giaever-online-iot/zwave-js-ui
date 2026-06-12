@@ -339,6 +339,20 @@ encryption_args() {            # echoes "--encrypt-key X" or "--no-encryption"; 
 
 full_if_older() { local v; v=$(cfg full-if-older-than); echo "${v:-7D}"; }
 
+# gdrive:// auth: duplicity reads a Google service-account JSON from
+# GOOGLE_SERVICE_JSON_FILE. Export it when backup.gdrive-credentials is set;
+# refuse loudly if the path is set but unreadable. No-op otherwise. Unit-tested.
+setup_gdrive_env() {
+    local gcred; gcred="$(cfg gdrive-credentials)"
+    [ -z "$gcred" ] && return 0
+    if [ ! -r "$gcred" ]; then
+        lprint "backup.gdrive-credentials is set but unreadable: ${gcred}" >&2
+        lprint "Put the Google service-account JSON under ${SNAP_COMMON:-/var/snap/\$SNAP_NAME/common}/ and point backup.gdrive-credentials at it." >&2
+        return 1
+    fi
+    export GOOGLE_SERVICE_JSON_FILE="$gcred"
+}
+
 build_backup_cmd() {           # $1 source dir -> duplicity backup command string
     # --allow-source-mismatch: the source is $SNAP_DATA/backups, whose path embeds the
     # snap revision (e.g. .../x4/backups). snapd copies it forward on refresh, so the
@@ -391,6 +405,10 @@ main() {
     # import a planted/shadowing module into the process holding the GPG keyring —
     # refuse it. PYTHONPATH above is unaffected (3.11+).
     export PYTHONSAFEPATH=1
+
+    # gdrive credentials (no-op unless configured); status must stay inspectable,
+    # so only the duplicity-running subcommands enforce this.
+    case "$sub" in backup|restore|list) setup_gdrive_env || exit 1 ;; esac
 
     local target; target="$(cfg target)"
     case "$sub" in

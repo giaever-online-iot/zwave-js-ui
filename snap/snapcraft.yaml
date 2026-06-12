@@ -210,7 +210,8 @@ parts:
       - python3-wheel
     # Runtime: the snap-staged interpreter (the core26 base ships no Python) plus
     # duplicity's runtime deps as archive debs — parity with the resolute duplicity
-    # deb's Depends — and our supported backends (boto3/b2sdk).
+    # deb's Depends — and our supported backends (boto3/b2sdk; the google trio for
+    # gdrive://, authenticated via backup.gdrive-credentials -> GOOGLE_SERVICE_JSON_FILE).
     stage-packages:
       - python3
       - gnupg
@@ -225,6 +226,9 @@ parts:
       - python3-setuptools
       - python3-boto3
       - python3-b2sdk
+      - python3-googleapi
+      - python3-google-auth
+      - python3-google-auth-oauthlib
     override-build: | # shell
       craftctl default
       # duplicity itself comes from PyPI, pinned + hash-locked, so every architecture

@@ -111,6 +111,17 @@ _ck="$( (ensure_agent() { return 1; }; cmd_create_key 2>&1) )"; _ckrc=$?
 assert_status "$_ckrc" "1" "create-key blocked -> status 1"
 assert_contains "$_ck" "pick-key | sudo ${SNAP_NAME}.backup import-key" "create-key blocked: suggests pick-key | import-key (interactive picker)"
 
+# --- gdrive credentials env (setup_gdrive_env) ---
+unset GOOGLE_SERVICE_JSON_FILE
+setup_gdrive_env; assert_status "$?" "0" "gdrive: unconfigured -> ok"
+assert_eq "${GOOGLE_SERVICE_JSON_FILE:-}" "" "gdrive: no env exported when unconfigured"
+_gj="$(mktemp)"; echo '{}' > "$_gj"
+(SNAPCTL_backup_gdrive_credentials="$_gj" setup_gdrive_env && [ "${GOOGLE_SERVICE_JSON_FILE:-}" = "$_gj" ])
+assert_status "$?" "0" "gdrive: readable credentials file -> env exported"
+SNAPCTL_backup_gdrive_credentials=/nonexistent/sa.json setup_gdrive_env 2>/dev/null
+assert_status "$?" "1" "gdrive: unreadable credentials -> refuse"
+rm -f "$_gj"
+
 # --- multi-uid keys: parse appends the EXTRA-uid count; menu renders it ---
 _colons3='pub:u:255:22:KEYID:1730000000:::-:::scESC::::::ed25519:::0:
 fpr:::::::::3333333333333333333333333333333333333333:
