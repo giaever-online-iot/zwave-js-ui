@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Test shim: load the REAL catalog from src/ (see helper/ui shim).
+source "$(dirname "${BASH_SOURCE[0]}")/../../../src/helper/catalog"

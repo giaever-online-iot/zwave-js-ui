@@ -14,6 +14,16 @@
       ],
       "depNameTemplate": "zwave-js/zwave-js-ui",
       "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^snap/snapcraft\\.yaml$/"
+      ],
+      "matchStrings": [
+        "# renovate: depName=(?<depName>[^\\s]+)\\n\\s+source-tag: (?<currentValue>v[\\d.]+)"
+      ],
+      "datasourceTemplate": "github-releases"
     }
   ],
   "packageRules": [

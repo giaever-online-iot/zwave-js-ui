@@ -101,4 +101,21 @@ assert_eq "$(printf '%s\n' "$_colons2" | parse_pubkey_list)" "$_want2" "pubkey l
 assert_eq "$(printf '%s\n' "$_colons" | first_fpr)" "0E32DAF912C2645073A3DFFA8956E92F1A70C779" "first_fpr"
 assert_eq "$(printf 'tru::1:9:\n' | first_fpr)" "" "first_fpr: no fpr line -> empty"
 
+# parse_collection_status: duplicity output -> TSV rows (awk collapses runs of spaces)
+raw=' Type of backup set:                            Time:      Num volumes:
+                Full         Mon Jun  9 00:00:01 2026                 2
+         Incremental         Tue Jun 10 00:00:01 2026                 1'
+assert_eq "$(printf '%s\n' "$raw" | parse_collection_status)" \
+    "$(printf 'Full\tMon Jun 9 00:00:01 2026\t2\nIncremental\tTue Jun 10 00:00:01 2026\t1')" \
+    "collection-status rows parsed"
+assert_eq "$(printf 'No backup chains found\n' | parse_collection_status)" "" "no sets -> empty"
+
+# cmd_status renders a table (plain ctx in CI); gpg absent -> private key "no"
+out="$(SNAPCTL_backup_target="sftp://nas/zui" GNUPGHOME="$SNAP_COMMON/.gnupg" cmd_status)"
+assert_contains "$out" "target" "status: target row"
+assert_contains "$out" "sftp://nas/zui" "status: target value"
+assert_contains "$out" "(unset)" "status: unset encrypt-key"
+assert_contains "$out" "$SNAP_DATA/backups" "status: dir row"
+assert_contains "$out" "3" "status: default retention"
+
 finish
