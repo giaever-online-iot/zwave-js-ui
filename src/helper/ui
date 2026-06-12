@@ -10,18 +10,33 @@
 
 UI_GUM="${UI_GUM:-${SNAP:-}/bin/gum}"
 
+# TTY-ness is captured ONCE here, at source time — at the script's top level,
+# before any command substitution. ui_* bodies resolve their context via
+# `case "$(ui_ctx)" in`, and inside $( ) fd 1 is ALWAYS the capture pipe, so a
+# live [ -t 1 ] there can never see the terminal: styled mode was structurally
+# unreachable (the rev-881 field bug). Per-call redirects of single ui_* calls
+# are deliberately not re-detected. Tests may assign UI_TTY1/UI_TTY2 directly.
+if [ -z "${UI_TTY1:-}" ]; then UI_TTY1=0; [ -t 1 ] && UI_TTY1=1; fi
+if [ -z "${UI_TTY2:-}" ]; then UI_TTY2=0; [ -t 2 ] && UI_TTY2=1; fi
+
 ui_ctx() {                     # [$1 output fd, default 1] -> syslog | plain | styled
     if [ "${DAEMONIZED:-0}" = 1 ]; then echo syslog; return; fi
     if [ -n "${NO_COLOR:-}" ] || [ "${TERM:-}" = dumb ]; then echo plain; return; fi
-    # TTY check, per requested fd. Test overrides: UI_TTY_FDS="1 2" lists fds to
-    # treat as TTYs (others NOT); UI_ASSUME_TTY=1 treats every fd as a TTY.
+    # TTY check, per requested fd, against the source-time flags above. Test
+    # overrides: UI_TTY_FDS="1 2" lists fds to treat as TTYs (others NOT);
+    # UI_ASSUME_TTY=1 treats every fd as a TTY.
+    local tty
     if [ -n "${UI_TTY_FDS:-}" ]; then
         case " ${UI_TTY_FDS} " in
             *" ${1:-1} "*) : ;;
             *) echo plain; return ;;
         esac
-    elif [ "${UI_ASSUME_TTY:-0}" != 1 ] && [ ! -t "${1:-1}" ]; then
-        echo plain; return
+    elif [ "${UI_ASSUME_TTY:-0}" != 1 ]; then
+        case "${1:-1}" in
+            2) tty="$UI_TTY2" ;;
+            *) tty="$UI_TTY1" ;;
+        esac
+        if [ "$tty" != 1 ]; then echo plain; return; fi
     fi
     if [ ! -x "$UI_GUM" ]; then echo plain; return; fi
     echo styled

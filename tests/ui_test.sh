@@ -20,9 +20,20 @@ source "$SNAP/helper/functions"     # fixture stub: SNAP_NAME, lprint, require_r
 # shellcheck source=/dev/null
 source "$ROOT/src/helper/ui"
 
+# Deterministic baseline regardless of where the suite runs: the library caches
+# TTY-ness at source time (UI_TTY1/UI_TTY2), which would be 1 on a developer's
+# terminal — pin both to 0 so "no TTY" assertions hold everywhere.
+# shellcheck disable=SC2034  # read by ui_ctx in the sourced library
+UI_TTY1=0
+# shellcheck disable=SC2034
+UI_TTY2=0
+
 # --- context resolution -------------------------------------------------
-# CI has no TTY, so the bare context is plain; UI_ASSUME_TTY=1 simulates a TTY.
+# Baseline is plain (flags pinned above); UI_ASSUME_TTY=1 simulates a TTY.
 assert_eq "$(ui_ctx)"                                  "plain"  "no TTY -> plain"
+assert_eq "$(UI_TTY1=1 ui_ctx)"                        "styled" "cached fd1 TTY flag -> styled"
+assert_eq "$(UI_TTY1=1 ui_ctx 2)"                      "plain"  "fd2 keyed: fd1 flag alone is not enough"
+assert_eq "$(UI_TTY2=1 ui_ctx 2)"                      "styled" "cached fd2 TTY flag -> styled for fd2"
 assert_eq "$(DAEMONIZED=1 ui_ctx)"                     "syslog" "daemonized -> syslog"
 assert_eq "$(DAEMONIZED=1 UI_ASSUME_TTY=1 ui_ctx)"     "syslog" "daemonized wins over TTY"
 assert_eq "$(UI_ASSUME_TTY=1 ui_ctx)"                  "styled" "TTY + stub gum -> styled"
@@ -124,5 +135,18 @@ GUM_ABORT=1 UI_ASSUME_TTY=1 ui_choose 'P' 'hint' a b >/dev/null 2>&1; assert_sta
 GUM_ABORT=1 UI_ASSUME_TTY=1 ui_input 'P' >/dev/null 2>&1;            assert_status "$?" "2" "input: ctrl-c -> 2"
 GUM_ABORT=1 UI_ASSUME_TTY=1 ui_confirm 'P' >/dev/null 2>&1;          assert_status "$?" "2" "confirm: ctrl-c -> 2"
 GUM_CONFIRM=1 UI_ASSUME_TTY=1 ui_confirm 'P'; assert_status "$?" "1" "confirm: plain no still 1"
+
+# --- real-pty integration (the rev-881 field bug) -----------------------------
+# Every ui_* body resolves its context via `case "$(ui_ctx)" in`; a live
+# [ -t 1 ] inside that $( ) is ALWAYS false (fd 1 is the capture pipe), so
+# styled mode could never engage on a real terminal — only the source-time
+# UI_TTY1/UI_TTY2 capture makes it reachable. Run on an actual pty via
+# script(1), with no test overrides, and demand the styled path.
+if command -v script >/dev/null 2>&1; then
+    pty_out="$(SNAP="$SNAP" ROOT="$ROOT" script -qec 'bash -c "source \"$SNAP/helper/functions\"; source \"$ROOT/src/helper/ui\"; ui_ok pty-styled"' /dev/null)"
+    assert_contains "$pty_out" "[style] ✓ pty-styled" "real pty -> styled (rev-881 regression)"
+else
+    echo "skip: script(1) unavailable — pty regression not run" >&2
+fi
 
 finish
