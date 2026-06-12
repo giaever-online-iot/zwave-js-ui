@@ -246,10 +246,16 @@ parts:
         --no-deps --no-build-isolation --require-hashes --break-system-packages \
         --target "${CRAFT_PART_INSTALL}/usr/lib/python3/dist-packages" \
         --requirement "${CRAFT_PROJECT_DIR}/requirements-duplicity.txt"
-      # pip --target also drops a console script with a build-env shebang (broken at
-      # runtime; the entry point is `python3 -m duplicity`) plus man/doc/locale
-      # data_files in a location nothing searches — strip the dead weight.
+    # Dead weight, excluded declaratively (cf. the zwave-js-ui part's stage list):
+    # pip's console script carries a build-env shebang (the entry point is
+    # `python3 -m duplicity`) and its data_files sit where nothing looks; the
+    # googleapi discovery cache is ~100 MB of JSON for EVERY Google API — the
+    # client falls back to network discovery for the one we use (drive v3),
+    # which is fine for a job that exists to reach the network.
+    stage:
+      - -usr/lib/python3/dist-packages/bin
+      - -usr/lib/python3/dist-packages/share
+      - -usr/lib/python3/dist-packages/googleapiclient/discovery_cache/documents
       # NOTE: this part has no `source:`, so after editing requirements-duplicity.txt
       # run `snapcraft clean backup-deps` for local incremental rebuilds.
-      rm -rf "${CRAFT_PART_INSTALL}/usr/lib/python3/dist-packages/bin" \
-             "${CRAFT_PART_INSTALL}/usr/lib/python3/dist-packages/share"
+      # (Dead-weight removal lives in the declarative `stage:` exclusions below.)
