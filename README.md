@@ -82,7 +82,7 @@ Manage your Z-Wave network from the web interface:
 ## Snap-Specific Features
 
 This snap includes features that simplify running and managing Z-Wave JS UI on systems that use snaps:
-- Read logs from the terminal regardless of whether the application logs to file
+- Read logs from the terminal regardless of whether the application logs to file (`zwave-js-ui.logs`)
 - Optional integration with the `code-server` snap to edit files in the persistent store
 
 ## Auto-Connections
@@ -108,6 +108,7 @@ Manual connect/disconnect examples:
 
 Additional notes:
 - If you install the snap outside the Snap Store (for example with `snap install --dangerous`), the interfaces might not be auto-connected and you may need to run the connect commands above.
+- `zwave-js-ui.logs` reads journald for any log not written to file ("log to file" off, the upstream default). That requires the `log-observe` interface, which is **not** auto-connected — without it the command exits with an error that includes the fix: `sudo snap connect zwave-js-ui:log-observe`.
 - Depending on your distribution, you may also need to adjust USB device permissions or add your user to a serial/dialout group for direct access to the controller device node.
 - Granting the `raw-usb` interface gives the snap broad access to USB devices. Only enable it if you trust the snap source and understand the implications.
 

@@ -89,7 +89,7 @@ Decide each stream's source by precedence — the filesystem is treated as groun
 |-----------|----------|
 | No `settings.json` (never configured) | Infer per Source resolution (→ journal by default); only show a friendly message if neither a file nor the journal yields anything. |
 | logToFile on but file absent | `tail -F` waits; emit a one-time "waiting for `<file>`" notice. |
-| `journalctl` denied / unavailable | Error with the `snap connect …:log-observe` hint. |
+| A followed stream resolves to journal while `log-observe` is unconnected | **Fatal: exit 1 before any follower launches**, naming the journald-backed stream(s) and printing the `snap connect …:log-observe` command. See the 2026-06-12 amendment. |
 | Not root (if required — see Verification) | `require_root`, consistent with `enable`/`disable`/`restart`. |
 
 ## Code & docs changes
@@ -121,3 +121,24 @@ Decide each stream's source by precedence — the filesystem is treated as groun
 - No timestamp-sorted global merge.
 - No log-level filtering.
 - No colorizing of log *content* (only labels).
+
+## Amendment 2026-06-12 — journald guard is fatal
+
+The first implementation softened the journal-denied case to a *warning* (probe
+`journalctl -n 0`, print the connect hint, launch the follower anyway). In
+practice `journalctl` dies instantly on the AppArmor denial and the command
+"succeeds" while showing nothing — confinement is per-snap, not per-UID, so
+`sudo` never helps. Amended behavior:
+
+- **Condition:** any *followed* stream resolves to the journal source while the
+  `log-observe` interface is unconnected. Checked with
+  `snapctl is-connected log-observe` (via the existing `plug_connected`
+  helper) — the stated condition itself, not a probe of its symptom.
+- **Behavior:** `require_journal_access` exits 1 with the stream label
+  (`journal_label`), the reason, and the connect command. `main` resolves all
+  selected streams **before** launching any follower, so death is a single
+  clean error with no half-started tails.
+- **Scope:** only streams being followed gate. A purely file-backed selection
+  (e.g. `logs zui` with `gateway.logToFile: true`) keeps working even when the
+  other stream is journald-backed without the interface — that request is
+  fully servable. The previous probe-and-warn block is removed.
