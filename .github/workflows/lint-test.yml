@@ -23,5 +23,7 @@ jobs:
         run: sudo snap install yq
       - name: Unit tests
         run: |
-          bash tests/logs_test.sh
-          bash tests/backup_test.sh
+          for t in tests/*_test.sh; do
+            echo "== $t"
+            bash "$t" || exit 1
+          done

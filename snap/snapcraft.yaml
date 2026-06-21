@@ -105,7 +105,7 @@ apps:
       - serial-port
       - hardware-observe
   help:
-    command: helper/env-wrapper --help
+    command: bin/help
   enable:
     command: bin/daemonize
   disable:
@@ -259,3 +259,16 @@ parts:
       # NOTE: this part has no `source:`, so after editing requirements-duplicity.txt
       # run `snapcraft clean backup-deps` for local incremental rebuilds.
       # (Dead-weight removal lives in the declarative `stage:` exclusions below.)
+
+  gum:
+    plugin: go
+    source: https://github.com/charmbracelet/gum.git
+    # renovate: depName=charmbracelet/gum
+    source-tag: v0.17.0
+    build-snaps:
+      - go/1.24/stable
+    build-environment:
+      - CGO_ENABLED: "0"
+      # Fail fast if the go snap channel ever lags gum's toolchain directive,
+      # instead of attempting a network toolchain download (blocked on Launchpad).
+      - GOTOOLCHAIN: local

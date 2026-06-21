@@ -78,6 +78,11 @@ assert_contains "$(follower_cmd 'file:/var/log/zui_current.log' 20)" "zui_curren
 assert_contains "$(follower_cmd journal 20)" "journalctl -u" "journal -> journalctl"
 assert_contains "$(follower_cmd journal 20)" "snap.zwave-js-ui.zwave-js-ui.service" "journal -> unit"
 
+# sel_to_target maps the interactive picker's labels onto follower targets
+assert_eq "$(sel_to_target all)"  "both" "picker: all -> both"
+assert_eq "$(sel_to_target zui)"  "zui"  "picker: zui"
+assert_eq "$(sel_to_target zwjs)" "zwjs" "picker: zwjs"
+
 # ---- journald guard: a journald-backed stream is unreadable without log-observe ----
 STUB_BIN="$HERE/fixtures/bin"   # instant-exit tail/journalctl so main's `wait` returns
 

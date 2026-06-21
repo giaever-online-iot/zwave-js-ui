@@ -1,28 +1,29 @@
 #!/usr/bin/env bash
+# daemonize — enable + start the service (zwave-js-ui.enable)
+: "${SNAP:?SNAP must be set}"
+source "$SNAP/helper/functions"
+source "$SNAP/helper/ui"
 
-source $SNAP/helper/functions
+main() {
+    require_root
+    if ! plugs_connected; then
+        ui_err "Cannot enable the $SNAP_NAME service — required interfaces are missing (see above)."
+        ui_print "Connect them, then verify the app boots with: sudo $SNAP_NAME.exec"
+        ui_print "More info: $SNAP_NAME.help"
+        return 1
+    fi
+    if ui_spin "Enabling $SNAP_NAME service…" snapctl start --enable "$SNAP_NAME.$SNAP_NAME"; then
+        ui_ok "Service enabled"
+        printf '%s\n' \
+            "follow all logs	sudo $SNAP_NAME.logs" \
+            "app log only	sudo $SNAP_NAME.logs zui" \
+            "driver log only	sudo $SNAP_NAME.logs zwjs" | ui_table
+        return 0
+    fi
+    ui_err "Failed enabling service"
+    return 1
+}
 
-require_root
-
-if ! plugs_connected; then
-    echo "Failed to enable ${SNAP_NAME} service!" >&2
-    echo ""
-    echo "Consult the help command:" >&2
-    echo "${SNAP_NAME}.help" >&2
-    echo ""
-    echo "Ensure ${SNAP_NAME} is booting successfully before daemonize it" >&2
-    echo "by running the app manually (${SNAP_NAME}.exec)." >&2
-    exit 1
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
 fi
-
-if snapctl start --enable "${SNAP_NAME}.${SNAP_NAME}"; then
-    echo "Service enabled!"
-    echo "- If you have turned OFF «log to file», follow logs with:"
-    echo "  $ snap logs ${SNAP_NAME} -f"
-    echo "- If you have turned ON «log to file», follow logs with:"
-    echo "  $ tail -f ${SNAP_DATA}/*.log"
-    exit 0
-fi
-
-echo "Failed enabling service" >&2
-exit 1
