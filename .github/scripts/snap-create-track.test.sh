@@ -32,11 +32,12 @@ run() {
   fi
 }
 
-run "empty cookie fails fast"   ""  ""                          ""    ""                                                          1 "SNAPCRAFT_SESSION_COOKIE is empty"
-run "201 creates track"         "c" '{"num-tracks-created": 1}' "201" ""                                                          0 "num-tracks-created=1"
-run "2xx but zero created"      "c" '{"num-tracks-created": 0}' "200" ""                                                          1 "created no track"
-run "302 -> login = expired"    "c" ""                          "302" "https://snapcraft.io/login?next=/zwave-js-ui/create-track" 1 "invalid or expired"
-run "403 unauthorized"          "c" '{"error":"nope"}'          "403" ""                                                          1 "unauthorized"
-run "500 generic failure"       "c" "oops"                      "500" ""                                                          1 "create-track failed (HTTP 500)"
+run "empty cookie fails fast"    ""    ""                          ""    ""                                                          1 "SNAPCRAFT_SESSION_COOKIE is empty"
+run "whitespace cookie fails"    $'\n' ""                          ""    ""                                                          1 "SNAPCRAFT_SESSION_COOKIE is empty"
+run "201 creates track"          "c"   '{"num-tracks-created": 1}' "201" ""                                                          0 "num-tracks-created=1"
+run "2xx but zero created"       "c"   '{"num-tracks-created": 0}' "200" ""                                                          1 "created no track"
+run "302 -> login = expired"     "c"   ""                          "302" "https://snapcraft.io/login?next=/zwave-js-ui/create-track" 1 "invalid or expired"
+run "403 unauthorized"           "c"   '{"error":"nope"}'          "403" ""                                                          1 "unauthorized"
+run "500 generic failure"        "c"   "oops"                      "500" ""                                                          1 "create-track failed (HTTP 500)"
 
 exit "$fail"

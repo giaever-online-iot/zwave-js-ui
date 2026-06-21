@@ -20,7 +20,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Shellcheck the release helper + tests
+      - name: Shellcheck the CI helpers + tests
         run: shellcheck .github/scripts/snap-release.sh .github/scripts/snap-release.test.sh .github/scripts/snap-create-track.sh .github/scripts/snap-create-track.test.sh
 
       - name: Run helper unit tests

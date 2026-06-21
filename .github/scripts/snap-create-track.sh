@@ -13,6 +13,10 @@ set -euo pipefail
 snap="${1:?usage: snap-create-track.sh <snap-name> <track>}"
 track="${2:?usage: snap-create-track.sh <snap-name> <track>}"
 cookie="${SNAPCRAFT_SESSION_COOKIE:-}"
+# Trim surrounding whitespace — a pasted cookie often carries a trailing newline,
+# which would otherwise slip past this guard and surface as a confusing 302.
+cookie="${cookie#"${cookie%%[![:space:]]*}"}"
+cookie="${cookie%"${cookie##*[![:space:]]}"}"
 
 if [ -z "$cookie" ]; then
   echo "::error::SNAPCRAFT_SESSION_COOKIE is empty or unset — cannot authenticate to create track ${track}. Set the repo secret to a current snapcraft.io session cookie." >&2
