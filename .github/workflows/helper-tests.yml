@@ -1,7 +1,7 @@
 name: Helper tests
 
-# Guards the CI helper that all the snap version/channel math depends on.
-# Runs only when the helper, its tests, or its fixtures change.
+# Guards the CI helpers (snap version/channel math; the retry-fetch remote-build
+# wrapper). Runs only when a helper, its tests, or its fixtures change.
 on:
   pull_request:
     branches: [main]
@@ -18,13 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Shellcheck the CI helpers + tests
-        run: shellcheck .github/scripts/snap-release.sh .github/scripts/snap-release.test.sh .github/scripts/snap-create-track.sh .github/scripts/snap-create-track.test.sh
+        run: shellcheck .github/scripts/*.sh
 
       - name: Run helper unit tests
-        run: bash .github/scripts/snap-release.test.sh
-
-      - name: Run create-track unit tests
-        run: bash .github/scripts/snap-create-track.test.sh
+        run: |
+          for t in .github/scripts/*.test.sh; do
+            echo "== $t"
+            bash "$t" || exit 1
+          done

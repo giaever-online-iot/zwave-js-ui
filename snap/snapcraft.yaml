@@ -1,6 +1,6 @@
 name: zwave-js-ui
 title: Zwave JS UI
-base: core24
+base: core26
 version: v11.19.1
 summary: Full-featured Z-Wave Control Panel and MQTT Gateway.
 description: | # markdown
@@ -105,7 +105,7 @@ apps:
       - serial-port
       - hardware-observe
   help:
-    command: helper/env-wrapper --help
+    command: bin/help
   enable:
     command: bin/daemonize
   disable:
@@ -199,10 +199,76 @@ parts:
 
   backup-deps:
     plugin: nil
+    # Tooling to pip-install duplicity at build time (and, on armhf — which has no
+    # prebuilt wheel — compile its _librsync C extension against librsync-dev).
+    build-packages:
+      - build-essential
+      - librsync-dev
+      - python3-dev
+      - python3-pip
+      - python3-setuptools
+      - python3-wheel
+    # Runtime: the snap-staged interpreter (the core26 base ships no Python) plus
+    # duplicity's runtime deps as archive debs — parity with the resolute duplicity
+    # deb's Depends — and our supported backends (boto3/b2sdk; the google trio for
+    # gdrive://, authenticated via backup.gdrive-credentials -> GOOGLE_SERVICE_JSON_FILE).
     stage-packages:
-      - duplicity
+      - python3
       - gnupg
+      - librsync2t64
+      - python3-fasteners
+      - python3-httplib2
+      - python3-lxml
+      - python3-paramiko
+      - python3-pexpect
+      - python3-psutil
+      - python3-requests
+      - python3-setuptools
       - python3-boto3
       - python3-b2sdk
-      - python3-paramiko
-      - python3-requests
+      - python3-googleapi
+      - python3-google-auth
+      - python3-google-auth-oauthlib
+    override-build: | # shell
+      craftctl default
+      # duplicity itself comes from PyPI, pinned + hash-locked, so every architecture
+      # ships the SAME version (the archive deb would drift per-release and the
+      # duplicity-team PPA builds amd64 only). --no-deps: its PyPI metadata hard-depends
+      # on EVERY backend (~250 MB) — runtime deps are the curated debs above instead.
+      # --no-build-isolation: the armhf sdist build uses the deb toolchain (resolute
+      # setuptools 78.1.1 satisfies duplicity's >=78.1.0). --break-system-packages:
+      # pip 25 applies PEP 668 even to --target installs into the part dir.
+      # /usr/bin/python3 (build VM, has pip via build-packages) and NOT bare python3:
+      # stage-packages are unpacked into CRAFT_PART_INSTALL before this scriptlet and
+      # its usr/bin precedes /usr/bin on PATH, so bare python3 is the pip-less staged
+      # interpreter. Same 3.14 either way — the cp314 wheel ABI matches the staged runtime.
+      /usr/bin/python3 -m pip install \
+        --no-deps --no-build-isolation --require-hashes --break-system-packages \
+        --target "${CRAFT_PART_INSTALL}/usr/lib/python3/dist-packages" \
+        --requirement "${CRAFT_PROJECT_DIR}/requirements-duplicity.txt"
+    # Dead weight, excluded declaratively (cf. the zwave-js-ui part's stage list):
+    # pip's console script carries a build-env shebang (the entry point is
+    # `python3 -m duplicity`) and its data_files sit where nothing looks; the
+    # googleapi discovery cache is ~100 MB of JSON for EVERY Google API — the
+    # client falls back to network discovery for the one we use (drive v3),
+    # which is fine for a job that exists to reach the network.
+    stage:
+      - -usr/lib/python3/dist-packages/bin
+      - -usr/lib/python3/dist-packages/share
+      - -usr/lib/python3/dist-packages/googleapiclient/discovery_cache/documents
+      # NOTE: this part has no `source:`, so after editing requirements-duplicity.txt
+      # run `snapcraft clean backup-deps` for local incremental rebuilds.
+      # (Dead-weight removal lives in the declarative `stage:` exclusions below.)
+
+  gum:
+    plugin: go
+    source: https://github.com/charmbracelet/gum.git
+    # renovate: depName=charmbracelet/gum
+    source-tag: v0.17.0
+    build-snaps:
+      - go/1.24/stable
+    build-environment:
+      - CGO_ENABLED: "0"
+      # Fail fast if the go snap channel ever lags gum's toolchain directive,
+      # instead of attempting a network toolchain download (blocked on Launchpad).
+      - GOTOOLCHAIN: local

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Test stub: optionally record that a follower launched, then exit at once
+# so main's `wait` returns instead of following forever.
+[ -z "${TAIL_SENTINEL:-}" ] || : > "$TAIL_SENTINEL"
+exit 0

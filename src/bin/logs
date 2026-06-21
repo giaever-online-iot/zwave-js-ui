@@ -2,18 +2,23 @@
 # logs — unified, terminal-friendly log follower for zwave-js-ui
 : "${SNAP:?SNAP must be set}"
 source "$SNAP/helper/functions"
+source "$SNAP/helper/ui"
 
 # ---- pure helpers (unit-tested) added by later tasks ----
 
 usage() {
-    cat <<EOF
+    ui_usage <<EOF
 Usage: ${SNAP_NAME}.logs [zui|--zui|zwjs|--zwjs]
 
-  (no arg)        follow both streams, merged
+  (no arg)        follow both streams, merged (interactive terminals get a picker)
   zui  | --zui    follow the Z-Wave JS UI application log only
   zwjs | --zwjs   follow the Z-Wave JS driver log only
   -h   | --help   show this help
 EOF
+}
+
+sel_to_target() {              # picker label -> follower target
+    case "$1" in all) echo both ;; *) normalize_target "$1" ;; esac
 }
 
 normalize_target() {           # $1 raw token; echoes both|zui|zwjs; status 2 if unknown
@@ -119,6 +124,18 @@ prefix_lines() {               # $1 prefix; prepends to each stdin line
 
 journal_unit() { echo "snap.${SNAP_NAME}.${SNAP_NAME}.service"; }
 
+require_journal_access() {     # $@ journald-backed streams; dies unless log-observe is connected
+    # Confinement is per-snap, not per-UID: even under sudo, journald stays
+    # unreadable until the log-observe interface is connected — so a journald-
+    # backed stream without it can only ever produce silence. Die instead.
+    [ "$#" -gt 0 ] || return 0
+    local msg
+    if msg="$(plug_connected log-observe)"; then return 0; fi
+    lprint "$(journal_label "$@") logs to journald ('log to file' is off), which cannot be read without the log-observe interface." >&2
+    lprint "$msg" >&2
+    exit 1
+}
+
 follower_cmd() {               # $1 source spec, $2 backlog -> a %q-quoted command string
     local spec="$1" n="$2"
     case "$spec" in
@@ -143,7 +160,14 @@ main() {
 
     require_root
 
-    local target; target="$(parse_args "$@")" || { usage >&2; exit 2; }
+    local target
+    if [ "$#" -eq 0 ] && ui_interactive; then
+        local sel
+        sel="$(ui_choose 'Follow which logs?' "pass a stream: ${SNAP_NAME}.logs [zui|zwjs]" all zui zwjs)" || exit 2
+        target="$(sel_to_target "$sel")"
+    else
+        target="$(parse_args "$@")" || { usage >&2; exit 2; }
+    fi
 
     local use_color=0; [ -t 1 ] && use_color=1
 
@@ -156,24 +180,34 @@ main() {
 
     local sf; sf="$(settings_file)"
     local BACKLOG=20
-    local pids=() journal_streams=() s setting src p other
+    local pids=() journal_streams=() file_streams=() file_srcs=() s setting src p other i
 
-    # Register cleanup BEFORE launching anything, so a Ctrl-C mid-launch still reaps every
-    # follower subshell AND its children (tail/journalctl + prefixer). Empty pids = no-op.
-    trap 'for p in "${pids[@]}"; do pkill -P "$p" 2>/dev/null; kill "$p" 2>/dev/null; done' EXIT INT TERM
-
+    # Resolve every followed stream BEFORE launching anything: if one of them needs
+    # journald while log-observe is unconnected, die up front with a single clear
+    # error instead of half-starting tails next to a journalctl that shows silence.
     for s in "${streams[@]}"; do
         setting="$(read_log_setting "$sf" "$(setting_key "$s")")"
         src="$(resolve_source "$s" "$setting")"
         if [ "$src" = journal ]; then
             journal_streams+=("$s")
         else
-            # If the file doesn't exist yet (e.g. logToFile just enabled), tail -F waits
-            # silently — tell the user what it's waiting for.
-            [ -e "${src#file:}" ] || lprint "Waiting for log file: ${src#file:}" >&2
-            launch_follower "$src" "$(make_prefix "$(stream_upper "$s")" "$(stream_color "$s")" "$use_color")"
-            pids+=("$!")
+            file_streams+=("$s"); file_srcs+=("$src")
         fi
+    done
+
+    require_journal_access "${journal_streams[@]}"
+
+    # Register cleanup BEFORE launching anything, so a Ctrl-C mid-launch still reaps every
+    # follower subshell AND its children (tail/journalctl + prefixer). Empty pids = no-op.
+    trap 'for p in "${pids[@]}"; do pkill -P "$p" 2>/dev/null; kill "$p" 2>/dev/null; done' EXIT INT TERM
+
+    for i in "${!file_streams[@]}"; do
+        s="${file_streams[$i]}"; src="${file_srcs[$i]}"
+        # If the file doesn't exist yet (e.g. logToFile just enabled), tail -F waits
+        # silently — tell the user what it's waiting for.
+        [ -e "${src#file:}" ] || lprint "Waiting for log file: ${src#file:}" >&2
+        launch_follower "$src" "$(make_prefix "$(stream_upper "$s")" "$(stream_color "$s")" "$use_color")"
+        pids+=("$!")
     done
 
     if [ "${#journal_streams[@]}" -gt 0 ]; then
@@ -185,11 +219,6 @@ main() {
             if [ "$(resolve_source "$other" "$(read_log_setting "$sf" "$(setting_key "$other")")")" = journal ]; then
                 lprint "Note: ${target} and ${other} share one journald stream; ${other} lines may also appear." >&2
             fi
-        fi
-        # Probe journal access; on denial, point the user at the interface to connect.
-        if ! journalctl -u "$(journal_unit)" -n 0 >/dev/null 2>&1; then
-            lprint "Cannot read the journal (permission?). Connect the interface with:" >&2
-            lprint "  sudo snap connect ${SNAP_NAME}:log-observe" >&2
         fi
         launch_follower journal "$(make_prefix "$(journal_label "${journal_streams[@]}")" yellow "$use_color")"
         pids+=("$!")

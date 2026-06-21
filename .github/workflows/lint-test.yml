@@ -12,7 +12,7 @@ jobs:
   lint-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: shellcheck
         # All snap scripts + the test harness, at warning severity (-x follows sourced
         # files). Verified clean after the simplification-audit cleanup.
@@ -23,5 +23,7 @@ jobs:
         run: sudo snap install yq
       - name: Unit tests
         run: |
-          bash tests/logs_test.sh
-          bash tests/backup_test.sh
+          for t in tests/*_test.sh; do
+            echo "== $t"
+            bash "$t" || exit 1
+          done
