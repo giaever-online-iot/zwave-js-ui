@@ -87,6 +87,13 @@ nth_fpr() {
     awk -F'\t' -v n="$1" 'NR==n{print $1; f=1; exit} END{exit !f}'
 }
 
+# Every gpg call against the SNAP keyring shares the same two flags: --homedir $GNUPGHOME
+# (the snap-local keyring, exported in main) and --no-autostart (gpg must not try to spawn
+# the base-path agent that doesn't exist in the snap; secret-key ops launch the staged one
+# via ensure_agent and connect over its socket). Centralise them here. NB: pick-key targets
+# the USER's host keyring, not $GNUPGHOME, so it does NOT use this wrapper.
+gpg_snap() { gpg --no-autostart --homedir "$GNUPGHOME" "$@"; }
+
 # USER-context: list the invoking user's host public keys, or export one (armored) to
 # stdout. Refuses root (root can't read the user's keyring — owner-match fails). Pipe the
 # export into `sudo zwave-js-ui.backup import-key` to store it in the snap keyring.
@@ -176,14 +183,14 @@ cmd_import_key() {
     local tmp; tmp="$(mktemp "${SNAP_COMMON:-/tmp}/.import-key.XXXXXX")"
     trap 'rm -f "$tmp"' RETURN
     cat > "$tmp"
-    # --no-autostart: importing a PUBLIC key needs no gpg-agent; without this, gpg tries
-    # to autostart the (base-path, absent-in-snap) agent and exits non-zero even though
-    # the import succeeded. See the gpg-agent packaging note for the secret-key paths.
-    local fpr; fpr="$(gpg --no-autostart --homedir "$GNUPGHOME" --show-keys --with-colons "$tmp" 2>/dev/null | first_fpr)"
+    # gpg_snap carries --no-autostart: importing a PUBLIC key needs no gpg-agent; without
+    # it gpg tries to autostart the (base-path, absent-in-snap) agent and exits non-zero
+    # even though the import succeeded. See the gpg-agent packaging note for secret-key ops.
+    local fpr; fpr="$(gpg_snap --show-keys --with-colons "$tmp" 2>/dev/null | first_fpr)"
     # gpg's import chatter (incl. host-agent version warnings) confuses more than it
     # informs — keep it for the failure path only, where it is the diagnostic.
     local gpgout
-    if ! gpgout="$(gpg --no-autostart --homedir "$GNUPGHOME" --import "$tmp" 2>&1)"; then
+    if ! gpgout="$(gpg_snap --import "$tmp" 2>&1)"; then
         lprint "Key import failed — backup.encrypt-key not changed. gpg said:" >&2
         printf '%s\n' "$gpgout" >&2
         return 1
@@ -192,7 +199,7 @@ cmd_import_key() {
         # Mark the designated backup key ultimately trusted in this dedicated keyring, so
         # gpg/duplicity will encrypt to it non-interactively. Without a trust path an
         # imported public key is "Unusable" for batch encryption.
-        printf '%s:6:\n' "$fpr" | gpg --no-autostart --homedir "$GNUPGHOME" --import-ownertrust 2>/dev/null
+        printf '%s:6:\n' "$fpr" | gpg_snap --import-ownertrust 2>/dev/null
         snapctl set backup.encrypt-key="$fpr"
         lprint "Imported ${fpr} (trusted) and set backup.encrypt-key=${fpr}." >&2
     else
@@ -255,18 +262,18 @@ cmd_create_key() {
     uid="$uid <$email>"
     # gpg chatter (trustdb, revocation-cert notes) only on failure, where it explains.
     local gpgout
-    if ! gpgout="$(gpg --no-autostart --homedir "$GNUPGHOME" --batch --pinentry-mode loopback --passphrase "$pass" \
+    if ! gpgout="$(gpg_snap --batch --pinentry-mode loopback --passphrase "$pass" \
         --quick-generate-key "$uid" ed25519 cert,sign never 2>&1)"; then
         lprint "Key generation failed — check the name/email are valid. gpg said:" >&2
         printf '%s\n' "$gpgout" >&2
         return 1
     fi
-    local fpr; fpr="$(gpg --no-autostart --homedir "$GNUPGHOME" --list-keys --with-colons "$email" 2>/dev/null | first_fpr)"
+    local fpr; fpr="$(gpg_snap --list-keys --with-colons "$email" 2>/dev/null | first_fpr)"
     if [ -z "$fpr" ]; then
         lprint "Key was generated but its fingerprint could not be read for '${email}'." >&2
         return 1
     fi
-    if ! gpgout="$(gpg --no-autostart --homedir "$GNUPGHOME" --batch --pinentry-mode loopback --passphrase "$pass" \
+    if ! gpgout="$(gpg_snap --batch --pinentry-mode loopback --passphrase "$pass" \
         --quick-add-key "$fpr" cv25519 encr never 2>&1)"; then
         lprint "Adding the encryption subkey failed; '${fpr}' is not usable for backups yet. gpg said:" >&2
         printf '%s\n' "$gpgout" >&2
@@ -291,7 +298,7 @@ cmd_export_key() {
     fi
     local fpr; fpr="$(cfg encrypt-key)"
     [ -n "$fpr" ] || { lprint "backup.encrypt-key not set; nothing to export." >&2; exit 1; }
-    if ! gpg --no-autostart --homedir "$GNUPGHOME" --list-secret-keys "$fpr" >/dev/null 2>&1; then
+    if ! gpg_snap --list-secret-keys "$fpr" >/dev/null 2>&1; then
         lprint "No private key on this device for ${fpr} (public-only or card key); nothing to export." >&2
         exit 0
     fi
@@ -301,7 +308,7 @@ cmd_export_key() {
     # stderr to a scratch file: it must not pollute the armored stdout, and gpg's
     # notes only help when the export FAILS (pinentry itself draws on the tty).
     local exported gpgerr; gpgerr="$(mktemp "${SNAP_COMMON:-/tmp}/.export-key-err.XXXXXX")"
-    if ! exported="$(gpg --no-autostart --homedir "$GNUPGHOME" --export-secret-keys --armor "$fpr" 2>"$gpgerr")" || [ -z "$exported" ]; then
+    if ! exported="$(gpg_snap --export-secret-keys --armor "$fpr" 2>"$gpgerr")" || [ -z "$exported" ]; then
         lprint "Export failed or produced no output — aborting. The private key has NOT been deleted. gpg said:" >&2
         cat "$gpgerr" >&2; rm -f "$gpgerr"
         exit 1
@@ -313,7 +320,7 @@ cmd_export_key() {
     case "${ans:-N}" in
         y|Y|yes|YES)
             local delout
-            if ! delout="$(gpg --no-autostart --homedir "$GNUPGHOME" --batch --yes --delete-secret-keys "$fpr" 2>&1)"; then
+            if ! delout="$(gpg_snap --batch --yes --delete-secret-keys "$fpr" 2>&1)"; then
                 lprint "Failed to delete the private key — it may still be present in the snap keyring. gpg said:" >&2
                 printf '%s\n' "$delout" >&2
                 exit 1
@@ -338,6 +345,22 @@ encryption_args() {            # echoes "--encrypt-key X" or "--no-encryption"; 
 }
 
 full_if_older() { local v; v=$(cfg full-if-older-than); echo "${v:-7D}"; }
+retention()     { local v; v=$(cfg retention);          echo "${v:-3}"; }
+
+# Preconditions shared by the backup/restore/list actions. Each prints guidance and exits
+# non-zero when unmet, matching the inline checks they replaced. (The `backup` action keeps
+# its own target check — it stays quiet for the daemonized timer instead of exiting 1.)
+require_target() {
+    [ -n "$(cfg target)" ] && return 0
+    lprint "backup.target not set." >&2
+    exit 1
+}
+
+require_encryption_config() {
+    encryption_args >/dev/null 2>&1 && return 0
+    lprint "Set 'backup.encrypt-key=<gpg-fpr>' or opt out with 'backup.encrypt=false'." >&2
+    exit 1
+}
 
 # gdrive:// auth: duplicity reads a Google service-account JSON from
 # GOOGLE_SERVICE_JSON_FILE. Export it when backup.gdrive-credentials is set;
@@ -422,24 +445,17 @@ main() {
                 lprint "Nothing to back up in $(backup_dir) — enable ZUI's scheduled backups in its settings." >&2
                 exit 0
             fi
-            if ! encryption_args >/dev/null 2>&1; then
-                lprint "Set 'backup.encrypt-key=<gpg-fpr>' or opt out with 'backup.encrypt=false'." >&2
-                exit 1
-            fi
+            require_encryption_config
             # shellcheck disable=SC2294
             if ! eval "$(build_backup_cmd "$(backup_dir)")"; then
                 lprint "Backup failed (duplicity exited non-zero)." >&2
                 exit 1
             fi
-            local keep; keep="$(cfg retention)"; keep="${keep:-3}"
-            "$DUP_PY" -m duplicity remove-all-but-n-full "$keep" --force --archive-dir "$ARCHIVE_DIR" "$target" || true
+            "$DUP_PY" -m duplicity remove-all-but-n-full "$(retention)" --force --archive-dir "$ARCHIVE_DIR" "$target" || true
             ;;
         restore)
-            [ -n "$target" ] || { lprint "backup.target not set." >&2; exit 1; }
-            if ! encryption_args >/dev/null 2>&1; then
-                lprint "Set 'backup.encrypt-key=<gpg-fpr>' or opt out with 'backup.encrypt=false'." >&2
-                exit 1
-            fi
+            require_target
+            require_encryption_config
             local dest; dest="$(backup_dir)"; mkdir -p "$dest"
             if encryption_args 2>/dev/null | grep -q -- '--no-encryption'; then
                 lprint "Restoring into ${dest} (no encryption)." >&2
@@ -460,11 +476,8 @@ main() {
             lprint "Done. Now use ZUI's in-app restore (NVM / store) to recover." >&2
             ;;
         list)
-            [ -n "$target" ] || { lprint "backup.target not set." >&2; exit 1; }
-            if ! encryption_args >/dev/null 2>&1; then
-                lprint "Set 'backup.encrypt-key=<gpg-fpr>' or opt out with 'backup.encrypt=false'." >&2
-                exit 1
-            fi
+            require_target
+            require_encryption_config
             # shellcheck disable=SC2294
             eval "$(build_list_cmd)"
             ;;

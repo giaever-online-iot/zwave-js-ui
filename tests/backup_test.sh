@@ -30,6 +30,11 @@ assert_eq "$(parse_sub 'status')"  "status"  "status"
 assert_eq "$(parse_sub 'import-key')" "import-key" "import-key"
 parse_sub bogus >/dev/null 2>&1; assert_status "$?" "2" "unknown -> 2"
 
+assert_eq "$(full_if_older)"                          "7D" "full_if_older default"
+assert_eq "$(SNAPCTL_backup_full_if_older_than=30D full_if_older)" "30D" "full_if_older configured"
+assert_eq "$(retention)"                              "3"  "retention default"
+assert_eq "$(SNAPCTL_backup_retention=5 retention)"   "5"  "retention configured"
+
 assert_eq "$(SNAPCTL_backup_encrypt_key=ABC123 encryption_args)" "--encrypt-key ABC123" "enc key"
 assert_eq "$(SNAPCTL_backup_encrypt=false encryption_args)"      "--no-encryption"       "no-encryption opt-out"
 encryption_args >/dev/null 2>&1; assert_status "$?" "2" "neither set -> refuse"

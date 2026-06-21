@@ -76,12 +76,14 @@ apps:
     daemon: simple
     restart-condition: always
     environment:
-      STORE_DIR: $SNAP_DATA
-      ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
+      # &app-env is the shared base; the daemon adds DAEMONIZED (lprint -> syslog).
+      <<: &app-env
+        STORE_DIR: $SNAP_DATA
+        ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
+        npm_config_cache: /usr/local/share/.cache/npm
       DAEMONIZED: 1
-      npm_config_cache: /usr/local/share/.cache/npm
-    command: lib/node_modules/zui-snap/node_modules/.bin/zwave-js-ui
-    command-chain:
+    command: &app-command lib/node_modules/zui-snap/node_modules/.bin/zwave-js-ui
+    command-chain: &app-command-chain
       - helper/env-wrapper
     plugs:
       - network
@@ -91,13 +93,9 @@ apps:
       - hardware-observe
       - log-observe
   exec:
-    environment:
-      STORE_DIR: $SNAP_DATA
-      ZWAVEJS_EXTERNAL_CONFIG: $SNAP_DATA/.ext-config
-      npm_config_cache: /usr/local/share/.cache/npm
-    command: lib/node_modules/zui-snap/node_modules/.bin/zwave-js-ui
-    command-chain:
-      - helper/env-wrapper
+    environment: *app-env
+    command: *app-command
+    command-chain: *app-command-chain
     plugs:
       - network
       - network-bind
@@ -105,7 +103,7 @@ apps:
       - serial-port
       - hardware-observe
   help:
-    command: helper/env-wrapper --help
+    command: bin/help
   enable:
     command: bin/daemonize
   disable:
@@ -138,8 +136,6 @@ layout:
   # Cache is set to (env) something outside the rw mount, to prevent storing it inside the store dir.
   /usr/local/share/.cache/npm:
     bind: $SNAP/.cache/npm
-  #/usr/local/share/.yarn: ?? Do we need this? Leave until proper testing is OK
-    #symlink: $SNAP/lib/node_modules
 
 slots: # ZUI offers new config dir within data (e.g for code-server snap)
   store-dir:
@@ -151,8 +147,6 @@ slots: # ZUI offers new config dir within data (e.g for code-server snap)
 parts:
   zwave-js-ui:
     after: [dependencies]
-    build-environment:
-      - DEBUG_BUILD: "false"
     build-snaps:
       - yq
     plugin: npm
@@ -161,16 +155,7 @@ parts:
     source: src/node
     override-build: | # shell
       ZUIV="${SNAPCRAFT_PROJECT_VERSION#v}" yq -i '.version=env(ZUIV),.dependencies.zwave-js-ui=env(ZUIV)' -o=j "${CRAFT_PART_BUILD}/package.json"
-      #cat "${CRAFT_PART_BUILD}/package.json"
-
       craftctl default
-
-      #! Add extra debugging
-      # if [ "${DEBUG_BUILD}" == true ]; then
-      #   echo "DEBUG"
-      #   echo "process.on(\"warning\", (warning) => { console.warn(\"Node.js warning: \" + warning.stack);});" >> "${CRAFT_PART_INSTALL}/lib/node_modules/zui-snap/node_modules/.bin/zwave-js-ui"
-      # fi
-
     stage-packages:
       - on armhf:
         - libatomic1

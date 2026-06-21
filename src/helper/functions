@@ -31,27 +31,22 @@ function plug_connected {
 function plugs_connected {
     MISSING=0
 
-    RAW_OUT=$(plug_connected "raw-usb")
-    RAW_RES=$?
-
-    SERIAL_OUT=$(plug_connected "serial-port")
-    SERIAL_RES=$?
-
-    if [ "$RAW_RES" -ne 0 ] && [ "$SERIAL_RES" -ne 0 ]; then
-        lprint "$RAW_OUT"
+    # raw-usb OR serial-port satisfies the controller requirement, so only surface the
+    # connect guidance when BOTH are missing. Probe silently with `snapctl is-connected`
+    # for that decision, then let plug_connected print via lprint — do NOT capture its
+    # output: under DAEMONIZED lprint routes to logger, so a captured string is empty and
+    # the message is lost (and the suppression for a single acceptable gap breaks).
+    if ! snapctl is-connected "raw-usb" && ! snapctl is-connected "serial-port"; then
+        plug_connected "raw-usb"
         lprint "----- OR -----"
-        lprint "$SERIAL_OUT"
+        plug_connected "serial-port"
         lprint "See ${SNAP_NAME}.help for more info on the serial-port plug"
         MISSING=1
     fi
 
     plug_connected "hardware-observe" || MISSING=1
 
-    if [ $MISSING -ne 0 ]; then
-        return 1
-    fi
-
-    return 0
+    [ "$MISSING" -eq 0 ]
 }
 
 function require_root {
@@ -64,15 +59,13 @@ function require_root {
 
 function testnset_config {
     lprint "Testing ${1}, or setting ${2}"
-    RES=$(snapctl get ${1})
-    if [ $? -ne 0 ] || [ -z "${RES}" ]; then
-        lprint "Setting ${1}=${2}"
-        RES=$(snapctl set ${1}=${2})
-        if [ $? -ne 0 ]; then
-            lprint "${RES}"
-            exit 1
-        fi
+    if RES=$(snapctl get "${1}") && [ -n "${RES}" ]; then
         return 0
+    fi
+    lprint "Setting ${1}=${2}"
+    if ! RES=$(snapctl set "${1}=${2}"); then
+        lprint "${RES}"
+        exit 1
     fi
     return 0
 }
