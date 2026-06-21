@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source $SNAP/helper/functions
+source "$SNAP/helper/functions"
 
 require_root
 
@@ -41,8 +41,13 @@ if [ -n "$(snapctl get timezone)" ]; then
     TZ=$(snapctl get timezone); export TZ
 fi
 
-#export GIT_DIR="${SNAP}/lib/node_modules/zwave-js-ui/.git"
 export ZWAVEJS_LOGS_DIR="${STORE_DIR}/logs/zwavejs"
 BACKUPS_DIR="$(backup_dir)"; export BACKUPS_DIR
 
-[ "$(basename "${1}")" == "npm" ] && cd "${SNAP}/lib/node_modules/zwave-js-ui" && exec "${@}" || exec "${@}"
+# When chained ahead of `npm`, run it from the app's module dir so its subcommands
+# resolve; otherwise exec the target as-is. Explicit if/then avoids the `A && B || C`
+# pitfall where a failed `cd` would silently fall through to an un-chdir'd exec.
+if [ "$(basename "${1}")" = "npm" ]; then
+    cd "${SNAP}/lib/node_modules/zwave-js-ui" || exit 1
+fi
+exec "${@}"
