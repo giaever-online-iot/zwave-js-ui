@@ -70,6 +70,17 @@ ui_cols() {                    # terminal width in columns. UI_COLS overrides (t
     printf '%s\n' "$c"
 }
 
+ui_lines() {                   # terminal height in rows. UI_LINES overrides (tests); 24 if unknown.
+                               # Same fd discipline as ui_cols; stty's FIRST field is rows.
+    if [ -n "${UI_LINES:-}" ]; then printf '%s\n' "$UI_LINES"; return; fi
+    local r
+    r="$(stty size 2>/dev/null </dev/tty | cut -d' ' -f1)"
+    case "$r" in ''|0|*[!0-9]*) r="$(stty size <&2 2>/dev/null | cut -d' ' -f1)" ;; esac
+    case "$r" in ''|0|*[!0-9]*) r="$(stty size <&0 2>/dev/null | cut -d' ' -f1)" ;; esac
+    case "$r" in ''|0|*[!0-9]*) r=24 ;; esac
+    printf '%s\n' "$r"
+}
+
 ui_print() {                   # one plain line, routed per context
     if [ "$(ui_ctx)" = syslog ]; then lprint "$*"; else printf '%s\n' "$*"; fi
 }

@@ -173,4 +173,20 @@ if command -v script >/dev/null 2>&1 && command -v setsid >/dev/null 2>&1; then
     assert_contains "$cw2" "77" "ui_cols reads fd2 winsize with no controlling tty / piped stdin"
 fi
 
+# --- ui_lines: terminal height detection --------------------------------------
+assert_eq "$(UI_LINES=42 ui_lines)" "42" "ui_lines honors UI_LINES override"
+rows_auto="$(UI_LINES='' ui_lines)"
+case "$rows_auto" in
+    ''|0|*[!0-9]*) FAIL=$((FAIL+1)); printf 'FAIL: ui_lines not a positive int: %q\n' "$rows_auto" >&2 ;;
+    *) PASS=$((PASS+1)) ;;
+esac
+if command -v script >/dev/null 2>&1; then
+    rl="$(ROOT="$ROOT" script -qec 'stty rows 37 2>/dev/null; bash -c "source \"$ROOT/src/helper/ui\"; ui_lines"' /dev/null | tr -d '\r')"
+    assert_contains "$rl" "37" "ui_lines reads real pty winsize (rows)"
+fi
+if command -v script >/dev/null 2>&1 && command -v setsid >/dev/null 2>&1; then
+    rl2="$(ROOT="$ROOT" script -qec 'stty rows 29 2>/dev/null; setsid bash -c "source \"$ROOT/src/helper/ui\"; ui_lines" </dev/null' /dev/null | tr -d '\r')"
+    assert_contains "$rl2" "29" "ui_lines reads fd2 rows with no controlling tty / piped stdin"
+fi
+
 finish
