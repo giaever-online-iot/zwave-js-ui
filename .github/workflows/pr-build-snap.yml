@@ -4,13 +4,16 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
-    # Only the snap recipe and its bundled source affect the built artifact, so
+    # Only the snap recipe and its bundled inputs affect the built artifact, so
     # build + publish to v<MM>/edge/<PR> ONLY when those change. Everything else
     # (docs, LICENSE, .gitignore, .github/**, renovate.json, editor config) is
     # intentionally excluded — a doc/config edit must not mint a store revision.
+    # requirements-duplicity.txt IS a build input: snapcraft pip-installs it into
+    # the artifact, and Renovate opens requirements-only bump PRs for it.
     paths:
       - 'snap/**'
       - 'src/**'
+      - 'requirements-duplicity.txt'
   workflow_dispatch:
 
 permissions:
@@ -136,7 +139,7 @@ jobs:
           IFS=',' read -ra WANT <<< "${{ steps.meta.outputs.archs }}"
           uploaded=(); missing=()
           for arch in "${WANT[@]}"; do
-            # Matches name_version_arch.snap (snapcraft 8.x / core24) — '*' also tolerates name_arch.snap.
+            # Matches name_version_arch.snap (snapcraft 8.14+ / core26) — '*' also tolerates name_arch.snap.
             f="$(ls -1 "${SNAP_NAME}"*"${arch}".snap 2>/dev/null | head -n1 || true)"
             if [ -z "$f" ]; then echo "missing snap for $arch"; missing+=("$arch"); continue; fi
             echo "Uploading $f -> $CHAN"
