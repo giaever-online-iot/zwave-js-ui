@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
+# de-daemonize — stop + disable the service (zwave-js-ui.disable)
+: "${SNAP:?SNAP must be set}"
+source "$SNAP/helper/functions"
+source "$SNAP/helper/ui"
 
-source $SNAP/helper/functions 
+main() {
+    require_root
+    if ui_spin "Disabling $SNAP_NAME service…" snapctl stop --disable "$SNAP_NAME.$SNAP_NAME"; then
+        ui_ok "Service disabled"
+        return 0
+    fi
+    ui_err "Failed disabling $SNAP_NAME service"
+    return 1
+}
 
-require_root
-
-if snapctl stop --disable "${SNAP_NAME}.${SNAP_NAME}"; then
-    echo "Service ${SNAP_NAME} disabled."
-    exit 0
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
 fi
-
-echo "Failed disabling ${SNAP_NAME} service" >&2
-exit 1

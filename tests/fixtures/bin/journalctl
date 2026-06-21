@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Test stub: succeed instantly so main's `wait` returns instead of following forever.
+exit 0

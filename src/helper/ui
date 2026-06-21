@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+# ui — gum-backed uniform terminal UI library. The ONLY place gum is invoked.
+# Source AFTER helper/functions (needs lprint). Rendering degrades by context:
+#   syslog: DAEMONIZED=1                           -> lprint only, never styled
+#   plain:  no TTY / NO_COLOR / TERM=dumb / no gum -> plain text, zero ANSI bytes
+#   styled: TTY + gum                              -> gum rendering, widgets allowed
+# Wording is identical across contexts; only the prefix glyphs differ
+# (styled ✓/!/✗ vs plain OK:/WARN:/ERROR:) so docs can quote one canonical text.
+# Test overrides: UI_GUM (gum path), UI_ASSUME_TTY=1 (treat stdin+stdout as TTY).
+
+UI_GUM="${UI_GUM:-${SNAP:-}/bin/gum}"
+
+# TTY-ness is captured ONCE here, at source time — at the script's top level,
+# before any command substitution. ui_* bodies resolve their context via
+# `case "$(ui_ctx)" in`, and inside $( ) fd 1 is ALWAYS the capture pipe, so a
+# live [ -t 1 ] there can never see the terminal: styled mode was structurally
+# unreachable (the rev-881 field bug). Per-call redirects of single ui_* calls
+# are deliberately not re-detected. Tests may assign UI_TTY1/UI_TTY2 directly.
+if [ -z "${UI_TTY1:-}" ]; then UI_TTY1=0; [ -t 1 ] && UI_TTY1=1; fi
+if [ -z "${UI_TTY2:-}" ]; then UI_TTY2=0; [ -t 2 ] && UI_TTY2=1; fi
+
+ui_ctx() {                     # [$1 output fd, default 1] -> syslog | plain | styled
+    if [ "${DAEMONIZED:-0}" = 1 ]; then echo syslog; return; fi
+    if [ -n "${NO_COLOR:-}" ] || [ "${TERM:-}" = dumb ]; then echo plain; return; fi
+    # TTY check, per requested fd, against the source-time flags above. Test
+    # overrides: UI_TTY_FDS="1 2" lists fds to treat as TTYs (others NOT);
+    # UI_ASSUME_TTY=1 treats every fd as a TTY.
+    local tty
+    if [ -n "${UI_TTY_FDS:-}" ]; then
+        case " ${UI_TTY_FDS} " in
+            *" ${1:-1} "*) : ;;
+            *) echo plain; return ;;
+        esac
+    elif [ "${UI_ASSUME_TTY:-0}" != 1 ]; then
+        case "${1:-1}" in
+            2) tty="$UI_TTY2" ;;
+            *) tty="$UI_TTY1" ;;
+        esac
+        if [ "$tty" != 1 ]; then echo plain; return; fi
+    fi
+    if [ ! -x "$UI_GUM" ]; then echo plain; return; fi
+    echo styled
+}
+
+# Returns non-zero when not interactive — under `set -e` call it ONLY as a
+# condition (`if ui_interactive`, `ui_interactive || …`), never as a bare statement.
+ui_interactive() {             # widgets additionally need stdin to be a terminal
+    [ "$(ui_ctx)" = styled ] || return 1
+    if [ -n "${UI_TTY_FDS:-}" ]; then
+        case " ${UI_TTY_FDS} " in *" 0 "*) return 0 ;; *) return 1 ;; esac
+    fi
+    [ "${UI_ASSUME_TTY:-0}" = 1 ] || [ -t 0 ]
+}
+
+ui_cols() {                    # terminal width in columns. UI_COLS overrides (tests); 80 if unknown.
+                               # Reads winsize off a fd that command substitution does NOT rebind —
+                               # the controlling tty first, then fd 2 / fd 0 — because inside $( )
+                               # fd 1 is always the capture pipe (the trap behind the rev-881 bug),
+                               # so its winsize would never reflect the real terminal. A 0×0 winsize
+                               # (e.g. a detached pty) counts as unknown and falls through to 80.
+    if [ -n "${UI_COLS:-}" ]; then printf '%s\n' "$UI_COLS"; return; fi
+    local c
+    # /dev/tty: suppress fd 2 BEFORE the open so a missing controlling tty is silent.
+    c="$(stty size 2>/dev/null </dev/tty | cut -d' ' -f2)"
+    # fd 2 / fd 0: dup the terminal handle BEFORE redirecting fd 2 to /dev/null —
+    # `2>/dev/null <&2` would point fd 0 at the just-nulled fd 2 and read nothing.
+    case "$c" in ''|0|*[!0-9]*) c="$(stty size <&2 2>/dev/null | cut -d' ' -f2)" ;; esac
+    case "$c" in ''|0|*[!0-9]*) c="$(stty size <&0 2>/dev/null | cut -d' ' -f2)" ;; esac
+    case "$c" in ''|0|*[!0-9]*) c=80 ;; esac
+    printf '%s\n' "$c"
+}
+
+ui_print() {                   # one plain line, routed per context
+    if [ "$(ui_ctx)" = syslog ]; then lprint "$*"; else printf '%s\n' "$*"; fi
+}
+
+ui_header() {                  # $1 title, $2 optional subtitle
+    local text="$1${2:+ · $2}"
+    case "$(ui_ctx)" in
+        styled) "$UI_GUM" style --border rounded --padding "0 2" --border-foreground 6 "$text" ;;
+        *)      ui_print "== $text ==" ;;
+    esac
+}
+
+ui_ok() {
+    case "$(ui_ctx)" in
+        styled) "$UI_GUM" style --foreground 2 "✓ $*" ;;
+        *)      ui_print "OK: $*" ;;
+    esac
+}
+
+ui_warn() {
+    case "$(ui_ctx 2)" in
+        styled) "$UI_GUM" style --foreground 3 "! $*" >&2 ;;
+        *)      ui_print "WARN: $*" >&2 ;;
+    esac
+}
+
+ui_err() {
+    case "$(ui_ctx 2)" in
+        styled) "$UI_GUM" style --foreground 1 "✗ $*" >&2 ;;
+        *)      ui_print "ERROR: $*" >&2 ;;
+    esac
+}
+
+ui_align() {                   # stdin: TAB-separated rows -> two-space aligned columns (pure)
+                               # column width is byte-based (mawk length) — ASCII-only alignment
+    awk -F'\t' '
+        { for (i=1; i<=NF; i++) { if (length($i) > w[i]) w[i] = length($i); c[NR,i] = $i } n[NR] = NF }
+        END { for (r=1; r<=NR; r++) { line = ""
+                for (i=1; i<=n[r]; i++) line = line sprintf("%-*s", (i < n[r] ? w[i]+2 : 0), c[r,i])
+                sub(/[ \t]+$/, "", line); print line } }'
+}
+
+# shellcheck disable=SC2120  # called with args from ui_kv and external scripts
+ui_table() {                   # stdin: TAB-separated rows; args: optional column headers
+                               # headers must not contain commas (gum --columns delimiter)
+    local cols
+    case "$(ui_ctx)" in
+        styled)
+            if [ "$#" -gt 0 ]; then
+                cols="$(IFS=,; printf '%s' "$*")"
+                "$UI_GUM" table --print --separator "$(printf '\t')" --columns "$cols"
+            else
+                "$UI_GUM" table --print --separator "$(printf '\t')"
+            fi ;;
+        *)
+            {
+                if [ "$#" -gt 0 ]; then local IFS=$'\t'; printf '%s\n' "$*"; fi
+                cat
+            } | ui_align ;;
+    esac
+}
+
+ui_kv() {                      # args: key value [key value]... -> 2-column table
+                               # an odd trailing argument is ignored
+    local out="" k v
+    while [ "$#" -ge 2 ]; do
+        k="$1"; v="$2"; shift 2
+        out="${out}${k}"$'\t'"${v}"$'\n'
+    done
+    printf '%s' "$out" | ui_table
+}
+
+ui_usage() {                   # stdin: usage text (readable raw; light markdown when styled)
+    case "$(ui_ctx)" in
+        styled) "$UI_GUM" format ;;
+        *)      cat ;;
+    esac
+}
+
+ui_choose() {                  # $1 prompt, $2 no-TTY hint, $3.. items -> echoes selection; 2 if not interactive/Ctrl-C/abort
+    local prompt="$1" hint="$2"; shift 2
+    if ui_interactive; then
+        "$UI_GUM" choose --header "$prompt" "$@"
+        local rc=$?
+        [ "$rc" = 130 ] && return 2
+        return "$rc"
+    else
+        ui_err "no TTY — $hint"
+        return 2
+    fi
+}
+
+ui_input() {                   # [--password] $1 prompt -> echoes value; piped stdin honored; 2 if nothing to read/Ctrl-C/abort
+                               # non-interactive path consumes ONE line of stdin — never call it in a
+                               # pipeline whose stdin carries data for a later command
+    local pw=()
+    if [ "${1:-}" = "--password" ]; then pw=(--password); shift; fi
+    if ui_interactive; then
+        "$UI_GUM" input "${pw[@]}" --header "$1"
+        local rc=$?
+        [ "$rc" = 130 ] && return 2
+        return "$rc"
+    elif [ ! -t 0 ]; then
+        local v; IFS= read -r v || return 2
+        printf '%s\n' "$v"
+    else
+        return 2
+    fi
+}
+
+ui_confirm() {                 # $1 question -> 0 yes / 1 no / 2 cannot ask/Ctrl-C/abort. Default is NO everywhere.
+    if ui_interactive; then
+        "$UI_GUM" confirm --default=false "$1"
+        local rc=$?
+        [ "$rc" = 130 ] && return 2
+        return "$rc"
+    elif [ ! -t 0 ]; then
+        local a; IFS= read -r a || a=""
+        case "$a" in y|Y|yes|YES) return 0 ;; *) return 1 ;; esac
+    else
+        return 2
+    fi
+}
+
+ui_spin() {                    # $1 title, rest: command — spinner when styled, plain title otherwise
+    local title="$1"; shift
+    if [ "$(ui_ctx)" = styled ]; then
+        "$UI_GUM" spin --spinner dot --title "$title" --show-output -- "$@"
+    else
+        ui_print "$title"
+        "$@"
+    fi
+}
