@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Shellcheck the release helper + tests
         run: shellcheck .github/scripts/snap-release.sh .github/scripts/snap-release.test.sh
