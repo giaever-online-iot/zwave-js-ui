@@ -123,17 +123,46 @@ ui_align() {                   # stdin: TAB-separated rows -> two-space aligned 
                 sub(/[ \t]+$/, "", line); print line } }'
 }
 
+ui_table_width() {             # [headers...]; stdin TSV -> natural bordered-table width estimate
+                               # sum(per-column max widths incl. headers) + 3 padding/border per col + 1
+    { if [ "$#" -gt 0 ]; then local IFS=$'\t'; printf '%s\n' "$*"; fi; cat; } | awk -F'\t' '
+        { for (i=1;i<=NF;i++) if (length($i)>w[i]) w[i]=length($i); if (NF>nc) nc=NF }
+        END { s=0; for (i=1;i<=nc;i++) s+=w[i]; print s + 3*nc + 1 }'
+}
+
+ui_stack() {                   # [headers...]; stdin TSV -> generic stacked records
+                               # col-1 = title; later columns = indented "header: value" (bare if no header)
+    local headers=("$@") line i
+    local -a fields
+    while IFS= read -r line; do
+        IFS=$'\t' read -ra fields <<< "$line"
+        printf '%s\n' "${fields[0]}"
+        for i in "${!fields[@]}"; do
+            [ "$i" -eq 0 ] && continue
+            if [ -n "${headers[$i]:-}" ]; then
+                printf '    %s: %s\n' "${headers[$i]}" "${fields[$i]}"
+            else
+                printf '    %s\n' "${fields[$i]}"
+            fi
+        done
+        printf '\n'
+    done
+}
+
 # shellcheck disable=SC2120  # called with args from ui_kv and external scripts
 ui_table() {                   # stdin: TAB-separated rows; args: optional column headers
                                # headers must not contain commas (gum --columns delimiter)
-    local cols
+    local cols rows
     case "$(ui_ctx)" in
         styled)
-            if [ "$#" -gt 0 ]; then
+            rows="$(cat)"
+            if [ "$(printf '%s\n' "$rows" | ui_table_width "$@")" -gt "$(ui_cols)" ]; then
+                printf '%s\n' "$rows" | ui_stack "$@"
+            elif [ "$#" -gt 0 ]; then
                 cols="$(IFS=,; printf '%s' "$*")"
-                "$UI_GUM" table --print --separator "$(printf '\t')" --columns "$cols"
+                printf '%s\n' "$rows" | "$UI_GUM" table --print --separator "$(printf '\t')" --columns "$cols"
             else
-                "$UI_GUM" table --print --separator "$(printf '\t')"
+                printf '%s\n' "$rows" | "$UI_GUM" table --print --separator "$(printf '\t')"
             fi ;;
         *)
             {

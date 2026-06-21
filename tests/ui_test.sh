@@ -189,4 +189,26 @@ if command -v script >/dev/null 2>&1 && command -v setsid >/dev/null 2>&1; then
     assert_contains "$rl2" "29" "ui_lines reads fd2 rows with no controlling tty / piped stdin"
 fi
 
+# --- ui_table width-fit: stack when wider than the terminal --------------------
+assert_eq "$(printf 'aa\tbbbb\n' | ui_table_width)" "$((2+4+3*2+1))" "table_width = sumcols + 3/col + 1"
+
+narrow="$(printf 'server.host\t0.0.0.0\tIP address the web UI binds to\n' \
+    | UI_ASSUME_TTY=1 UI_COLS=20 ui_table setting value description)"
+assert_contains "$narrow" "server.host"                              "stack: col-1 title"
+assert_contains "$narrow" "    value: 0.0.0.0"                       "stack: indented header: value"
+assert_contains "$narrow" "    description: IP address the web UI binds to" "stack: indented desc"
+case "$narrow" in *'[table]'*) FAIL=$((FAIL+1)); echo "FAIL: narrow used gum table" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+
+assert_contains "$(printf 'k\tv\n' | UI_ASSUME_TTY=1 UI_COLS=999 ui_table key value)" "[table]" "wide -> gum table"
+
+# headerless (ui_kv-style) 2-col: label is the title, value indented bare
+kvn="$(printf 'encrypt-key\t0E32DAF912C2645073A3DFFA8956E92F1A70C779\n' | UI_ASSUME_TTY=1 UI_COLS=20 ui_table)"
+assert_contains "$kvn" "encrypt-key"                                  "kv stack: label title"
+assert_contains "$kvn" "    0E32DAF912C2645073A3DFFA8956E92F1A70C779" "kv stack: indented bare value"
+
+# plain ctx unchanged (aligned columns, zero ANSI)
+plain="$(printf 'k\tv\n' | ui_table key value)"
+assert_contains "$plain" "k" "plain: aligned still works"
+printf '%s' "$plain" | grep -q "$(printf '\033')"; assert_status "$?" "1" "plain: zero ANSI"
+
 finish
