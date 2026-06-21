@@ -149,4 +149,28 @@ else
     echo "skip: script(1) unavailable — pty regression not run" >&2
 fi
 
+# --- ui_cols: terminal width detection ----------------------------------------
+# UI_COLS is the test/override hatch; the auto path reads the real winsize off a
+# fd that command substitution does NOT rebind (controlling tty, then fd2/fd0).
+assert_eq "$(UI_COLS=137 ui_cols)" "137" "ui_cols honors UI_COLS override"
+# With no override it must still yield a positive integer (failed reads -> 80).
+cols_auto="$(UI_COLS='' ui_cols)"
+case "$cols_auto" in
+    ''|0|*[!0-9]*) FAIL=$((FAIL+1)); printf 'FAIL: ui_cols not a positive int: %q\n' "$cols_auto" >&2 ;;
+    *) PASS=$((PASS+1)) ;;
+esac
+# Auto-detect reads the actual terminal winsize on a real pty (set via stty).
+if command -v script >/dev/null 2>&1; then
+    cw="$(ROOT="$ROOT" script -qec 'stty cols 91 2>/dev/null; bash -c "source \"$ROOT/src/helper/ui\"; ui_cols"' /dev/null | tr -d '\r')"
+    assert_contains "$cw" "91" "ui_cols reads real pty winsize"
+fi
+# Regression: inside `settings_rows | settings_render`, ui_cols runs with fd 0 = a
+# pipe, so the width must come off fd 2. Emulate with setsid (no controlling tty,
+# so /dev/tty is unavailable) + stdin closed. The redirect order must dup fd 2
+# BEFORE redirecting it to /dev/null — `2>/dev/null <&2` silently reads /dev/null.
+if command -v script >/dev/null 2>&1 && command -v setsid >/dev/null 2>&1; then
+    cw2="$(ROOT="$ROOT" script -qec 'stty cols 77 2>/dev/null; setsid bash -c "source \"$ROOT/src/helper/ui\"; ui_cols" </dev/null' /dev/null | tr -d '\r')"
+    assert_contains "$cw2" "77" "ui_cols reads fd2 winsize with no controlling tty / piped stdin"
+fi
+
 finish

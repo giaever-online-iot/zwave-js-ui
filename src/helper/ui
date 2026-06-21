@@ -52,6 +52,24 @@ ui_interactive() {             # widgets additionally need stdin to be a termina
     [ "${UI_ASSUME_TTY:-0}" = 1 ] || [ -t 0 ]
 }
 
+ui_cols() {                    # terminal width in columns. UI_COLS overrides (tests); 80 if unknown.
+                               # Reads winsize off a fd that command substitution does NOT rebind —
+                               # the controlling tty first, then fd 2 / fd 0 — because inside $( )
+                               # fd 1 is always the capture pipe (the trap behind the rev-881 bug),
+                               # so its winsize would never reflect the real terminal. A 0×0 winsize
+                               # (e.g. a detached pty) counts as unknown and falls through to 80.
+    if [ -n "${UI_COLS:-}" ]; then printf '%s\n' "$UI_COLS"; return; fi
+    local c
+    # /dev/tty: suppress fd 2 BEFORE the open so a missing controlling tty is silent.
+    c="$(stty size 2>/dev/null </dev/tty | cut -d' ' -f2)"
+    # fd 2 / fd 0: dup the terminal handle BEFORE redirecting fd 2 to /dev/null —
+    # `2>/dev/null <&2` would point fd 0 at the just-nulled fd 2 and read nothing.
+    case "$c" in ''|0|*[!0-9]*) c="$(stty size <&2 2>/dev/null | cut -d' ' -f2)" ;; esac
+    case "$c" in ''|0|*[!0-9]*) c="$(stty size <&0 2>/dev/null | cut -d' ' -f2)" ;; esac
+    case "$c" in ''|0|*[!0-9]*) c=80 ;; esac
+    printf '%s\n' "$c"
+}
+
 ui_print() {                   # one plain line, routed per context
     if [ "$(ui_ctx)" = syslog ]; then lprint "$*"; else printf '%s\n' "$*"; fi
 }
