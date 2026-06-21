@@ -83,4 +83,46 @@ assert_eq "$(sel_to_target all)"  "both" "picker: all -> both"
 assert_eq "$(sel_to_target zui)"  "zui"  "picker: zui"
 assert_eq "$(sel_to_target zwjs)" "zwjs" "picker: zwjs"
 
+# ---- journald guard: a journald-backed stream is unreadable without log-observe ----
+STUB_BIN="$HERE/fixtures/bin"   # instant-exit tail/journalctl so main's `wait` returns
+
+# require_journal_access: no journald-backed streams -> no-op, plug irrelevant
+( export TEST_CONNECTED_PLUGS=""; require_journal_access ) >/dev/null 2>&1
+assert_status "$?" "0" "guard: no journald streams -> ok"
+
+# connected -> passes silently
+out="$( ( export TEST_CONNECTED_PLUGS="log-observe"; require_journal_access zui ) 2>&1 )"; st=$?
+assert_status "$st" "0" "guard: plug connected -> ok"
+assert_eq "$out" "" "guard: plug connected -> silent"
+
+# journald-backed + plug missing -> dies with the why and the fix
+out="$( ( export TEST_CONNECTED_PLUGS=""; require_journal_access zui zwjs ) 2>&1 )"; st=$?
+assert_status "$st" "1" "guard: missing plug -> exit 1"
+assert_contains "$out" "ZUI/ZWJS" "guard: names the journald streams"
+assert_contains "$out" "journald" "guard: says why"
+assert_contains "$out" "snap connect zwave-js-ui:log-observe" "guard: connect instructions"
+
+# main: a followed journald stream w/o the plug kills the command BEFORE any
+# follower launches — the file-backed stream must not have been tailed.
+printf '%s' '{"gateway":{"logToFile":true},"zwave":{"logToFile":false}}' > "$SNAP_DATA/settings.json"
+out="$( ( PATH="$STUB_BIN:$PATH"; export TAIL_SENTINEL="$SNAP_DATA/tail.ran"; export TEST_CONNECTED_PLUGS=""; main ) 2>&1 )"; st=$?
+assert_status "$st" "1" "main: journald stream w/o plug -> exit 1"
+assert_contains "$out" "snap connect zwave-js-ui:log-observe" "main: death message has the fix"
+[ ! -e "$SNAP_DATA/tail.ran" ]; assert_status "$?" "0" "main: no follower launched before death"
+
+# main: all streams journald-backed w/o plug -> same death
+printf '%s' '{"gateway":{"logToFile":false},"zwave":{"logToFile":false}}' > "$SNAP_DATA/settings.json"
+( PATH="$STUB_BIN:$PATH"; export TEST_CONNECTED_PLUGS=""; main ) >/dev/null 2>&1
+assert_status "$?" "1" "main: all-journald w/o plug -> exit 1"
+
+# main: a purely file-backed selection still works — only FOLLOWED streams gate
+printf '%s' '{"gateway":{"logToFile":true},"zwave":{"logToFile":false}}' > "$SNAP_DATA/settings.json"
+( PATH="$STUB_BIN:$PATH"; export TEST_CONNECTED_PLUGS=""; main zui ) >/dev/null 2>&1
+assert_status "$?" "0" "main: file-backed selection unaffected by missing plug"
+
+# main: journald-backed WITH the plug connected -> follows the journal
+printf '%s' '{"gateway":{"logToFile":false},"zwave":{"logToFile":false}}' > "$SNAP_DATA/settings.json"
+( PATH="$STUB_BIN:$PATH"; export TEST_CONNECTED_PLUGS="log-observe"; main ) >/dev/null 2>&1
+assert_status "$?" "0" "main: connected -> follows journal"
+
 finish

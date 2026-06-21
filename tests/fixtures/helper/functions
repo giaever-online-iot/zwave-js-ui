@@ -2,3 +2,15 @@
 SNAP_NAME="zwave-js-ui"
 lprint() { echo "$*"; }
 require_root() { :; }   # no-op under test
+
+# Mirrors the real helper's contract (prints connect instructions, returns 1)
+# without snapctl: a plug counts as connected iff listed in $TEST_CONNECTED_PLUGS.
+plug_connected() {
+    case " ${TEST_CONNECTED_PLUGS:-} " in
+        *" $1 "*) return 0 ;;
+    esac
+    echo "Missing plug: «$1»"
+    echo "Connect with:"
+    echo "$ sudo snap connect ${SNAP_NAME}:$1"
+    return 1
+}

@@ -51,6 +51,8 @@ For reference (not relied upon by the code), ZUI currently writes:
 
 duplicity provides encrypted, incremental backups to many backends. It is **not in the snap today** and is added via `stage-packages` (duplicity + GnuPG + per-backend libraries; core24/Ubuntu 24.04).
 
+> **Superseded (2026-06-11):** since the core26 base switch, duplicity is pip-installed (pinned + hash-locked, `--no-deps`) and runs on snap-staged Python via `-m duplicity` — see `docs/superpowers/plans/2026-06-11-core26-pip-duplicity.md`. The contract in the rest of this spec is unchanged.
+
 - **Incremental chains** with periodic fulls (`--full-if-older-than`, default `7D`) and pruning (`remove-older-than`, retention configurable).
 - **Archive/cache dir** must be stable across runs for incrementals → `--archive-dir "$SNAP_COMMON/duplicity-cache"` (revision-independent, writable).
 - The backup **source** is `$BACKUPS_DIR`; the **target** is `backup.target` (a duplicity URL).

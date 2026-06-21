@@ -5,11 +5,12 @@ on:
     types: [closed]
     branches: [main]
     # Mirror pr-build-snap's filter: a merge only has something to promote when
-    # the PR built something (snap/ or src/). Docs-only merges skip entirely;
-    # the branch-has-revisions guard remains the runtime backstop.
+    # the PR built something (snap/, src/, or the pip requirements). Docs-only
+    # merges skip entirely; the branch-has-revisions guard remains the backstop.
     paths:
       - 'snap/**'
       - 'src/**'
+      - 'requirements-duplicity.txt'
 
 permissions:
   contents: read
@@ -31,7 +32,7 @@ jobs:
       SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install snapcraft
         run: sudo snap install snapcraft --classic
