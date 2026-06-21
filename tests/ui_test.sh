@@ -211,4 +211,18 @@ plain="$(printf 'k\tv\n' | ui_table key value)"
 assert_contains "$plain" "k" "plain: aligned still works"
 printf '%s' "$plain" | grep -q "$(printf '\033')"; assert_status "$?" "1" "plain: zero ANSI"
 
+# --- ui_pager: scroll only when styled AND taller than the screen --------------
+big="$(seq 1 50)"
+assert_contains "$(printf '%s\n' "$big" | UI_ASSUME_TTY=1 UI_LINES=10 ui_pager)" "[pager]" "pager: styled + overflow -> gum pager"
+# fits -> passthrough (no pager)
+fits="$(printf 'a\nb\n' | UI_ASSUME_TTY=1 UI_LINES=10 ui_pager)"
+assert_eq "$fits" "$(printf 'a\nb')" "pager: fits -> passthrough"
+case "$fits" in *'[pager]'*) FAIL=$((FAIL+1)); echo "FAIL: paged content that fit" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+# plain ctx -> passthrough even when tall
+plain="$(printf '%s\n' "$big" | NO_COLOR=1 UI_LINES=10 ui_pager)"
+case "$plain" in *'[pager]'*) FAIL=$((FAIL+1)); echo "FAIL: plain ctx paged" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+assert_contains "$plain" "50" "pager: plain passthrough keeps content"
+# gates on stdout: content arrives on a pipe (stdin not a tty) yet styled -> still pages
+assert_contains "$(printf '%s\n' "$big" | UI_ASSUME_TTY=1 UI_LINES=10 ui_pager)" "[pager]" "pager: piped stdin + styled still pages"
+
 finish

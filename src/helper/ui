@@ -189,6 +189,17 @@ ui_usage() {                   # stdin: usage text (readable raw; light markdown
     esac
 }
 
+ui_pager() {                   # stdin: content -> scrollable viewport when it overflows the screen.
+                               # Gates on stdout (ui_ctx), NOT stdin: gum pager reads content from
+                               # stdin and keystrokes from /dev/tty, so the content can be a pipe.
+    local content; content="$(cat)"
+    if [ "$(ui_ctx)" = styled ] && [ "$(printf '%s\n' "$content" | wc -l)" -gt "$(ui_lines)" ]; then
+        printf '%s\n' "$content" | "$UI_GUM" pager
+    else
+        printf '%s\n' "$content"
+    fi
+}
+
 ui_choose() {                  # $1 prompt, $2 no-TTY hint, $3.. items -> echoes selection; 2 if not interactive/Ctrl-C/abort
     local prompt="$1" hint="$2"; shift 2
     if ui_interactive; then
