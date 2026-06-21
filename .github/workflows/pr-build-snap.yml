@@ -63,16 +63,14 @@ jobs:
             echo "archs=$ARCHS"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Remote-build all archs (tolerant of partial failure)
+      # Builds + fetches every arch, retrying when a transient network error
+      # truncates the artifact DOWNLOAD (the Launchpad build itself succeeds).
+      # Validates each .snap, drops truncated ones, and re-fetches via --recover
+      # (no rebuild). Still tolerant of a genuine partial-arch build failure.
+      # Writes steps.build.outputs.snaps=<valid-count>. See remote-build.test.sh.
+      - name: Remote-build all archs (retry transient fetch failures)
         id: build
-        run: |
-          # Deliberately NOT 'set -e': a partial-arch build must not abort the step.
-          set -uo pipefail
-          echo "Building: ${{ steps.meta.outputs.archs }}"
-          snapcraft remote-build -v --launchpad-accept-public-upload --build-for="${{ steps.meta.outputs.archs }}" || true
-          ls -1 ./*.snap 2>/dev/null || echo "(no .snap files produced)"
-          count=$(ls -1 ./*.snap 2>/dev/null | wc -l | tr -d ' ')
-          echo "snaps=$count" >> "$GITHUB_OUTPUT"
+        run: .github/scripts/remote-build.sh "${{ steps.meta.outputs.archs }}"
 
       # remote-build writes its detailed error (e.g. the BadRequest reason) only to a
       # log file on the runner, which is otherwise lost. Surface it when no snap built.
