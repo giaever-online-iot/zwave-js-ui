@@ -17,6 +17,11 @@ source "$ROOT/src/bin/backup"          # backup's own helpers (+ stub functions 
 # shellcheck source=/dev/null
 source "$ROOT/src/helper/functions"    # REAL shared helpers (e.g. backup_dir), resolved against the snapctl stub above
 
+# Re-stub require_root: the real helper exits when not root, but main is invocable
+# under test because the integration tests run as an unprivileged user and only test
+# the rendering path, not the root check.
+require_root() { :; }
+
 # --- tests appended by later tasks ---
 
 assert_eq "$(backup_dir)" "$SNAP_DATA/backups" "default backup dir"
@@ -160,5 +165,16 @@ assert_eq "$(printf '%s\n' "$_two" | nth_fpr 2)" "222222222222222222222222222222
 printf '%s\n' "$_two" | nth_fpr 3 >/dev/null 2>&1; assert_status "$?" "1" "nth_fpr: out of range -> 1"
 printf '%s\n' "$_two" | nth_fpr x >/dev/null 2>&1; assert_status "$?" "1" "nth_fpr: non-numeric -> 1"
 printf '%s\n' "$_two" | nth_fpr '' >/dev/null 2>&1; assert_status "$?" "1" "nth_fpr: empty -> 1"
+
+# --- status routes through ui_pager (passthrough in plain ctx) -----------------
+# main status on a tiny styled screen must go through the gum pager stub.
+sp="$(SNAPCTL_backup_target="sftp://nas/zui" GNUPGHOME="$SNAP_COMMON/.gnupg" \
+     UI_ASSUME_TTY=1 UI_COLS=999 UI_LINES=2 main status 2>/dev/null)"
+assert_contains "$sp" "[pager]" "main status: pages through ui_pager on a tiny styled screen"
+# plain ctx: no pager, content intact
+spp="$(SNAPCTL_backup_target="sftp://nas/zui" GNUPGHOME="$SNAP_COMMON/.gnupg" \
+      NO_COLOR=1 UI_LINES=2 main status 2>/dev/null)"
+assert_contains "$spp" "sftp://nas/zui" "main status: plain ctx keeps content"
+case "$spp" in *'[pager]'*) FAIL=$((FAIL+1)); echo "FAIL: plain ctx paged status" >&2 ;; *) PASS=$((PASS+1)) ;; esac
 
 finish

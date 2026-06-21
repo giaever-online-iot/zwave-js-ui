@@ -54,5 +54,7 @@ main() {
 }
 
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
-    main "$@"
+    # main renders styled (UI_TTY1 is cached at source time, so the internal pipe to
+    # ui_pager does not flip the context to plain); ui_pager scrolls only on overflow.
+    main "$@" | ui_pager
 fi
