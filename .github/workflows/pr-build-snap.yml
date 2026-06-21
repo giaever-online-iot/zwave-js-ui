@@ -98,30 +98,17 @@ jobs:
         if: ${{ steps.build.outputs.snaps != '0' && github.event_name == 'pull_request' }}
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-          SNAPCRAFT_SESSION: ${{ secrets.SNAPCRAFT_SESSION }}
+          SNAPCRAFT_SESSION_COOKIE: ${{ secrets.SNAPCRAFT_SESSION_COOKIE }}
         run: |
           set -euo pipefail
           TRACK="${{ steps.meta.outputs.track }}"
+          # Listing tracks uses the macaroon (SNAPCRAFT_STORE_CREDENTIALS); skip if it exists.
           if snapcraft tracks "$SNAP_NAME" | awk 'NR>1{print $1}' | grep -qx "$TRACK"; then
             echo "Track $TRACK already exists."
             exit 0
           fi
-          echo "Creating track $TRACK via dashboard API ..."
-          resp="$(curl -sS -w $'\n%{http_code}' \
-            -X POST "https://snapcraft.io/${SNAP_NAME}/create-track" \
-            -H "Cookie: session=${SNAPCRAFT_SESSION};" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -H "Origin: https://snapcraft.io" \
-            -H "Referer: https://snapcraft.io/${SNAP_NAME}/releases" \
-            --data-urlencode "track-name=${TRACK}")"
-          code="$(printf '%s' "$resp" | tail -n1)"
-          body="$(printf '%s' "$resp" | sed '$d')"
-          echo "HTTP $code"; echo "$body"
-          case "$code" in
-            2*) echo "Track $TRACK created." ;;
-            401|403) echo "::error::create-track unauthorized — refresh the SNAPCRAFT_SESSION secret or verify Track-Creation-Guardrails for $SNAP_NAME."; exit 1 ;;
-            *) echo "::error::create-track failed (HTTP $code)."; exit 1 ;;
-          esac
+          # Creating a track has no snapcraft command — it needs the storefront session cookie.
+          bash .github/scripts/snap-create-track.sh "$SNAP_NAME" "$TRACK"
 
       - name: Upload built archs to v<MM>/edge/<PR>
         id: release
