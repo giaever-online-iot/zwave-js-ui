@@ -10,6 +10,8 @@
 #   branch-has-revisions <track> <pr>  (stdin: `snapcraft status`) -> yes|no
 #   needs-stable-bump <new> <cand>     yes iff cand set & major(new)>major(cand)
 #   is-at-least <ver> <floor>          yes iff ver>=floor  (floor "" -> yes)
+#   latest-targets <new> <cand> <edge> latest/* channels <new> may land on, each gated by
+#                                      new >= that channel's own ver (no downgrade); space-sep
 set -euo pipefail
 
 # numeric major.minor.patch compare; echoes -1|0|1 (leading 'v' stripped)
@@ -24,6 +26,12 @@ _vercmp() {
     if (( 10#$x < 10#$y )); then echo -1; return; fi
   done
   echo 0
+}
+
+# true (exit 0) iff ver >= floor; empty floor => true. Leading 'v' optional.
+_at_least() {
+  [ -z "${2:-}" ] && return 0
+  [ "$(_vercmp "${1:-}" "$2")" -ge 0 ]
 }
 
 cmd="${1:-}"; shift || true
@@ -69,10 +77,17 @@ case "$cmd" in
     if (( 10#$mn > 10#$mc )); then echo yes; else echo no; fi
     ;;
   is-at-least)
-    ver="${1:-}"; floor="${2:-}"
-    if [ -z "$floor" ]; then echo yes; exit 0; fi
-    c="$(_vercmp "$ver" "$floor")"
-    if [ "$c" -ge 0 ]; then echo yes; else echo no; fi
+    if _at_least "${1:-}" "${2:-}"; then echo yes; else echo no; fi
+    ;;
+  latest-targets)
+    # args: <new-ver> <latest/candidate ver> <latest/edge ver>.
+    # Echo the latest/* channels <new-ver> may land on — each gated independently by
+    # <new-ver> >= that channel's OWN current version, so a backport can never downgrade
+    # a shared channel already ahead. Empty floor (channel currently empty) => qualifies.
+    v="${1:-}"; out=""
+    if _at_least "$v" "${2:-}"; then out="$out latest/candidate"; fi
+    if _at_least "$v" "${3:-}"; then out="$out latest/edge"; fi
+    echo "${out# }"
     ;;
   *)
     echo "snap-release.sh: unknown subcommand: ${cmd:-<none>}" >&2

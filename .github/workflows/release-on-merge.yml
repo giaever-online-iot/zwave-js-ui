@@ -84,13 +84,17 @@ jobs:
           echo ">> $BRANCH -> $TRACK/stable"
           snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel "$TRACK/stable" --yes
 
-          # 3) Shared latest/* only if this isn't a backport.
-          if [ "$("$SR" is-at-least "$V" "$CAND")" = "yes" ]; then
-            echo ">> $BRANCH -> latest/candidate, latest/edge"
-            snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel latest/candidate --yes
-            snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel latest/edge --yes
+          # 3) Shared latest/* — promote each channel only if $V is >= that channel's OWN
+          #    current version, so a backport can never downgrade a channel already ahead.
+          EDGE="$("$SR" channel-version latest/edge <<<"$INFO")"
+          TARGETS="$("$SR" latest-targets "$V" "$CAND" "$EDGE")"
+          if [ -n "$TARGETS" ]; then
+            for ch in $TARGETS; do
+              echo ">> $BRANCH -> $ch"
+              snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel "$ch" --yes
+            done
           else
-            echo ">> backport ($V < $CAND): leaving latest/* unchanged"
+            echo ">> backport ($V; candidate=${CAND:-<none>} edge=${EDGE:-<none>}): leaving latest/* unchanged"
           fi
 
           # 4) Close the PR branch (auto-expires anyway; this is tidy-up).

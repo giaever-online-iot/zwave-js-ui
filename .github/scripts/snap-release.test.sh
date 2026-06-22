@@ -54,4 +54,13 @@ check "is-at-least lesser"       "no"  "$("$SR" is-at-least v11.5.0 v11.19.0)"
 check "is-at-least empty-floor"  "yes" "$("$SR" is-at-least v11.0.0 "")"
 check "is-at-least minor-numeric" "yes" "$("$SR" is-at-least v11.20.0 v11.9.0)"
 
+# latest-targets <new> <latest/candidate ver> <latest/edge ver> -> space-sep latest/* channels
+# <new> may land on, each gated by <new> >= that channel's OWN version (no downgrades).
+check "latest-targets both-newer"   "latest/candidate latest/edge" "$("$SR" latest-targets v11.21.0 v11.20.0 v11.20.0)"
+check "latest-targets equal"        "latest/candidate latest/edge" "$("$SR" latest-targets v11.20.0 v11.20.0 v11.20.0)"
+check "latest-targets edge-ahead"   "latest/candidate"             "$("$SR" latest-targets v11.20.0 v11.20.0 v11.21.0)"
+check "latest-targets cand-ahead"   "latest/edge"                  "$("$SR" latest-targets v11.20.0 v11.21.0 v11.20.0)"
+check "latest-targets backport"     ""                             "$("$SR" latest-targets v11.19.0 v11.20.0 v11.20.0)"
+check "latest-targets empty-floors" "latest/candidate latest/edge" "$("$SR" latest-targets v11.20.0 "" "")"
+
 exit "$fail"
