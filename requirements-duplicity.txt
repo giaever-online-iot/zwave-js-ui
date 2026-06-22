@@ -11,10 +11,28 @@
 # (python-gettext: keep the .tar.gz + the py3-none-any wheel hashes — same curl, its name/version.)
 # After editing this file run `snapcraft clean backup-deps` before a local incremental
 # rebuild — the backup-deps part has no `source:` watching this file.
-duplicity==3.0.7 \
-    --hash=sha256:464245217285012e8e0c74ad3edf16be7ff4801caa5272745f10d93a2a7de44e \
-    --hash=sha256:874b8496dda49eb755eca9230dd73b03ff52e0d1bb316b1b189d2af0da4b3751 \
-    --hash=sha256:7ddfa3902b43e7fd4dab268a49aad8c321b4853f9122000691a1be636a2fcc5d
+duplicity==3.1.0 \
+    --hash=sha256:10e3e75c24ae722fda7f48476e9732a79e0f15c43e3d1fe342d05b5c61587c36 \
+    --hash=sha256:1527af9d6e0aded54ffd384d8e2c342824f9f473943c4f6af930b525efff9d58 \
+    --hash=sha256:15ee788a0b7f5c70a13fd44d16b2231660b4e1a4741fd5b417af3e2db3bc5f8c \
+    --hash=sha256:3811a78ce1abd5f99a0b26cb0025cdc816b567a2f893c49bf6b03eea1f96959c \
+    --hash=sha256:3c346729793fe066800abc8ac7ff645f3b6fb6cb353f48cefc061a58f8e7c6d0 \
+    --hash=sha256:594267e64ed0166ec6b1c4231b2c72b21f5fe27bf3e6e93007fb7680bffcd15c \
+    --hash=sha256:6119dc76def56f4e2117c5e7b93354de6a839ccd4576d1255fcfcd1514d7f9ea \
+    --hash=sha256:69ffb7438811aa6b8ea501f17b1026dd872fac186eaf353522663a77d2fac417 \
+    --hash=sha256:702f84f730d53739d0af82af36c507338817d6d69d9f6f884cc242c0ef186dfb \
+    --hash=sha256:72ed58fdbef85f2384a6c87dc2138856edad6cfde1d272c860e41425d78962c5 \
+    --hash=sha256:80171179558f3c4407deb347b444df64ec2e05486adee70e9f3235afff4d7e23 \
+    --hash=sha256:892ec7212a84fc23661f19d46df1226795a7da0fbc83462687d6b77de96971c0 \
+    --hash=sha256:8f30d296f929fa0db4108afcbc84d8a29a64e7a727199f1efbf2f1ca5978cd9a \
+    --hash=sha256:9bb17e8f07a50eb52d2647dd33f74595ff8feffa03c38137a7401c8203d2d90f \
+    --hash=sha256:9bd8cecdb85043146537e34c5a8eb3f9fa66bf625bb9cc99787dc5774fc4919e \
+    --hash=sha256:a74ef057e2c39c27e8a3493b2e98c88c747408424f12e66233462b59b235ce82 \
+    --hash=sha256:a8440898cd90d70d6732f6121e1be333ea5718a3a230d018b35d581a2113cc22 \
+    --hash=sha256:b0030ea623a69cc3bda44faa622a134dada701da3fd546d9c80acf66fd0ff2aa \
+    --hash=sha256:b738a2cbda2ff233cd5d64c18aa5d73c14fc9467ca1cc89cf07ed7705a4eb98a \
+    --hash=sha256:d954f0e9f93bac3a6f4180b287ef2462286f0fdeb4086a388cfb3fdb823ed95a \
+    --hash=sha256:f5cedc1158a1e6281e4957d751a8bbbf496bde75d0f42af39e83a31120a503cf
 python-gettext==5.0 \
     --hash=sha256:083d4c72c5e72a6bd83b0570770792b9a1e572d8ab3e9cba554e0cd4781aa84a \
     --hash=sha256:869af1ea45e3dab6180557259824c2a62f1800e1286226af912431fe75c5084c
