@@ -194,6 +194,7 @@ parts:
     source: src/
     stage-packages:
       - uuid
+      - less
     organize:
       hooks: snap/hooks
 
