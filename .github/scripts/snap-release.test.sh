@@ -4,7 +4,7 @@ set -uo pipefail  # no -e: keep all tests running even if earlier ones fail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SR="$HERE/snap-release.sh"
-INFO="$HERE/fixtures/snap-info.txt"
+INFO="$HERE/fixtures/snapcraft-status.txt"
 fail=0
 
 check() { # desc expected actual
@@ -25,14 +25,14 @@ check "major v-prefixed" "12" "$("$SR" major v12.0.0)"
 check "major bare"       "11" "$("$SR" major 11.19.1)"
 check "major empty"      ""   "$("$SR" major "")"
 
-check "channel-version candidate" "v11.19.1" "$("$SR" channel-version latest/candidate <"$INFO")"
-check "channel-version stable"    "v11.14.0" "$("$SR" channel-version latest/stable <"$INFO")"
-check "channel-version caret"     ""         "$("$SR" channel-version latest/beta <"$INFO")"
-check "channel-version branch"    "v11.19.2" "$("$SR" channel-version v11.19/edge/42 <"$INFO")"
-check "channel-version absent"    ""         "$("$SR" channel-version v99.9/stable <"$INFO")"
+check "channel-version candidate"  "v11.20.0" "$("$SR" channel-version latest/candidate <"$INFO")"
+check "channel-version stable"     "v11.14.0" "$("$SR" channel-version latest/stable <"$INFO")"
+check "channel-version inherited"  ""         "$("$SR" channel-version latest/beta <"$INFO")"
+check "channel-version branch"     "v11.20.0" "$("$SR" channel-version v11.20/edge/204 <"$INFO")"
+check "channel-version absent"     ""         "$("$SR" channel-version v99.9/stable <"$INFO")"
 
-check "branch-has-revisions yes" "yes" "$("$SR" branch-has-revisions v11.19 42 <"$INFO")"
-check "branch-has-revisions no"  "no"  "$("$SR" branch-has-revisions v11.19 99 <"$INFO")"
+check "branch-has-revisions yes"   "yes" "$("$SR" branch-has-revisions v11.20 204 <"$INFO")"
+check "branch-has-revisions no"    "no"  "$("$SR" branch-has-revisions v11.20 999 <"$INFO")"
 
 check "needs-stable-bump major"      "yes" "$("$SR" needs-stable-bump v12.0.0 v11.20.3)"
 check "needs-stable-bump minor"      "no"  "$("$SR" needs-stable-bump v11.20.0 v11.19.1)"
