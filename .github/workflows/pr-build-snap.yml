@@ -5,11 +5,8 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened]
     # Only the snap recipe and its bundled inputs affect the built artifact, so
-    # build + publish to v<MM>/edge/<PR> ONLY when those change. Everything else
-    # (docs, LICENSE, .gitignore, .github/**, renovate.json, editor config) is
-    # intentionally excluded — a doc/config edit must not mint a store revision.
-    # requirements-duplicity.txt IS a build input: snapcraft pip-installs it into
-    # the artifact, and Renovate opens requirements-only bump PRs for it.
+    # build + publish ONLY when those change. Docs/config edits must not mint a
+    # store revision. requirements-duplicity.txt IS a build input (pip-installed).
     paths:
       - 'snap/**'
       - 'src/**'
@@ -28,162 +25,221 @@ env:
   SNAP_NAME: zwave-js-ui
 
 jobs:
-  build-and-release:
+  meta:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      track: ${{ steps.meta.outputs.track }}
+      archs: ${{ steps.meta.outputs.archs }}
+      archs_csv: ${{ steps.meta.outputs.archs_csv }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          # snapcraft remote-build refuses shallow clones ("Remote builds for
-          # shallow cloned git repos are not supported"), so fetch full history.
-          fetch-depth: 0
-
-      - name: Install snapcraft
-        run: sudo snap install snapcraft --classic
-
-      - name: Configure Launchpad credentials
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.local/share/snapcraft
-          # Trailing newline matters: the pre-#191 working version used `echo` (which
-          # appends one); `printf '%s'` dropped it and Launchpad auth/push then failed.
-          # `%s\n` keeps printf's literal-safety AND restores the newline.
-          printf '%s\n' "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
-
+      - uses: actions/checkout@v7
       - name: Resolve version / track / archs
         id: meta
         run: |
           set -euo pipefail
           V="$(yq '.version' snap/snapcraft.yaml)"
           TRACK="$(.github/scripts/snap-release.sh version-to-track "$V")"
-          ARCHS="$(yq '.platforms | keys | join(",")' snap/snapcraft.yaml)"
+          ARCHS_JSON="$(yq -o=json -I=0 '.platforms | keys' snap/snapcraft.yaml)"
+          ARCHS_CSV="$(yq '.platforms | keys | join(",")' snap/snapcraft.yaml)"
           {
             echo "version=$V"
             echo "track=$TRACK"
-            echo "archs=$ARCHS"
+            echo "archs=$ARCHS_JSON"
+            echo "archs_csv=$ARCHS_CSV"
           } >> "$GITHUB_OUTPUT"
 
-      # Builds + fetches every arch, retrying when a transient network error
-      # truncates the artifact DOWNLOAD (the Launchpad build itself succeeds).
-      # Validates each .snap, drops truncated ones, and re-fetches via --recover
-      # (no rebuild). Still tolerant of a genuine partial-arch build failure.
-      # Writes steps.build.outputs.snaps=<valid-count>. See remote-build.test.sh.
-      - name: Remote-build all archs (retry transient fetch failures)
-        id: build
-        run: .github/scripts/remote-build.sh "${{ steps.meta.outputs.archs }}"
-
-      # remote-build writes its detailed error (e.g. the BadRequest reason) only to a
-      # log file on the runner, which is otherwise lost. Surface it when no snap built.
-      - name: Dump snapcraft log on build failure
-        id: sclog
-        if: ${{ always() && steps.build.outputs.snaps == '0' }}
-        run: |
-          shopt -s nullglob
-          logs=( ~/.local/state/snapcraft/log/*.log ~/.cache/snapcraft/log/*.log )
-          tail_file="${RUNNER_TEMP}/snapcraft-log-tail.txt"; : > "$tail_file"
-          if [ ${#logs[@]} -eq 0 ]; then
-            echo "(no snapcraft log files found)" | tee -a "$tail_file"
-          else
-            for f in "${logs[@]}"; do
-              echo "::group::${f}"
-              cat "$f"
-              echo "::endgroup::"
-              { echo "===== ${f} ====="; cat "$f"; } >> "$tail_file"
-            done
-          fi
-          # Keep only the last 50 KB for the PR comment (well under GitHub's ~65 KB limit).
-          tail -c 50000 "$tail_file" > "${tail_file}.cut" && mv "${tail_file}.cut" "$tail_file"
-          echo "tail_file=${tail_file}" >> "$GITHUB_OUTPUT"
-
+  # Runs in parallel with the builds: it only needs the track NAME, so a failed
+  # build never blocks or skips it. Idempotent (the script checks existence first).
+  ensure-track:
+    needs: meta
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+      SNAPCRAFT_SESSION_COOKIE: ${{ secrets.SNAPCRAFT_SESSION_COOKIE }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install snapcraft
+        run: sudo snap install snapcraft --classic
       - name: Ensure version track exists
-        if: ${{ steps.build.outputs.snaps != '0' && github.event_name == 'pull_request' }}
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-          SNAPCRAFT_SESSION_COOKIE: ${{ secrets.SNAPCRAFT_SESSION_COOKIE }}
         run: |
           set -euo pipefail
-          TRACK="${{ steps.meta.outputs.track }}"
-          # Listing tracks uses the macaroon (SNAPCRAFT_STORE_CREDENTIALS); skip if it exists.
+          TRACK="${{ needs.meta.outputs.track }}"
+          # Listing tracks uses the macaroon; skip create if it already exists.
           if snapcraft tracks "$SNAP_NAME" | awk 'NR>1{print $1}' | grep -qx "$TRACK"; then
             echo "Track $TRACK already exists."
             exit 0
           fi
-          # Creating a track has no snapcraft command — it needs the storefront session cookie.
           bash .github/scripts/snap-create-track.sh "$SNAP_NAME" "$TRACK"
 
-      - name: Upload built archs to v<MM>/edge/<PR>
-        id: release
-        if: ${{ steps.build.outputs.snaps != '0' && github.event_name == 'pull_request' }}
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+  build:
+    needs: meta
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false           # a dead arch must not cancel its siblings
+      matrix:
+        arch: ${{ fromJSON(needs.meta.outputs.archs) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0         # snapcraft remote-build refuses shallow clones
+      - name: Install snapcraft
+        run: sudo snap install snapcraft --classic
+      - name: Configure Launchpad credentials
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.local/share/snapcraft
+          printf '%s\n' "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
+      - name: Remote-build ${{ matrix.arch }}
+        id: build
+        run: .github/scripts/remote-build.sh "${{ matrix.arch }}"
+      - name: Upload snap artifact
+        if: ${{ steps.build.outputs.snaps != '0' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: snap-${{ matrix.arch }}
+          path: ${{ env.SNAP_NAME }}*${{ matrix.arch }}.snap
+          retention-days: 1
+          if-no-files-found: error
+      - name: Capture snapcraft log on failure
+        if: ${{ always() && steps.build.outputs.snaps == '0' }}
+        run: |
+          shopt -s nullglob
+          logs=( ~/.local/state/snapcraft/log/*.log ~/.cache/snapcraft/log/*.log )
+          out="${RUNNER_TEMP}/buildlog-${{ matrix.arch }}.txt"; : > "$out"
+          if [ ${#logs[@]} -eq 0 ]; then
+            echo "(no snapcraft log files found for ${{ matrix.arch }})" >> "$out"
+          else
+            for f in "${logs[@]}"; do { echo "===== $f ====="; cat "$f"; } >> "$out"; done
+          fi
+          tail -c 50000 "$out" > "$out.cut" && mv "$out.cut" "$out"
+          echo "BUILDLOG=$out" >> "$GITHUB_ENV"
+      - name: Upload snapcraft log artifact
+        if: ${{ always() && steps.build.outputs.snaps == '0' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: buildlog-${{ matrix.arch }}
+          path: ${{ env.BUILDLOG }}
+          retention-days: 1
+          if-no-files-found: ignore
+
+  upload:
+    needs: [meta, build, ensure-track]
+    # Run even though `build` reports failure from a sibling arch (!cancelled),
+    # but only once the track exists.
+    if: ${{ !cancelled() && needs.ensure-track.result == 'success' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJSON(needs.meta.outputs.archs) }}
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install snapcraft
+        run: sudo snap install snapcraft --classic
+      - name: Download snap artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: snap-${{ matrix.arch }}
+          path: .
+        continue-on-error: true   # missing => this arch's build failed; handled below
+      - name: Upload to v<MM>/edge/<PR>
         run: |
           set -uo pipefail
-          TRACK="${{ steps.meta.outputs.track }}"
+          TRACK="${{ needs.meta.outputs.track }}"
           PR="${{ github.event.pull_request.number }}"
           CHAN="$TRACK/edge/$PR"
-          IFS=',' read -ra WANT <<< "${{ steps.meta.outputs.archs }}"
-          uploaded=(); missing=()
-          for arch in "${WANT[@]}"; do
-            # Matches name_version_arch.snap (snapcraft 8.14+ / core26) — '*' also tolerates name_arch.snap.
-            f="$(ls -1 "${SNAP_NAME}"*"${arch}".snap 2>/dev/null | head -n1 || true)"
-            if [ -z "$f" ]; then echo "missing snap for $arch"; missing+=("$arch"); continue; fi
-            echo "Uploading $f -> $CHAN"
-            # Retry the store upload: it can drop mid-transfer ("Connection aborted /
-            # RemoteDisconnected") on an otherwise-valid snap — a transient blip must not
-            # fail the build. Bounded, so a genuine rejection still fails. See retry.test.sh.
-            if .github/scripts/retry.sh 3 15 -- snapcraft upload "$f" --release="$CHAN"; then uploaded+=("$arch"); else echo "upload failed for $arch"; missing+=("$arch"); fi
-          done
-          {
-            echo "channel=$CHAN"
-            echo "missing=${missing[*]:-}"
-          } >> "$GITHUB_OUTPUT"
-          {
-            echo "comment<<EOF"
-            if [ "${#uploaded[@]}" -gt 0 ]; then
-              printf '✅ Snap for this PR published to `%s`\n\n' "$CHAN"
-              printf '```bash\nsudo snap install %s --channel=%s   # or: sudo snap refresh %s --channel=%s\n```\n\n' "$SNAP_NAME" "$CHAN" "$SNAP_NAME" "$CHAN"
-              printf 'Built: %s\n' "${uploaded[*]}"
-            else
-              printf '❌ No architectures were published for this PR.\n'
-            fi
-            if [ "${#missing[@]}" -gt 0 ]; then printf '\n⚠️ Failed/missing arch(es): %s\n' "${missing[*]}"; fi
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          ARCH="${{ matrix.arch }}"
+          f="$(ls -1 "${SNAP_NAME}"*"${ARCH}".snap 2>/dev/null | head -n1 || true)"
+          # FAIL (not no-op) when the artifact is missing, so "Re-run failed jobs"
+          # re-pairs a rebuilt arch with its upload instead of silently skipping it.
+          if [ -z "$f" ]; then
+            echo "::error::No snap artifact for ${ARCH} — its build did not succeed."
+            exit 1
+          fi
+          echo "Uploading $f -> $CHAN"
+          .github/scripts/retry.sh 3 15 -- snapcraft upload "$f" --release="$CHAN"
+      - name: Mark published
+        run: |
+          mkdir -p out && : > "out/uploaded-${{ matrix.arch }}"
+      - name: Upload published marker
+        uses: actions/upload-artifact@v4
+        with:
+          name: uploaded-${{ matrix.arch }}
+          path: out/uploaded-${{ matrix.arch }}
+          retention-days: 1
+          if-no-files-found: error
 
+  report:
+    needs: [meta, build, ensure-track, upload]
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download published markers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: uploaded-*
+          path: markers
+          merge-multiple: true
+        continue-on-error: true
+      - name: Download build logs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: buildlog-*
+          path: buildlogs
+          merge-multiple: true
+        continue-on-error: true
+      - name: Render comment + completeness
+        id: r
+        run: |
+          set -uo pipefail
+          TRACK="${{ needs.meta.outputs.track }}"
+          PR="${{ github.event.pull_request.number }}"
+          CHAN="$TRACK/edge/$PR"
+          WANTED="${{ needs.meta.outputs.archs_csv }}"
+          PUBLISHED="$(ls markers/ 2>/dev/null | sed -n 's/^uploaded-//p' | paste -sd, - || true)"
+          BODY="${RUNNER_TEMP}/comment.md"
+          SNAP_NAME="$SNAP_NAME" .github/scripts/pr-comment.sh "$CHAN" "$WANTED" "$PUBLISHED" > "$BODY"
+          # Fold the build log into the comment only when nothing was published.
+          if [ -z "$PUBLISHED" ] && ls buildlogs/* >/dev/null 2>&1; then
+            {
+              echo
+              echo '<details><summary>snapcraft log (last 50 KB)</summary>'
+              echo
+              echo '```text'
+              cat buildlogs/*
+              echo '```'
+              echo
+              echo '</details>'
+            } >> "$BODY"
+          fi
+          echo "body=$BODY" >> "$GITHUB_OUTPUT"
+          w="$(printf '%s' "$WANTED"    | tr ',' '\n' | sed '/^$/d' | sort -u)"
+          p="$(printf '%s' "$PUBLISHED" | tr ',' '\n' | sed '/^$/d' | sort -u)"
+          if [ "$w" = "$p" ]; then echo "complete=yes" >> "$GITHUB_OUTPUT"; else echo "complete=no" >> "$GITHUB_OUTPUT"; fi
       - name: Sticky PR comment
-        if: ${{ always() && github.event_name == 'pull_request' }}
         uses: actions/github-script@v9
         env:
-          BODY: ${{ steps.release.outputs.comment }}
-          BUILT: ${{ steps.build.outputs.snaps }}
-          SCLOG_FILE: ${{ steps.sclog.outputs.tail_file }}
+          BODY: ${{ steps.r.outputs.body }}
         with:
           script: |
             const fs = require('fs');
             const marker = '<!-- pr-build-snap -->';
-            const failed = (!process.env.BUILT || process.env.BUILT === '0' || !process.env.BODY);
-            let text = failed
-              ? '❌ Build produced no snaps (or a preceding step failed). Check the Action logs.'
-              : process.env.BODY;
-            // On failure, fold the captured snapcraft log (last 50 KB) into the comment.
-            if (failed && process.env.SCLOG_FILE && fs.existsSync(process.env.SCLOG_FILE)) {
-              const log = fs.readFileSync(process.env.SCLOG_FILE, 'utf8');
-              text += `\n\n<details>\n<summary>snapcraft log (last 50 KB)</summary>\n\n\`\`\`text\n${log}\n\`\`\`\n\n</details>`;
-            }
+            const text = fs.readFileSync(process.env.BODY, 'utf8');
             const body = `${marker}\n${text}`;
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
-            const issuesApi = (github.rest && github.rest.issues) ? github.rest.issues : github.issues;
-            const { data: comments } = await issuesApi.listComments({ owner, repo, issue_number, per_page: 100 });
+            const api = github.rest.issues;
+            const { data: comments } = await api.listComments({ owner, repo, issue_number, per_page: 100 });
             const existing = comments.find(c => c.body && c.body.includes(marker));
-            if (existing) {
-              await issuesApi.updateComment({ owner, repo, comment_id: existing.id, body });
-            } else {
-              await issuesApi.createComment({ owner, repo, issue_number, body });
-            }
-
-      - name: Fail if build/upload incomplete
-        if: ${{ steps.build.outputs.snaps == '0' || steps.release.outputs.missing != '' }}
+            if (existing) await api.updateComment({ owner, repo, comment_id: existing.id, body });
+            else await api.createComment({ owner, repo, issue_number, body });
+      - name: Fail if any wanted arch is unpublished
+        if: ${{ steps.r.outputs.complete != 'yes' }}
         run: |
-          echo "::error::Incomplete: snaps=${{ steps.build.outputs.snaps }} missing=[${{ steps.release.outputs.missing }}]"
+          echo "::error::Incomplete publish: wanted=[${{ needs.meta.outputs.archs_csv }}]"
           exit 1
