@@ -59,10 +59,15 @@ jobs:
           PR="${{ steps.meta.outputs.pr }}"
           BRANCH="$TRACK/edge/$PR"
 
-          INFO="$(snap info "$SNAP")"
+          INFO="$(snapcraft status "$SNAP")"
 
           if [ "$("$SR" branch-has-revisions "$TRACK" "$PR" <<<"$INFO")" != "yes" ]; then
-            echo "No revisions in $BRANCH (docs-only merge / build failed / branch expired). Nothing to promote."
+            echo "::warning::release-on-merge: no revisions in $BRANCH to promote. If the build uploaded (see this PR's 'PR Build Snap' run), release them manually:"
+            echo "  snapcraft promote $SNAP --from-channel $BRANCH --to-channel $TRACK/stable --yes"
+            echo "  snapcraft promote $SNAP --from-channel $BRANCH --to-channel latest/candidate --yes   # if this is the newest release"
+            echo "  snapcraft promote $SNAP --from-channel $BRANCH --to-channel latest/edge --yes"
+            echo "  # or by revision: snapcraft revisions $SNAP  ->  snapcraft release $SNAP <rev> $TRACK/stable,latest/candidate,latest/edge"
+            echo "  snapcraft set-default-track $SNAP $TRACK"
             exit 0
           fi
 
