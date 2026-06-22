@@ -235,6 +235,8 @@ main() {
     # The producer (followers + wait) backgrounds into a FIFO; less reads the FIFO
     # in the foreground (keys from /dev/tty) with +F (follow) and -R (keep colours).
     # Quitting less kills the producer, whose trap reaps the tailers — no orphans.
+    # (run_followers always launches >=1 follower with the current stream logic; a
+    # zero-follower producer would close the FIFO and leave less at an empty EOF page.)
     if logs_should_page; then
         local fifo; fifo="$(mktemp -u "${SNAP_COMMON:-${TMPDIR:-/tmp}}/.zlogs.XXXXXX")"
         if ! mkfifo "$fifo" 2>/dev/null; then run_followers; return; fi
