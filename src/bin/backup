@@ -511,17 +511,18 @@ main() {
         list)
             require_target
             require_encryption_config
-            local raw rows
+            local raw rows out
             # shellcheck disable=SC2294
             raw="$(eval "$(build_list_cmd)")" || { ui_err "Listing failed (duplicity exited non-zero)."; exit 1; }
             rows="$(printf '%s\n' "$raw" | parse_collection_status)"
             if [ -n "$rows" ]; then
-                printf '%s\n' "$rows" | ui_table "type" "time" "volumes"
+                out="$(printf '%s\n' "$rows" | ui_table "type" "time" "volumes")"
             else
-                printf '%s\n' "$raw"     # nothing parsed — show duplicity's own words
+                out="$raw"               # nothing parsed — show duplicity's own words
             fi
+            printf '%s\n' "$out" | ui_pager
             ;;
-        status) cmd_status ;;
+        status) cmd_status | ui_pager ;;
         import-key) cmd_import_key ;;
         create-key) cmd_create_key "${2:-}" "${3:-}" "${4:-}" ;;
         export-key) cmd_export_key ;;

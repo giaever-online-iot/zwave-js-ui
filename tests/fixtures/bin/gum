@@ -9,6 +9,7 @@ case "$cmd" in
     confirm) exit "${GUM_CONFIRM:-0}" ;;
     spin)    while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do shift; done; shift; "$@" ;;
     table)   sed 's/^/[table] /' ;;
+    pager)   sed 's/^/[pager] /' ;;
     format)  sed 's/^/[format] /' ;;
     style)   printf '[style] %s\n' "${*: -1}" ;;   # assumes text is the LAST arg — true for all ui_* call shapes
     *)       exit 64 ;;

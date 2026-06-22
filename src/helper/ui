@@ -70,6 +70,17 @@ ui_cols() {                    # terminal width in columns. UI_COLS overrides (t
     printf '%s\n' "$c"
 }
 
+ui_lines() {                   # terminal height in rows. UI_LINES overrides (tests); 24 if unknown.
+                               # Same fd discipline as ui_cols; stty's FIRST field is rows.
+    if [ -n "${UI_LINES:-}" ]; then printf '%s\n' "$UI_LINES"; return; fi
+    local r
+    r="$(stty size 2>/dev/null </dev/tty | cut -d' ' -f1)"
+    case "$r" in ''|0|*[!0-9]*) r="$(stty size <&2 2>/dev/null | cut -d' ' -f1)" ;; esac
+    case "$r" in ''|0|*[!0-9]*) r="$(stty size <&0 2>/dev/null | cut -d' ' -f1)" ;; esac
+    case "$r" in ''|0|*[!0-9]*) r=24 ;; esac
+    printf '%s\n' "$r"
+}
+
 ui_print() {                   # one plain line, routed per context
     if [ "$(ui_ctx)" = syslog ]; then lprint "$*"; else printf '%s\n' "$*"; fi
 }
@@ -112,17 +123,46 @@ ui_align() {                   # stdin: TAB-separated rows -> two-space aligned 
                 sub(/[ \t]+$/, "", line); print line } }'
 }
 
+ui_table_width() {             # [headers...]; stdin TSV -> natural bordered-table width estimate
+                               # sum(per-column max widths incl. headers) + 3 padding/border per col + 1
+    { if [ "$#" -gt 0 ]; then local IFS=$'\t'; printf '%s\n' "$*"; fi; cat; } | awk -F'\t' '
+        { for (i=1;i<=NF;i++) if (length($i)>w[i]) w[i]=length($i); if (NF>nc) nc=NF }
+        END { s=0; for (i=1;i<=nc;i++) s+=w[i]; print s + 3*nc + 1 }'
+}
+
+ui_stack() {                   # [headers...]; stdin TSV -> generic stacked records
+                               # col-1 = title; later columns = indented "header: value" (bare if no header)
+    local headers=("$@") line i
+    local -a fields
+    while IFS= read -r line; do
+        IFS=$'\t' read -ra fields <<< "$line"
+        printf '%s\n' "${fields[0]}"
+        for i in "${!fields[@]}"; do
+            [ "$i" -eq 0 ] && continue
+            if [ -n "${headers[$i]:-}" ]; then
+                printf '    %s: %s\n' "${headers[$i]}" "${fields[$i]}"
+            else
+                printf '    %s\n' "${fields[$i]}"
+            fi
+        done
+        printf '\n'
+    done
+}
+
 # shellcheck disable=SC2120  # called with args from ui_kv and external scripts
 ui_table() {                   # stdin: TAB-separated rows; args: optional column headers
                                # headers must not contain commas (gum --columns delimiter)
-    local cols
+    local cols rows
     case "$(ui_ctx)" in
         styled)
-            if [ "$#" -gt 0 ]; then
+            rows="$(cat)"
+            if [ "$(printf '%s\n' "$rows" | ui_table_width "$@")" -gt "$(ui_cols)" ]; then
+                printf '%s\n' "$rows" | ui_stack "$@"
+            elif [ "$#" -gt 0 ]; then
                 cols="$(IFS=,; printf '%s' "$*")"
-                "$UI_GUM" table --print --separator "$(printf '\t')" --columns "$cols"
+                printf '%s\n' "$rows" | "$UI_GUM" table --print --separator "$(printf '\t')" --columns "$cols"
             else
-                "$UI_GUM" table --print --separator "$(printf '\t')"
+                printf '%s\n' "$rows" | "$UI_GUM" table --print --separator "$(printf '\t')"
             fi ;;
         *)
             {
@@ -147,6 +187,17 @@ ui_usage() {                   # stdin: usage text (readable raw; light markdown
         styled) "$UI_GUM" format ;;
         *)      cat ;;
     esac
+}
+
+ui_pager() {                   # stdin: content -> scrollable viewport when it overflows the screen.
+                               # Gates on stdout (ui_ctx), NOT stdin: gum pager reads content from
+                               # stdin and keystrokes from /dev/tty, so the content can be a pipe.
+    local content; content="$(cat)"
+    if [ "$(ui_ctx)" = styled ] && [ "$(printf '%s\n' "$content" | wc -l)" -gt "$(ui_lines)" ]; then
+        printf '%s\n' "$content" | "$UI_GUM" pager
+    else
+        printf '%s\n' "$content"
+    fi
 }
 
 ui_choose() {                  # $1 prompt, $2 no-TTY hint, $3.. items -> echoes selection; 2 if not interactive/Ctrl-C/abort

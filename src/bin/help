@@ -33,58 +33,6 @@ commands_rows() {
         "$SNAP_NAME.help	this overview"
 }
 
-table_width() {                # stdin: TSV rows -> estimated bordered-table width
-                               # sum(per-column max widths) + 3 padding/border per column + 1
-    awk -F'\t' '
-        { for (i=1;i<=NF;i++) if (length($i)>w[i]) w[i]=length($i); if (NF>nc) nc=NF }
-        END { s=0; for (i=1;i<=nc;i++) s+=w[i]; print s + 3*nc + 1 }'
-}
-
-settings_stack() {             # stdin: TSV key,value,default,description -> stacked, width-aware.
-                               # Default sits inline after the value, but drops to its own indented
-                               # line when "key = value [default: …]" would overflow the terminal
-                               # (e.g. a 40-char GPG fingerprint value). Description always indented.
-    local key val def desc line cols; cols="$(ui_cols)"
-    while IFS=$'\t' read -r key val def desc; do
-        line="  $key = $val   [default: $def]"
-        if [ "${#line}" -le "$cols" ]; then
-            printf '%s\n' "$line"
-        else
-            printf '  %s = %s\n' "$key" "$val"
-            printf '      [default: %s]\n' "$def"
-        fi
-        printf '      %s\n\n' "$desc"
-    done
-}
-
-commands_stack() {             # stdin: TSV command,description -> command over indented description
-    local cmd desc
-    while IFS=$'\t' read -r cmd desc; do
-        printf '  %s\n      %s\n' "$cmd" "$desc"
-    done
-}
-
-# Width-aware: keep the gum table while it fits the terminal; otherwise stack so a
-# narrow terminal never hard-wraps the columns into mush. Plain/syslog contexts are
-# left untouched (aligned table, zero ANSI) — stacking only helps a styled TTY.
-settings_render() {            # stdin: settings TSV
-    local rows; rows="$(cat)"
-    if [ "$(ui_ctx)" = styled ] && [ "$(printf '%s\n' "$rows" | table_width)" -gt "$(ui_cols)" ]; then
-        printf '%s\n' "$rows" | settings_stack
-    else
-        printf '%s\n' "$rows" | ui_table "setting" "value" "default" "description"
-    fi
-}
-
-commands_render() {            # stdin: commands TSV
-    local rows; rows="$(cat)"
-    if [ "$(ui_ctx)" = styled ] && [ "$(printf '%s\n' "$rows" | table_width)" -gt "$(ui_cols)" ]; then
-        printf '%s\n' "$rows" | commands_stack
-    else
-        printf '%s\n' "$rows" | ui_table "command" "description"
-    fi
-}
-
 main() {
     plugs_connected || ui_warn "Required interfaces are not connected — see the connect instructions above."
     ui_header "$SNAP_NAME" "$(snap_version) · $(service_state)"
@@ -92,12 +40,12 @@ main() {
     ui_print "The daemon is DISABLED by default after install. Enable it with:"
     ui_print "  sudo $SNAP_NAME.enable"
     echo
-    settings_rows | settings_render
+    settings_rows | ui_table "setting" "value" "default" "description"
     echo
     ui_print "Set options with:  sudo snap set $SNAP_NAME <key>=<value>"
     ui_print "Other settings live in the web UI after start."
     echo
-    commands_rows | commands_render
+    commands_rows | ui_table "command" "description"
     echo
     ui_print "serial-port plug (needs snapd's experimental hotplug):"
     ui_print "  sudo snap set system experimental.hotplug=true && sudo systemctl restart snapd"
@@ -106,5 +54,7 @@ main() {
 }
 
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
-    main "$@"
+    # main renders styled (UI_TTY1 is cached at source time, so the internal pipe to
+    # ui_pager does not flip the context to plain); ui_pager scrolls only on overflow.
+    main "$@" | ui_pager
 fi

@@ -173,4 +173,56 @@ if command -v script >/dev/null 2>&1 && command -v setsid >/dev/null 2>&1; then
     assert_contains "$cw2" "77" "ui_cols reads fd2 winsize with no controlling tty / piped stdin"
 fi
 
+# --- ui_lines: terminal height detection --------------------------------------
+assert_eq "$(UI_LINES=42 ui_lines)" "42" "ui_lines honors UI_LINES override"
+rows_auto="$(UI_LINES='' ui_lines)"
+case "$rows_auto" in
+    ''|0|*[!0-9]*) FAIL=$((FAIL+1)); printf 'FAIL: ui_lines not a positive int: %q\n' "$rows_auto" >&2 ;;
+    *) PASS=$((PASS+1)) ;;
+esac
+if command -v script >/dev/null 2>&1; then
+    rl="$(ROOT="$ROOT" script -qec 'stty rows 37 2>/dev/null; bash -c "source \"$ROOT/src/helper/ui\"; ui_lines"' /dev/null | tr -d '\r')"
+    assert_contains "$rl" "37" "ui_lines reads real pty winsize (rows)"
+fi
+if command -v script >/dev/null 2>&1 && command -v setsid >/dev/null 2>&1; then
+    rl2="$(ROOT="$ROOT" script -qec 'stty rows 29 2>/dev/null; setsid bash -c "source \"$ROOT/src/helper/ui\"; ui_lines" </dev/null' /dev/null | tr -d '\r')"
+    assert_contains "$rl2" "29" "ui_lines reads fd2 rows with no controlling tty / piped stdin"
+fi
+
+# --- ui_table width-fit: stack when wider than the terminal --------------------
+assert_eq "$(printf 'aa\tbbbb\n' | ui_table_width)" "$((2+4+3*2+1))" "table_width = sumcols + 3/col + 1"
+
+narrow="$(printf 'server.host\t0.0.0.0\tIP address the web UI binds to\n' \
+    | UI_ASSUME_TTY=1 UI_COLS=20 ui_table setting value description)"
+assert_contains "$narrow" "server.host"                              "stack: col-1 title"
+assert_contains "$narrow" "    value: 0.0.0.0"                       "stack: indented header: value"
+assert_contains "$narrow" "    description: IP address the web UI binds to" "stack: indented desc"
+case "$narrow" in *'[table]'*) FAIL=$((FAIL+1)); echo "FAIL: narrow used gum table" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+
+assert_contains "$(printf 'k\tv\n' | UI_ASSUME_TTY=1 UI_COLS=999 ui_table key value)" "[table]" "wide -> gum table"
+
+# headerless (ui_kv-style) 2-col: label is the title, value indented bare
+kvn="$(printf 'encrypt-key\t0E32DAF912C2645073A3DFFA8956E92F1A70C779\n' | UI_ASSUME_TTY=1 UI_COLS=20 ui_table)"
+assert_contains "$kvn" "encrypt-key"                                  "kv stack: label title"
+assert_contains "$kvn" "    0E32DAF912C2645073A3DFFA8956E92F1A70C779" "kv stack: indented bare value"
+
+# plain ctx unchanged (aligned columns, zero ANSI)
+plain="$(printf 'k\tv\n' | ui_table key value)"
+assert_contains "$plain" "k" "plain: aligned still works"
+printf '%s' "$plain" | grep -q "$(printf '\033')"; assert_status "$?" "1" "plain: zero ANSI"
+
+# --- ui_pager: scroll only when styled AND taller than the screen --------------
+big="$(seq 1 50)"
+assert_contains "$(printf '%s\n' "$big" | UI_ASSUME_TTY=1 UI_LINES=10 ui_pager)" "[pager]" "pager: styled + overflow -> gum pager"
+# fits -> passthrough (no pager)
+fits="$(printf 'a\nb\n' | UI_ASSUME_TTY=1 UI_LINES=10 ui_pager)"
+assert_eq "$fits" "$(printf 'a\nb')" "pager: fits -> passthrough"
+case "$fits" in *'[pager]'*) FAIL=$((FAIL+1)); echo "FAIL: paged content that fit" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+# plain ctx -> passthrough even when tall
+plain="$(printf '%s\n' "$big" | NO_COLOR=1 UI_LINES=10 ui_pager)"
+case "$plain" in *'[pager]'*) FAIL=$((FAIL+1)); echo "FAIL: plain ctx paged" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+assert_contains "$plain" "50" "pager: plain passthrough keeps content"
+# gates on stdout: content arrives on a pipe (stdin not a tty) yet styled -> still pages
+assert_contains "$(printf '%s\n' "$big" | UI_ASSUME_TTY=1 UI_LINES=10 ui_pager)" "[pager]" "pager: piped stdin + styled still pages"
+
 finish
