@@ -4,7 +4,7 @@ set -uo pipefail  # no -e: keep all tests running even if earlier ones fail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SR="$HERE/snap-release.sh"
-INFO="$HERE/fixtures/snap-info.txt"
+INFO="$HERE/fixtures/snapcraft-status.txt"
 fail=0
 
 check() { # desc expected actual
@@ -25,14 +25,23 @@ check "major v-prefixed" "12" "$("$SR" major v12.0.0)"
 check "major bare"       "11" "$("$SR" major 11.19.1)"
 check "major empty"      ""   "$("$SR" major "")"
 
-check "channel-version candidate" "v11.19.1" "$("$SR" channel-version latest/candidate <"$INFO")"
-check "channel-version stable"    "v11.14.0" "$("$SR" channel-version latest/stable <"$INFO")"
-check "channel-version caret"     ""         "$("$SR" channel-version latest/beta <"$INFO")"
-check "channel-version branch"    "v11.19.2" "$("$SR" channel-version v11.19/edge/42 <"$INFO")"
-check "channel-version absent"    ""         "$("$SR" channel-version v99.9/stable <"$INFO")"
+check "channel-version candidate"  "v11.20.0" "$("$SR" channel-version latest/candidate <"$INFO")"
+check "channel-version stable"     "v11.14.0" "$("$SR" channel-version latest/stable <"$INFO")"
+check "channel-version inherited"  ""         "$("$SR" channel-version latest/beta <"$INFO")"
+check "channel-version branch"     "v11.20.0" "$("$SR" channel-version v11.20/edge/204 <"$INFO")"
+check "channel-version absent"     ""         "$("$SR" channel-version v99.9/stable <"$INFO")"
 
-check "branch-has-revisions yes" "yes" "$("$SR" branch-has-revisions v11.19 42 <"$INFO")"
-check "branch-has-revisions no"  "no"  "$("$SR" branch-has-revisions v11.19 99 <"$INFO")"
+check "branch-has-revisions yes"   "yes" "$("$SR" branch-has-revisions v11.20 204 <"$INFO")"
+check "branch-has-revisions no"    "no"  "$("$SR" branch-has-revisions v11.20 999 <"$INFO")"
+
+# Same parser must also handle the interactive/TTY layout, where snapcraft blanks
+# Track+Arch on continuation rows. CI captures non-interactively (repeated columns),
+# but the parser is hardened for both — these lock that in.
+TTY="$HERE/fixtures/snapcraft-status-tty.txt"
+check "tty channel-version candidate" "v11.20.0" "$("$SR" channel-version latest/candidate <"$TTY")"
+check "tty channel-version branch"    "v11.20.0" "$("$SR" channel-version v11.20/edge/204 <"$TTY")"
+check "tty channel-version inherited" ""         "$("$SR" channel-version latest/beta <"$TTY")"
+check "tty branch-has-revisions yes"  "yes"      "$("$SR" branch-has-revisions v11.20 204 <"$TTY")"
 
 check "needs-stable-bump major"      "yes" "$("$SR" needs-stable-bump v12.0.0 v11.20.3)"
 check "needs-stable-bump minor"      "no"  "$("$SR" needs-stable-bump v11.20.0 v11.19.1)"
@@ -44,5 +53,14 @@ check "is-at-least greater"      "yes" "$("$SR" is-at-least v11.20.0 v11.19.9)"
 check "is-at-least lesser"       "no"  "$("$SR" is-at-least v11.5.0 v11.19.0)"
 check "is-at-least empty-floor"  "yes" "$("$SR" is-at-least v11.0.0 "")"
 check "is-at-least minor-numeric" "yes" "$("$SR" is-at-least v11.20.0 v11.9.0)"
+
+# latest-targets <new> <latest/candidate ver> <latest/edge ver> -> space-sep latest/* channels
+# <new> may land on, each gated by <new> >= that channel's OWN version (no downgrades).
+check "latest-targets both-newer"   "latest/candidate latest/edge" "$("$SR" latest-targets v11.21.0 v11.20.0 v11.20.0)"
+check "latest-targets equal"        "latest/candidate latest/edge" "$("$SR" latest-targets v11.20.0 v11.20.0 v11.20.0)"
+check "latest-targets edge-ahead"   "latest/candidate"             "$("$SR" latest-targets v11.20.0 v11.20.0 v11.21.0)"
+check "latest-targets cand-ahead"   "latest/edge"                  "$("$SR" latest-targets v11.20.0 v11.21.0 v11.20.0)"
+check "latest-targets backport"     ""                             "$("$SR" latest-targets v11.19.0 v11.20.0 v11.20.0)"
+check "latest-targets empty-floors" "latest/candidate latest/edge" "$("$SR" latest-targets v11.20.0 "" "")"
 
 exit "$fail"

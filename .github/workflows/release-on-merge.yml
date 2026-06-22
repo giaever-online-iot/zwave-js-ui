@@ -59,10 +59,15 @@ jobs:
           PR="${{ steps.meta.outputs.pr }}"
           BRANCH="$TRACK/edge/$PR"
 
-          INFO="$(snap info "$SNAP")"
+          INFO="$(snapcraft status "$SNAP")"
 
           if [ "$("$SR" branch-has-revisions "$TRACK" "$PR" <<<"$INFO")" != "yes" ]; then
-            echo "No revisions in $BRANCH (docs-only merge / build failed / branch expired). Nothing to promote."
+            echo "::warning::release-on-merge: no revisions in $BRANCH to promote. If the build uploaded (see this PR's 'PR Build Snap' run), release them manually:"
+            echo "  snapcraft promote $SNAP --from-channel $BRANCH --to-channel $TRACK/stable --yes"
+            echo "  snapcraft promote $SNAP --from-channel $BRANCH --to-channel latest/candidate --yes   # if this is the newest release"
+            echo "  snapcraft promote $SNAP --from-channel $BRANCH --to-channel latest/edge --yes"
+            echo "  # or by revision: snapcraft revisions $SNAP  ->  snapcraft release $SNAP <rev> $TRACK/stable,latest/candidate,latest/edge"
+            echo "  snapcraft set-default-track $SNAP $TRACK"
             exit 0
           fi
 
@@ -72,32 +77,36 @@ jobs:
           # 1) Major bump: move previous major's final to latest/stable BEFORE candidate is overwritten.
           if [ "$("$SR" needs-stable-bump "$V" "$CAND")" = "yes" ]; then
             echo ">> major bump: latest/candidate -> latest/stable"
-            snapcraft promote "$SNAP" --from-channel latest/candidate --to-channel latest/stable --yes
+            .github/scripts/retry.sh 3 15 -- snapcraft promote "$SNAP" --from-channel latest/candidate --to-channel latest/stable --yes
           fi
 
           # 2) The version track's own stable line (always; safe for backports).
           echo ">> $BRANCH -> $TRACK/stable"
-          snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel "$TRACK/stable" --yes
+          .github/scripts/retry.sh 3 15 -- snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel "$TRACK/stable" --yes
 
-          # 3) Shared latest/* only if this isn't a backport.
-          if [ "$("$SR" is-at-least "$V" "$CAND")" = "yes" ]; then
-            echo ">> $BRANCH -> latest/candidate, latest/edge"
-            snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel latest/candidate --yes
-            snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel latest/edge --yes
+          # 3) Shared latest/* — promote each channel only if $V is >= that channel's OWN
+          #    current version, so a backport can never downgrade a channel already ahead.
+          EDGE="$("$SR" channel-version latest/edge <<<"$INFO")"
+          TARGETS="$("$SR" latest-targets "$V" "$CAND" "$EDGE")"
+          if [ -n "$TARGETS" ]; then
+            for ch in $TARGETS; do
+              echo ">> $BRANCH -> $ch"
+              .github/scripts/retry.sh 3 15 -- snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel "$ch" --yes
+            done
           else
-            echo ">> backport ($V < $CAND): leaving latest/* unchanged"
+            echo ">> backport ($V; candidate=${CAND:-<none>} edge=${EDGE:-<none>}): leaving latest/* unchanged"
           fi
 
           # 4) Close the PR branch (auto-expires anyway; this is tidy-up).
           echo ">> closing $BRANCH"
-          snapcraft close "$SNAP" "$BRANCH" --yes || echo "close failed (already gone?); ignoring"
+          .github/scripts/retry.sh 3 15 -- snapcraft close "$SNAP" "$BRANCH" --yes || echo "close failed (already gone?); ignoring"
 
           # 5) Default track follows the merged line; never regresses or jumps to stray tracks.
           CAND_TRACK=""
           if [ -n "$CAND" ]; then CAND_TRACK="$("$SR" version-to-track "$CAND")"; fi
           if [ "$TRACK" != "$CAND_TRACK" ] && [ "$("$SR" is-at-least "$TRACK" "$CAND_TRACK")" = "yes" ]; then
             echo ">> set default track -> $TRACK"
-            snapcraft set-default-track "$SNAP" "$TRACK"
+            .github/scripts/retry.sh 3 15 -- snapcraft set-default-track "$SNAP" "$TRACK"
           else
             echo ">> default track unchanged (line=${CAND_TRACK:-<none>})"
           fi

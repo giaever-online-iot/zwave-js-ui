@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 #
-# snap-release.sh — version/channel math + `snap info` parsing for the snap
+# snap-release.sh — version/channel math + `snapcraft status` parsing for the snap
 # release workflows. Pure functions: read args/stdin, write stdout, no network.
 #
 # Subcommands:
 #   version-to-track <ver>             v11.19.1|11.19.1 -> v11.19    (""->"")
 #   major <ver>                        v12.0.0 -> 12                 (""->"")
-#   channel-version <channel>          (stdin: `snap info`) -> version or "" (^/--/- -> "")
-#   branch-has-revisions <track> <pr>  (stdin: `snap info`) -> yes|no
+#   channel-version <channel>          (stdin: `snapcraft status`) -> version or "" (^/--/- -> "")
+#   branch-has-revisions <track> <pr>  (stdin: `snapcraft status`) -> yes|no
 #   needs-stable-bump <new> <cand>     yes iff cand set & major(new)>major(cand)
 #   is-at-least <ver> <floor>          yes iff ver>=floor  (floor "" -> yes)
+#   latest-targets <new> <cand> <edge> latest/* channels <new> may land on, each gated by
+#                                      new >= that channel's own ver (no downgrade); space-sep
 set -euo pipefail
 
 # numeric major.minor.patch compare; echoes -1|0|1 (leading 'v' stripped)
@@ -24,6 +26,12 @@ _vercmp() {
     if (( 10#$x < 10#$y )); then echo -1; return; fi
   done
   echo 0
+}
+
+# true (exit 0) iff ver >= floor; empty floor => true. Leading 'v' optional.
+_at_least() {
+  [ -z "${2:-}" ] && return 0
+  [ "$(_vercmp "${1:-}" "$2")" -ge 0 ]
 }
 
 cmd="${1:-}"; shift || true
@@ -42,24 +50,19 @@ case "$cmd" in
     printf '%s\n' "${in%%.*}"
     ;;
   channel-version)
-    # stdin = `snap info`; arg = channel like latest/candidate or v11.19/edge/42
-    awk -v ch="${1:-}" '
-      /^channels:/ { inblk=1; next }
-      inblk && NF==0 { inblk=0 }
-      inblk {
-        line=$0; sub(/^[ \t]+/, "", line)
-        ci=index(line, ":"); if (ci==0) next
-        name=substr(line, 1, ci-1)
-        rest=substr(line, ci+1); sub(/^[ \t]+/, "", rest)
-        split(rest, a, /[ \t]+/); ver=a[1]
-        if (name==ch) {
-          if (ver=="^" || ver=="--" || ver=="-") ver=""
-          print ver; exit
-        }
-      }'
+    # stdin = `snapcraft status`; arg = channel like latest/candidate or v11.20/edge/204.
+    # Columns: Track Arch Channel Version Revision Progress Expires-at. Robust to BOTH
+    # layouts snapcraft emits: captured non-interactively (CI: `$(...)` => no TTY) it
+    # repeats Track+Arch on every row; in a terminal it blanks them on continuation rows.
+    # So: carry the last Track token forward, find the Version field (`^v[0-9]`) on each
+    # row, and read the Channel as the field immediately before it.
+    ch="${1:-}"
+    awk -v t="${ch%%/*}" -v c="${ch#*/}" '
+      $1 ~ /^(latest|v[0-9][0-9.]*)$/ { tr = $1 }
+      { for (i = 2; i <= NF; i++) if ($i ~ /^v[0-9]/) { if (tr == t && $(i-1) == c) { print $i; exit } break } }'
     ;;
   branch-has-revisions)
-    # stdin = `snap info`; args = track pr. Re-use channel-version via `bash "$0"`
+    # stdin = `snapcraft status`; args = track pr. Re-use channel-version via `bash "$0"`
     # so this works whether or not the script's exec bit is set.
     info="$(cat)"
     ver="$(bash "$0" channel-version "${1:-}/edge/${2:-}" <<<"$info")"
@@ -74,10 +77,17 @@ case "$cmd" in
     if (( 10#$mn > 10#$mc )); then echo yes; else echo no; fi
     ;;
   is-at-least)
-    ver="${1:-}"; floor="${2:-}"
-    if [ -z "$floor" ]; then echo yes; exit 0; fi
-    c="$(_vercmp "$ver" "$floor")"
-    if [ "$c" -ge 0 ]; then echo yes; else echo no; fi
+    if _at_least "${1:-}" "${2:-}"; then echo yes; else echo no; fi
+    ;;
+  latest-targets)
+    # args: <new-ver> <latest/candidate ver> <latest/edge ver>.
+    # Echo the latest/* channels <new-ver> may land on — each gated independently by
+    # <new-ver> >= that channel's OWN current version, so a backport can never downgrade
+    # a shared channel already ahead. Empty floor (channel currently empty) => qualifies.
+    v="${1:-}"; out=""
+    if _at_least "$v" "${2:-}"; then out="$out latest/candidate"; fi
+    if _at_least "$v" "${3:-}"; then out="$out latest/edge"; fi
+    echo "${out# }"
     ;;
   *)
     echo "snap-release.sh: unknown subcommand: ${cmd:-<none>}" >&2
