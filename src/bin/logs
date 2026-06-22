@@ -154,6 +154,40 @@ launch_follower() {            # $1 source spec, $2 prefix — backgrounds a sub
     ( eval "exec $(follower_cmd "$1" "$BACKLOG")" 2>&1 | prefix_lines "$2" ) &
 }
 
+logs_should_page() {           # page only on an interactive terminal with a pager available
+    [ -t 1 ] && command -v less >/dev/null 2>&1
+}
+
+run_followers() {              # launch every resolved follower, reap on exit, then wait.
+                               # Reads main's resolved locals via bash dynamic scope
+                               # (file_streams, file_srcs, journal_streams, target, use_color,
+                               # sf, BACKLOG). Returns 1 if nothing was launched (no `exit`,
+                               # so it is safe whether run in the foreground or backgrounded).
+    local pids=() i s other p
+    trap 'for p in "${pids[@]}"; do pkill -P "$p" 2>/dev/null; kill "$p" 2>/dev/null; done' EXIT INT TERM
+    for i in "${!file_streams[@]}"; do
+        s="${file_streams[$i]}"
+        [ -e "${file_srcs[$i]#file:}" ] || lprint "Waiting for log file: ${file_srcs[$i]#file:}" >&2
+        launch_follower "${file_srcs[$i]}" "$(make_prefix "$(stream_upper "$s")" "$(stream_color "$s")" "$use_color")"
+        pids+=("$!")
+    done
+    if [ "${#journal_streams[@]}" -gt 0 ]; then
+        if [ "$target" != both ]; then
+            other=$([ "$target" = zui ] && echo zwjs || echo zui)
+            if [ "$(resolve_source "$other" "$(read_log_setting "$sf" "$(setting_key "$other")")")" = journal ]; then
+                lprint "Note: ${target} and ${other} share one journald stream; ${other} lines may also appear." >&2
+            fi
+        fi
+        launch_follower journal "$(make_prefix "$(journal_label "${journal_streams[@]}")" yellow "$use_color")"
+        pids+=("$!")
+    fi
+    if [ "${#pids[@]}" -eq 0 ]; then
+        lprint "No logs to follow yet. Start/configure ${SNAP_NAME} first (see ${SNAP_NAME}.help)." >&2
+        return 1
+    fi
+    wait
+}
+
 main() {
     # Help works without root and before arg validation. (Only -h/--help; no bare alias.)
     case "${1:-}" in -h|--help) usage; exit 0 ;; esac
@@ -180,7 +214,7 @@ main() {
 
     local sf; sf="$(settings_file)"
     local BACKLOG=20
-    local pids=() journal_streams=() file_streams=() file_srcs=() s setting src p other i
+    local journal_streams=() file_streams=() file_srcs=() s setting src
 
     # Resolve every followed stream BEFORE launching anything: if one of them needs
     # journald while log-observe is unconnected, die up front with a single clear
@@ -197,40 +231,22 @@ main() {
 
     require_journal_access "${journal_streams[@]}"
 
-    # Register cleanup BEFORE launching anything, so a Ctrl-C mid-launch still reaps every
-    # follower subshell AND its children (tail/journalctl + prefixer). Empty pids = no-op.
-    trap 'for p in "${pids[@]}"; do pkill -P "$p" 2>/dev/null; kill "$p" 2>/dev/null; done' EXIT INT TERM
-
-    for i in "${!file_streams[@]}"; do
-        s="${file_streams[$i]}"; src="${file_srcs[$i]}"
-        # If the file doesn't exist yet (e.g. logToFile just enabled), tail -F waits
-        # silently — tell the user what it's waiting for.
-        [ -e "${src#file:}" ] || lprint "Waiting for log file: ${src#file:}" >&2
-        launch_follower "$src" "$(make_prefix "$(stream_upper "$s")" "$(stream_color "$s")" "$use_color")"
-        pids+=("$!")
-    done
-
-    if [ "${#journal_streams[@]}" -gt 0 ]; then
-        # Honesty notice: only when a single stream is requested AND the OTHER stream is
-        # also journal-backed — then the shared journald stream genuinely carries both. If
-        # the other stream logs to a file, its lines won't appear here, so don't cry wolf.
-        if [ "$target" != both ]; then
-            other=$([ "$target" = zui ] && echo zwjs || echo zui)
-            if [ "$(resolve_source "$other" "$(read_log_setting "$sf" "$(setting_key "$other")")")" = journal ]; then
-                lprint "Note: ${target} and ${other} share one journald stream; ${other} lines may also appear." >&2
-            fi
-        fi
-        launch_follower journal "$(make_prefix "$(journal_label "${journal_streams[@]}")" yellow "$use_color")"
-        pids+=("$!")
+    # Interactive terminal + a pager: follow live AND let the user scroll back.
+    # The producer (followers + wait) backgrounds into a FIFO; less reads the FIFO
+    # in the foreground (keys from /dev/tty) with +F (follow) and -R (keep colours).
+    # Quitting less kills the producer, whose trap reaps the tailers — no orphans.
+    if logs_should_page; then
+        local fifo; fifo="$(mktemp -u "${SNAP_COMMON:-${TMPDIR:-/tmp}}/.zlogs.XXXXXX")"
+        if ! mkfifo "$fifo" 2>/dev/null; then run_followers; return; fi
+        run_followers >"$fifo" &
+        local producer=$!
+        less +F -R "$fifo"
+        kill -TERM "$producer" 2>/dev/null
+        wait "$producer" 2>/dev/null
+        rm -f "$fifo"
+    else
+        run_followers
     fi
-
-    # Defensive: with the current stream logic at least one follower is always launched.
-    if [ "${#pids[@]}" -eq 0 ]; then
-        lprint "No logs to follow yet. Start/configure ${SNAP_NAME} first (see ${SNAP_NAME}.help)." >&2
-        exit 1
-    fi
-
-    wait
 }
 
 # run main only when executed, not when sourced (enables unit tests)
