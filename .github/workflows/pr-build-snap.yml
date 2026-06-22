@@ -128,7 +128,10 @@ jobs:
             f="$(ls -1 "${SNAP_NAME}"*"${arch}".snap 2>/dev/null | head -n1 || true)"
             if [ -z "$f" ]; then echo "missing snap for $arch"; missing+=("$arch"); continue; fi
             echo "Uploading $f -> $CHAN"
-            if snapcraft upload "$f" --release="$CHAN"; then uploaded+=("$arch"); else echo "upload failed for $arch"; missing+=("$arch"); fi
+            # Retry the store upload: it can drop mid-transfer ("Connection aborted /
+            # RemoteDisconnected") on an otherwise-valid snap — a transient blip must not
+            # fail the build. Bounded, so a genuine rejection still fails. See retry.test.sh.
+            if .github/scripts/retry.sh 3 15 -- snapcraft upload "$f" --release="$CHAN"; then uploaded+=("$arch"); else echo "upload failed for $arch"; missing+=("$arch"); fi
           done
           {
             echo "channel=$CHAN"
