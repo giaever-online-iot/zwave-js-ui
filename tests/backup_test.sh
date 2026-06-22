@@ -168,8 +168,11 @@ printf '%s\n' "$_two" | nth_fpr '' >/dev/null 2>&1; assert_status "$?" "1" "nth_
 
 # --- status routes through ui_pager (passthrough in plain ctx) -----------------
 # main status on a tiny styled screen must go through the gum pager stub.
+# TERM must be non-dumb: ui_ctx returns plain on TERM=dumb BEFORE the UI_ASSUME_TTY
+# check, and GitHub runners export no TERM (bash defaults it to dumb) — so pin it
+# here, or this styled assertion passes locally but fails in CI.
 sp="$(SNAPCTL_backup_target="sftp://nas/zui" GNUPGHOME="$SNAP_COMMON/.gnupg" \
-     UI_ASSUME_TTY=1 UI_COLS=999 UI_LINES=2 main status 2>/dev/null)"
+     TERM=xterm-256color UI_ASSUME_TTY=1 UI_COLS=999 UI_LINES=2 main status 2>/dev/null)"
 assert_contains "$sp" "[pager]" "main status: pages through ui_pager on a tiny styled screen"
 # plain ctx: no pager, content intact
 spp="$(SNAPCTL_backup_target="sftp://nas/zui" GNUPGHOME="$SNAP_COMMON/.gnupg" \
