@@ -26,6 +26,15 @@ hasnt "partial: armhf not avail" "$part" "Available for: amd64, arm64, armhf"
 
 none="$("$PC" "$CH" "amd64,arm64,armhf" "")"
 has   "none: nothing published"  "$none" "❌ No architectures were published"
+hasnt "none: no install command" "$none" "sudo snap install"
+
+dflt="$(env -u SNAP_NAME "$PC" "$CH" "amd64" "amd64")"
+has "default snap name when SNAP_NAME unset" "$dflt" "sudo snap install zwave-js-ui --channel=$CH"
+
+single="$("$PC" "$CH" "amd64" "amd64")"
+has   "single: success header"   "$single" "✅ Published to \`$CH\`"
+has   "single: architectures"    "$single" "Architectures: amd64"
+hasnt "single: no failed line"   "$single" "❌ Failed:"
 
 [ "$fail" -eq 0 ] && echo "All pr-comment tests passed." || echo "Some pr-comment tests FAILED."
 exit "$fail"

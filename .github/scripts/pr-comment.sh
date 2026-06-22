@@ -17,13 +17,14 @@ snap="${SNAP_NAME:-zwave-js-ui}"
 to_lines() { printf '%s' "${1:-}" | tr ',' '\n' | sed '/^$/d' | sort -u; }
 w="$(to_lines "$wanted")"
 p="$(to_lines "$published")"
-count() { printf '%s\n' "${1}" | sed '/^$/d' | wc -l | tr -d ' '; }
+count() { printf '%s\n' "${1:-}" | sed '/^$/d' | wc -l | tr -d ' '; }
 nw="$(count "$w")"
 np="$(count "$p")"
 
-join_csv() { printf '%s\n' "${1}" | sed '/^$/d' | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g'; }
+join_csv() { printf '%s\n' "${1:-}" | sed '/^$/d' | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g'; }
 avail="$(join_csv "$p")"
-failed="$(comm -23 <(printf '%s\n' "$w" | sed '/^$/d') <(printf '%s\n' "$p" | sed '/^$/d') | { tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g'; })"
+failed="$(comm -23 <(printf '%s\n' "$w" | sed '/^$/d') <(printf '%s\n' "$p" | sed '/^$/d'))"
+failed="$(join_csv "$failed")"
 
 if [ "$np" -eq 0 ]; then
     printf '❌ No architectures were published for this PR.\n'
