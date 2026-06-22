@@ -216,13 +216,12 @@ big="$(seq 1 50)"
 assert_contains "$(printf '%s\n' "$big" | UI_ASSUME_TTY=1 UI_LINES=10 ui_pager)" "[pager]" "pager: styled + overflow -> gum pager"
 # fits -> passthrough (no pager)
 fits="$(printf 'a\nb\n' | UI_ASSUME_TTY=1 UI_LINES=10 ui_pager)"
-assert_eq "$fits" "$(printf 'a\nb')" "pager: fits -> passthrough"
-case "$fits" in *'[pager]'*) FAIL=$((FAIL+1)); echo "FAIL: paged content that fit" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+assert_eq "$fits" "$(printf 'a\nb')" "pager: fits -> passthrough (exact equality also proves no [pager])"
 # plain ctx -> passthrough even when tall
 plain="$(printf '%s\n' "$big" | NO_COLOR=1 UI_LINES=10 ui_pager)"
 case "$plain" in *'[pager]'*) FAIL=$((FAIL+1)); echo "FAIL: plain ctx paged" >&2 ;; *) PASS=$((PASS+1)) ;; esac
 assert_contains "$plain" "50" "pager: plain passthrough keeps content"
-# gates on stdout: content arrives on a pipe (stdin not a tty) yet styled -> still pages
-assert_contains "$(printf '%s\n' "$big" | UI_ASSUME_TTY=1 UI_LINES=10 ui_pager)" "[pager]" "pager: piped stdin + styled still pages"
+# Note: ui_pager gates on stdout (ui_ctx), not stdin — every case above already
+# pipes content in (stdin not a tty), so test 1 covers "piped + styled -> pages".
 
 finish
