@@ -77,12 +77,12 @@ jobs:
           # 1) Major bump: move previous major's final to latest/stable BEFORE candidate is overwritten.
           if [ "$("$SR" needs-stable-bump "$V" "$CAND")" = "yes" ]; then
             echo ">> major bump: latest/candidate -> latest/stable"
-            snapcraft promote "$SNAP" --from-channel latest/candidate --to-channel latest/stable --yes
+            .github/scripts/retry.sh 3 15 -- snapcraft promote "$SNAP" --from-channel latest/candidate --to-channel latest/stable --yes
           fi
 
           # 2) The version track's own stable line (always; safe for backports).
           echo ">> $BRANCH -> $TRACK/stable"
-          snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel "$TRACK/stable" --yes
+          .github/scripts/retry.sh 3 15 -- snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel "$TRACK/stable" --yes
 
           # 3) Shared latest/* — promote each channel only if $V is >= that channel's OWN
           #    current version, so a backport can never downgrade a channel already ahead.
@@ -91,7 +91,7 @@ jobs:
           if [ -n "$TARGETS" ]; then
             for ch in $TARGETS; do
               echo ">> $BRANCH -> $ch"
-              snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel "$ch" --yes
+              .github/scripts/retry.sh 3 15 -- snapcraft promote "$SNAP" --from-channel "$BRANCH" --to-channel "$ch" --yes
             done
           else
             echo ">> backport ($V; candidate=${CAND:-<none>} edge=${EDGE:-<none>}): leaving latest/* unchanged"
@@ -99,14 +99,14 @@ jobs:
 
           # 4) Close the PR branch (auto-expires anyway; this is tidy-up).
           echo ">> closing $BRANCH"
-          snapcraft close "$SNAP" "$BRANCH" --yes || echo "close failed (already gone?); ignoring"
+          .github/scripts/retry.sh 3 15 -- snapcraft close "$SNAP" "$BRANCH" --yes || echo "close failed (already gone?); ignoring"
 
           # 5) Default track follows the merged line; never regresses or jumps to stray tracks.
           CAND_TRACK=""
           if [ -n "$CAND" ]; then CAND_TRACK="$("$SR" version-to-track "$CAND")"; fi
           if [ "$TRACK" != "$CAND_TRACK" ] && [ "$("$SR" is-at-least "$TRACK" "$CAND_TRACK")" = "yes" ]; then
             echo ">> set default track -> $TRACK"
-            snapcraft set-default-track "$SNAP" "$TRACK"
+            .github/scripts/retry.sh 3 15 -- snapcraft set-default-track "$SNAP" "$TRACK"
           else
             echo ">> default track unchanged (line=${CAND_TRACK:-<none>})"
           fi
