@@ -123,6 +123,7 @@ jobs:
           path: ${{ env.BUILDLOG }}
           retention-days: 1
           if-no-files-found: ignore
+          overwrite: true   # "Re-run failed jobs" re-runs this leg; replace the prior attempt's log
 
   upload:
     needs: [meta, build, ensure-track]
