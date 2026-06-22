@@ -148,7 +148,7 @@ jobs:
         continue-on-error: true   # missing => this arch's build failed; handled below
       - name: Upload to v<MM>/edge/<PR>
         run: |
-          set -uo pipefail
+          set -euo pipefail
           TRACK="${{ needs.meta.outputs.track }}"
           PR="${{ github.event.pull_request.number }}"
           CHAN="$TRACK/edge/$PR"
@@ -163,9 +163,11 @@ jobs:
           echo "Uploading $f -> $CHAN"
           .github/scripts/retry.sh 3 15 -- snapcraft upload "$f" --release="$CHAN"
       - name: Mark published
+        if: ${{ success() }}
         run: |
           mkdir -p out && : > "out/uploaded-${{ matrix.arch }}"
       - name: Upload published marker
+        if: ${{ success() }}
         uses: actions/upload-artifact@v4
         with:
           name: uploaded-${{ matrix.arch }}
@@ -196,7 +198,7 @@ jobs:
       - name: Render comment + completeness
         id: r
         run: |
-          set -uo pipefail
+          set -euo pipefail
           TRACK="${{ needs.meta.outputs.track }}"
           PR="${{ github.event.pull_request.number }}"
           CHAN="$TRACK/edge/$PR"
@@ -204,6 +206,15 @@ jobs:
           PUBLISHED="$(ls markers/ 2>/dev/null | sed -n 's/^uploaded-//p' | paste -sd, - || true)"
           BODY="${RUNNER_TEMP}/comment.md"
           SNAP_NAME="$SNAP_NAME" .github/scripts/pr-comment.sh "$CHAN" "$WANTED" "$PUBLISHED" > "$BODY"
+          # When the track couldn't be ensured (e.g. expired SNAPCRAFT_SESSION_COOKIE),
+          # uploads are skipped even though builds may have succeeded — say so explicitly
+          # rather than letting the comment read like a build failure.
+          if [ "${{ needs.ensure-track.result }}" != "success" ]; then
+            {
+              echo
+              echo '⚠️ Release was blocked: the version track could not be ensured (see the **ensure-track** job — e.g. an expired `SNAPCRAFT_SESSION_COOKIE`). Builds may have succeeded; fix the cause and use "Re-run failed jobs".'
+            } >> "$BODY"
+          fi
           # Fold the build log into the comment only when nothing was published.
           if [ -z "$PUBLISHED" ] && ls buildlogs/* >/dev/null 2>&1; then
             {
@@ -221,6 +232,8 @@ jobs:
           w="$(printf '%s' "$WANTED"    | tr ',' '\n' | sed '/^$/d' | sort -u)"
           p="$(printf '%s' "$PUBLISHED" | tr ',' '\n' | sed '/^$/d' | sort -u)"
           if [ "$w" = "$p" ]; then echo "complete=yes" >> "$GITHUB_OUTPUT"; else echo "complete=no" >> "$GITHUB_OUTPUT"; fi
+          missing="$(comm -23 <(printf '%s\n' "$w") <(printf '%s\n' "$p") | paste -sd, - || true)"
+          echo "missing=$missing" >> "$GITHUB_OUTPUT"
       - name: Sticky PR comment
         uses: actions/github-script@v9
         env:
@@ -241,5 +254,5 @@ jobs:
       - name: Fail if any wanted arch is unpublished
         if: ${{ steps.r.outputs.complete != 'yes' }}
         run: |
-          echo "::error::Incomplete publish: wanted=[${{ needs.meta.outputs.archs_csv }}]"
+          echo "::error::Incomplete publish: missing=[${{ steps.r.outputs.missing }}] wanted=[${{ needs.meta.outputs.archs_csv }}]"
           exit 1
