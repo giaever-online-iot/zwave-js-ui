@@ -132,10 +132,12 @@ ui_table_width() {             # [headers...]; stdin TSV -> natural bordered-tab
 
 ui_stack() {                   # [headers...]; stdin TSV -> generic stacked records
                                # col-1 = title; later columns = indented "header: value" (bare if no header)
-    local headers=("$@") line i
+    local headers=("$@") line i first=1
     local -a fields
     while IFS= read -r line; do
         IFS=$'\t' read -ra fields <<< "$line"
+        # blank line BETWEEN records, not a trailing one after the last
+        [ "$first" -eq 1 ] && first=0 || printf '\n'
         printf '%s\n' "${fields[0]}"
         for i in "${!fields[@]}"; do
             [ "$i" -eq 0 ] && continue
@@ -145,7 +147,6 @@ ui_stack() {                   # [headers...]; stdin TSV -> generic stacked reco
                 printf '    %s\n' "${fields[$i]}"
             fi
         done
-        printf '\n'
     done
 }
 
