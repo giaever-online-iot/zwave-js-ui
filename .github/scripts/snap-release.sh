@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# snap-release.sh — version/channel math + `snap info` parsing for the snap
+# snap-release.sh — version/channel math + `snapcraft status` parsing for the snap
 # release workflows. Pure functions: read args/stdin, write stdout, no network.
 #
 # Subcommands:
 #   version-to-track <ver>             v11.19.1|11.19.1 -> v11.19    (""->"")
 #   major <ver>                        v12.0.0 -> 12                 (""->"")
-#   channel-version <channel>          (stdin: `snap info`) -> version or "" (^/--/- -> "")
-#   branch-has-revisions <track> <pr>  (stdin: `snap info`) -> yes|no
+#   channel-version <channel>          (stdin: `snapcraft status`) -> version or "" (^/--/- -> "")
+#   branch-has-revisions <track> <pr>  (stdin: `snapcraft status`) -> yes|no
 #   needs-stable-bump <new> <cand>     yes iff cand set & major(new)>major(cand)
 #   is-at-least <ver> <floor>          yes iff ver>=floor  (floor "" -> yes)
 set -euo pipefail
@@ -42,24 +42,19 @@ case "$cmd" in
     printf '%s\n' "${in%%.*}"
     ;;
   channel-version)
-    # stdin = `snap info`; arg = channel like latest/candidate or v11.19/edge/42
-    awk -v ch="${1:-}" '
-      /^channels:/ { inblk=1; next }
-      inblk && NF==0 { inblk=0 }
-      inblk {
-        line=$0; sub(/^[ \t]+/, "", line)
-        ci=index(line, ":"); if (ci==0) next
-        name=substr(line, 1, ci-1)
-        rest=substr(line, ci+1); sub(/^[ \t]+/, "", rest)
-        split(rest, a, /[ \t]+/); ver=a[1]
-        if (name==ch) {
-          if (ver=="^" || ver=="--" || ver=="-") ver=""
-          print ver; exit
-        }
-      }'
+    # stdin = `snapcraft status`; arg = channel like latest/candidate or v11.20/edge/204.
+    # Columns: Track Arch Channel Version Revision Progress Expires-at. Robust to BOTH
+    # layouts snapcraft emits: captured non-interactively (CI: `$(...)` => no TTY) it
+    # repeats Track+Arch on every row; in a terminal it blanks them on continuation rows.
+    # So: carry the last Track token forward, find the Version field (`^v[0-9]`) on each
+    # row, and read the Channel as the field immediately before it.
+    ch="${1:-}"
+    awk -v t="${ch%%/*}" -v c="${ch#*/}" '
+      $1 ~ /^(latest|v[0-9][0-9.]*)$/ { tr = $1 }
+      { for (i = 2; i <= NF; i++) if ($i ~ /^v[0-9]/) { if (tr == t && $(i-1) == c) { print $i; exit } break } }'
     ;;
   branch-has-revisions)
-    # stdin = `snap info`; args = track pr. Re-use channel-version via `bash "$0"`
+    # stdin = `snapcraft status`; args = track pr. Re-use channel-version via `bash "$0"`
     # so this works whether or not the script's exec bit is set.
     info="$(cat)"
     ver="$(bash "$0" channel-version "${1:-}/edge/${2:-}" <<<"$info")"
