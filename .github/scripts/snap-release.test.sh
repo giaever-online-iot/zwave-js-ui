@@ -34,6 +34,15 @@ check "channel-version absent"     ""         "$("$SR" channel-version v99.9/sta
 check "branch-has-revisions yes"   "yes" "$("$SR" branch-has-revisions v11.20 204 <"$INFO")"
 check "branch-has-revisions no"    "no"  "$("$SR" branch-has-revisions v11.20 999 <"$INFO")"
 
+# Same parser must also handle the interactive/TTY layout, where snapcraft blanks
+# Track+Arch on continuation rows. CI captures non-interactively (repeated columns),
+# but the parser is hardened for both — these lock that in.
+TTY="$HERE/fixtures/snapcraft-status-tty.txt"
+check "tty channel-version candidate" "v11.20.0" "$("$SR" channel-version latest/candidate <"$TTY")"
+check "tty channel-version branch"    "v11.20.0" "$("$SR" channel-version v11.20/edge/204 <"$TTY")"
+check "tty channel-version inherited" ""         "$("$SR" channel-version latest/beta <"$TTY")"
+check "tty branch-has-revisions yes"  "yes"      "$("$SR" branch-has-revisions v11.20 204 <"$TTY")"
+
 check "needs-stable-bump major"      "yes" "$("$SR" needs-stable-bump v12.0.0 v11.20.3)"
 check "needs-stable-bump minor"      "no"  "$("$SR" needs-stable-bump v11.20.0 v11.19.1)"
 check "needs-stable-bump empty-cand" "no"  "$("$SR" needs-stable-bump v11.19.1 "")"

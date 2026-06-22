@@ -43,11 +43,15 @@ case "$cmd" in
     ;;
   channel-version)
     # stdin = `snapcraft status`; arg = channel like latest/candidate or v11.20/edge/204.
-    # snapcraft status columns: Track Arch Channel Version Revision Progress Expires-at
-    # (Track+Arch repeat on every row; `↑` marks an inherited channel.)
+    # Columns: Track Arch Channel Version Revision Progress Expires-at. Robust to BOTH
+    # layouts snapcraft emits: captured non-interactively (CI: `$(...)` => no TTY) it
+    # repeats Track+Arch on every row; in a terminal it blanks them on continuation rows.
+    # So: carry the last Track token forward, find the Version field (`^v[0-9]`) on each
+    # row, and read the Channel as the field immediately before it.
     ch="${1:-}"
     awk -v t="${ch%%/*}" -v c="${ch#*/}" '
-      $1==t && $3==c && $4 ~ /^v?[0-9]/ { print $4; exit }'
+      $1 ~ /^(latest|v[0-9][0-9.]*)$/ { tr = $1 }
+      { for (i = 2; i <= NF; i++) if ($i ~ /^v[0-9]/) { if (tr == t && $(i-1) == c) { print $i; exit } break } }'
     ;;
   branch-has-revisions)
     # stdin = `snapcraft status`; args = track pr. Re-use channel-version via `bash "$0"`
