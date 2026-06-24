@@ -96,7 +96,7 @@ jobs:
         run: .github/scripts/remote-build.sh "${{ matrix.arch }}"
       - name: Upload snap artifact
         if: ${{ steps.build.outputs.snaps != '0' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: snap-${{ matrix.arch }}
           path: ${{ env.SNAP_NAME }}*${{ matrix.arch }}.snap
@@ -117,7 +117,7 @@ jobs:
           echo "BUILDLOG=$out" >> "$GITHUB_ENV"
       - name: Upload snapcraft log artifact
         if: ${{ always() && steps.build.outputs.snaps == '0' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: buildlog-${{ matrix.arch }}
           path: ${{ env.BUILDLOG }}
@@ -142,7 +142,7 @@ jobs:
       - name: Install snapcraft
         run: sudo snap install snapcraft --classic
       - name: Download snap artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: snap-${{ matrix.arch }}
           path: .
@@ -169,7 +169,7 @@ jobs:
           mkdir -p out && : > "out/uploaded-${{ matrix.arch }}"
       - name: Upload published marker
         if: ${{ success() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: uploaded-${{ matrix.arch }}
           path: out/uploaded-${{ matrix.arch }}
@@ -183,14 +183,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Download published markers
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: uploaded-*
           path: markers
           merge-multiple: true
         continue-on-error: true
       - name: Download build logs
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: buildlog-*
           path: buildlogs
