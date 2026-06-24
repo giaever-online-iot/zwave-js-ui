@@ -125,4 +125,34 @@ printf '%s' '{"gateway":{"logToFile":false},"zwave":{"logToFile":false}}' > "$SN
 ( PATH="$STUB_BIN:$PATH"; export TEST_CONNECTED_PLUGS="log-observe"; main ) >/dev/null 2>&1
 assert_status "$?" "0" "main: connected -> follows journal"
 
+# --- live-log viewer: less +F -R on a TTY, raw stream when piped ----------------
+# logs_should_page: needs both a TTY on stdout AND less on PATH.
+( PATH="$HERE/fixtures/bin:$PATH"; logs_should_page </dev/null >/dev/null 2>&1 ); \
+    assert_status "$?" "1" "should_page: no TTY on stdout -> no"
+
+# Real-pty integration: under script(1), stdout is a TTY; with stub less + stub
+# followers, main must launch the pager as `less +F -R <fifo>` and exit cleanly.
+if command -v script >/dev/null 2>&1; then
+    LESS_LOG="$SNAP_DATA/less.argv"
+    out="$(ROOT="$ROOT" SNAP="$SNAP" SNAP_DATA="$SNAP_DATA" LESS_LOG="$LESS_LOG" \
+        STUB="$HERE/fixtures/bin" \
+        timeout 15 script -qec '
+            export PATH="$STUB:$PATH"
+            printf "%s" "{\"gateway\":{\"logToFile\":true},\"zwave\":{\"logToFile\":true}}" > "$SNAP_DATA/settings.json"
+            require_root() { :; }
+            source "$ROOT/src/bin/logs"
+            main zui
+        ' /dev/null 2>&1; echo "rc=$?")"
+    assert_contains "$(cat "$LESS_LOG" 2>/dev/null)" "+F -R" "viewer: TTY run launches less +F -R"
+    assert_contains "$out" "rc=0" "viewer: paged run exits cleanly (no hang)"
+fi
+
+# Piped (no TTY): main must NOT invoke less — raw stream path.
+LESS_LOG2="$SNAP_DATA/less2.argv"; : > "$LESS_LOG2"
+printf '%s' '{"gateway":{"logToFile":true},"zwave":{"logToFile":false}}' > "$SNAP_DATA/settings.json"
+( PATH="$HERE/fixtures/bin:$PATH"; LESS_LOG="$LESS_LOG2"; require_root() { :; }
+  TAIL_SENTINEL="$SNAP_DATA/t.ran"; export TAIL_SENTINEL
+  timeout 10 bash -c 'source "$ROOT/src/bin/logs"; require_root() { :; }; main zui' </dev/null >/dev/null 2>&1 )
+assert_eq "$(cat "$LESS_LOG2" 2>/dev/null)" "" "viewer: piped run does NOT invoke less"
+
 finish

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Fake less for unit tests: record argv, drain a few lines from the file arg
+# (proves it can read the FIFO), then exit (simulates the user pressing q).
+[ -n "${LESS_LOG:-}" ] && printf '%s\n' "$*" >> "$LESS_LOG"
+f="${*: -1}"
+n=0; while [ "$n" -lt 3 ] && IFS= read -r _; do n=$((n+1)); done < "$f" 2>/dev/null
+exit 0
