@@ -211,17 +211,23 @@ plain="$(printf 'k\tv\n' | ui_table key value)"
 assert_contains "$plain" "k" "plain: aligned still works"
 printf '%s' "$plain" | grep -q "$(printf '\033')"; assert_status "$?" "1" "plain: zero ANSI"
 
-# --- ui_pager: scroll only when styled AND taller than the screen --------------
+# --- ui_pager: scroll via `less -R` when styled AND taller than the screen ------
+# less, NOT gum pager: gum pager's border + line-number gutter shrink the usable
+# width and re-wrap a table already sized to the terminal (the wrap regression).
+PATH="$HERE/fixtures/bin:$PATH"   # use the less stub, not real less (which would block)
 big="$(seq 1 50)"
-assert_contains "$(printf '%s\n' "$big" | UI_ASSUME_TTY=1 UI_LINES=10 ui_pager)" "[pager]" "pager: styled + overflow -> gum pager"
-# fits -> passthrough (no pager)
+LESS_LOG="$SNAP_DATA/less_pager.log"; export LESS_LOG; : > "$LESS_LOG"
+printf '%s\n' "$big" | UI_ASSUME_TTY=1 UI_LINES=10 ui_pager >/dev/null
+assert_contains "$(cat "$LESS_LOG")" "-R" "pager: styled + overflow -> less -R"
+# fits -> passthrough: content intact, less NOT invoked
+: > "$LESS_LOG"
 fits="$(printf 'a\nb\n' | UI_ASSUME_TTY=1 UI_LINES=10 ui_pager)"
-assert_eq "$fits" "$(printf 'a\nb')" "pager: fits -> passthrough (exact equality also proves no [pager])"
-# plain ctx -> passthrough even when tall
+assert_eq "$fits" "$(printf 'a\nb')" "pager: fits -> passthrough"
+assert_eq "$(cat "$LESS_LOG")" "" "pager: fits -> less NOT invoked"
+# plain ctx -> passthrough even when tall, less NOT invoked
+: > "$LESS_LOG"
 plain="$(printf '%s\n' "$big" | NO_COLOR=1 UI_LINES=10 ui_pager)"
-case "$plain" in *'[pager]'*) FAIL=$((FAIL+1)); echo "FAIL: plain ctx paged" >&2 ;; *) PASS=$((PASS+1)) ;; esac
 assert_contains "$plain" "50" "pager: plain passthrough keeps content"
-# Note: ui_pager gates on stdout (ui_ctx), not stdin — every case above already
-# pipes content in (stdin not a tty), so test 1 covers "piped + styled -> pages".
+assert_eq "$(cat "$LESS_LOG")" "" "pager: plain -> less NOT invoked"
 
 finish
