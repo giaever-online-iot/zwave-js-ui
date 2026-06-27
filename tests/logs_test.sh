@@ -162,4 +162,14 @@ printf '%s' '{"gateway":{"logToFile":true},"zwave":{"logToFile":false}}' > "$SNA
   timeout 10 bash -c 'source "$ROOT/src/bin/logs"; require_root() { :; }; main zui' </dev/null >/dev/null 2>&1 )
 assert_eq "$(cat "$LESS_LOG2" 2>/dev/null)" "" "viewer: piped run does NOT invoke less"
 
+# --- viewer hint: a key legend leads the paged buffer (discoverable on scroll-up) ---
+h="$(use_color=1 log_viewer_hint)"
+assert_contains "$h" "Ctrl-C" "hint: documents Ctrl-C (scroll back)"
+assert_contains "$h" "F"      "hint: documents F (resume follow)"
+assert_contains "$h" "q"      "hint: documents q (quit)"
+# coloured on a TTY, plain otherwise
+case "$h" in *$'\033'*) PASS=$((PASS+1)) ;; *) FAIL=$((FAIL+1)); echo "FAIL: TTY hint not coloured" >&2 ;; esac
+hp="$(use_color=0 log_viewer_hint)"
+case "$hp" in *$'\033'*) FAIL=$((FAIL+1)); echo "FAIL: plain hint has ANSI" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+
 finish
