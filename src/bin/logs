@@ -233,7 +233,9 @@ main() {
 
     # Interactive terminal + a pager: follow live AND let the user scroll back.
     # The producer (followers + wait) backgrounds into a FIFO; less reads the FIFO
-    # in the foreground (keys from /dev/tty) with +F (follow) and -R (keep colours).
+    # in the foreground (keys from /dev/tty) with +F (follow), -R (keep colours),
+    # and -f (a FIFO is a non-regular file; interactive less refuses it otherwise:
+    # "<fifo> is not a regular file (use -f to see it)").
     # Quitting less kills the producer, whose trap reaps the tailers — no orphans.
     # (run_followers always launches >=1 follower with the current stream logic; a
     # zero-follower producer would close the FIFO and leave less at an empty EOF page.)
@@ -242,7 +244,7 @@ main() {
         if ! mkfifo "$fifo" 2>/dev/null; then run_followers; return; fi
         run_followers >"$fifo" &
         local producer=$!
-        less +F -R "$fifo"
+        less +F -R -f "$fifo"
         kill -TERM "$producer" 2>/dev/null
         wait "$producer" 2>/dev/null
         rm -f "$fifo"
