@@ -166,18 +166,20 @@ printf '%s\n' "$_two" | nth_fpr 3 >/dev/null 2>&1; assert_status "$?" "1" "nth_f
 printf '%s\n' "$_two" | nth_fpr x >/dev/null 2>&1; assert_status "$?" "1" "nth_fpr: non-numeric -> 1"
 printf '%s\n' "$_two" | nth_fpr '' >/dev/null 2>&1; assert_status "$?" "1" "nth_fpr: empty -> 1"
 
-# --- status routes through ui_pager (passthrough in plain ctx) -----------------
-# main status on a tiny styled screen must go through the gum pager stub.
-# TERM must be non-dumb: ui_ctx returns plain on TERM=dumb BEFORE the UI_ASSUME_TTY
-# check, and GitHub runners export no TERM (bash defaults it to dumb) — so pin it
-# here, or this styled assertion passes locally but fails in CI.
-sp="$(SNAPCTL_backup_target="sftp://nas/zui" GNUPGHOME="$SNAP_COMMON/.gnupg" \
-     TERM=xterm-256color UI_ASSUME_TTY=1 UI_COLS=999 UI_LINES=2 main status 2>/dev/null)"
-assert_contains "$sp" "[pager]" "main status: pages through ui_pager on a tiny styled screen"
-# plain ctx: no pager, content intact
+# --- status routes through ui_pager (less) on a tiny styled screen --------------
+# ui_pager pages with `less -R` (see helper/ui). Stub less on PATH so it's invoked
+# (and doesn't block). TERM must be non-dumb: ui_ctx returns plain on TERM=dumb
+# BEFORE the UI_ASSUME_TTY check, and GitHub runners export no TERM — so pin it.
+PATH="$HERE/fixtures/bin:$PATH"
+LESS_LOG="$SNAP_DATA/less.log"; export LESS_LOG; : > "$LESS_LOG"
+SNAPCTL_backup_target="sftp://nas/zui" GNUPGHOME="$SNAP_COMMON/.gnupg" \
+     TERM=xterm-256color UI_ASSUME_TTY=1 UI_COLS=999 UI_LINES=2 main status >/dev/null 2>&1
+assert_contains "$(cat "$LESS_LOG")" "-R" "main status: pages via less on a tiny styled screen"
+# plain ctx: no pager, content intact, less NOT invoked
+: > "$LESS_LOG"
 spp="$(SNAPCTL_backup_target="sftp://nas/zui" GNUPGHOME="$SNAP_COMMON/.gnupg" \
       NO_COLOR=1 UI_LINES=2 main status 2>/dev/null)"
 assert_contains "$spp" "sftp://nas/zui" "main status: plain ctx keeps content"
-case "$spp" in *'[pager]'*) FAIL=$((FAIL+1)); echo "FAIL: plain ctx paged status" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+assert_eq "$(cat "$LESS_LOG")" "" "main status: plain ctx -> less NOT invoked"
 
 finish

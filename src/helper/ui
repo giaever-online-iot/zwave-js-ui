@@ -191,11 +191,15 @@ ui_usage() {                   # stdin: usage text (readable raw; light markdown
 }
 
 ui_pager() {                   # stdin: content -> scrollable viewport when it overflows the screen.
-                               # Gates on stdout (ui_ctx), NOT stdin: gum pager reads content from
-                               # stdin and keystrokes from /dev/tty, so the content can be a pipe.
+                               # Pages with `less -R`, NOT `gum pager`: gum pager draws a border +
+                               # line-number gutter that shrink the usable width and re-wrap content
+                               # already sized to the terminal (e.g. the help command table). less is
+                               # full-width, keeps colours (-R), and is staged in the snap. Gates on
+                               # stdout (ui_ctx); content arrives on stdin, less reads keys from /dev/tty.
     local content; content="$(cat)"
-    if [ "$(ui_ctx)" = styled ] && [ "$(printf '%s\n' "$content" | wc -l)" -gt "$(ui_lines)" ]; then
-        printf '%s\n' "$content" | "$UI_GUM" pager
+    if [ "$(ui_ctx)" = styled ] && command -v less >/dev/null 2>&1 \
+       && [ "$(printf '%s\n' "$content" | wc -l)" -gt "$(ui_lines)" ]; then
+        printf '%s\n' "$content" | less -R
     else
         printf '%s\n' "$content"
     fi
