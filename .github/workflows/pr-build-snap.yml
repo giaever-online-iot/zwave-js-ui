@@ -4,13 +4,10 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
-    # Only the snap recipe and its bundled inputs affect the built artifact, so
-    # build + publish ONLY when those change. Docs/config edits must not mint a
-    # store revision. requirements-duplicity.txt IS a build input (pip-installed).
-    paths:
-      - 'snap/**'
-      - 'src/**'
-      - 'requirements-duplicity.txt'
+    # Runs on EVERY PR so the always-on `gate` job can be a required status check.
+    # The expensive build still runs ONLY when build inputs change — the `changes`
+    # job detects snap/**, src/**, requirements-duplicity.txt and gates the build
+    # jobs; docs/config PRs skip the build and `gate` reports green trivially.
   workflow_dispatch:
 
 permissions:
@@ -25,7 +22,34 @@ env:
   SNAP_NAME: zwave-js-ui
 
 jobs:
+  # Detect whether this PR touches build inputs. Runs on every PR; its output gates
+  # the expensive build jobs and lets `gate` (a required check) pass docs/CI PRs.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.f.outputs.build }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Detect build-affecting changes
+        id: f
+        run: |
+          set -euo pipefail
+          # workflow_dispatch has no PR diff — treat it as a (build-only) build.
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          base="${{ github.event.pull_request.base.sha }}"
+          if git diff --name-only "$base" HEAD | grep -qE '^(snap/|src/|requirements-duplicity\.txt$)'; then
+            echo "build=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          fi
+
   meta:
+    needs: changes
+    if: ${{ needs.changes.outputs.build == 'true' }}
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.meta.outputs.version }}
@@ -177,8 +201,8 @@ jobs:
           if-no-files-found: error
 
   report:
-    needs: [meta, build, ensure-track, upload]
-    if: ${{ always() && github.event_name == 'pull_request' }}
+    needs: [changes, meta, build, ensure-track, upload]
+    if: ${{ always() && github.event_name == 'pull_request' && needs.changes.outputs.build == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -256,4 +280,27 @@ jobs:
         if: ${{ steps.r.outputs.complete != 'yes' }}
         run: |
           echo "::error::Incomplete publish: missing=[${{ steps.r.outputs.missing }}] wanted=[${{ needs.meta.outputs.archs_csv }}]"
+          exit 1
+
+  # Always-on required check: green unless this PR changes build inputs AND the
+  # build/publish (report) did not succeed. Safe to require in branch protection —
+  # it lets docs/CI PRs through while blocking a merge-before-publish of a build PR.
+  gate:
+    needs: [changes, report]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require a published build for build-affecting PRs
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "Not a pull_request event — gate not applicable."; exit 0
+          fi
+          if [ "${{ needs.changes.outputs.build }}" != "true" ]; then
+            echo "No snap/src/requirements changes — no build required; gate passes."; exit 0
+          fi
+          if [ "${{ needs.report.result }}" = "success" ]; then
+            echo "Build published successfully; gate passes."; exit 0
+          fi
+          echo "::error::This PR changes build inputs but the snap build/publish did not succeed (report=${{ needs.report.result }}). Don't merge until the build is green and published."
           exit 1
