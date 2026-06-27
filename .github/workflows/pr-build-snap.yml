@@ -100,7 +100,7 @@ jobs:
         with:
           name: snap-${{ matrix.arch }}
           path: ${{ env.SNAP_NAME }}*${{ matrix.arch }}.snap
-          retention-days: 1
+          retention-days: 7
           if-no-files-found: error
       - name: Capture snapcraft log on failure
         if: ${{ always() && steps.build.outputs.snaps == '0' }}
@@ -121,7 +121,7 @@ jobs:
         with:
           name: buildlog-${{ matrix.arch }}
           path: ${{ env.BUILDLOG }}
-          retention-days: 1
+          retention-days: 7
           if-no-files-found: ignore
           overwrite: true   # "Re-run failed jobs" re-runs this leg; replace the prior attempt's log
 
@@ -173,7 +173,7 @@ jobs:
         with:
           name: uploaded-${{ matrix.arch }}
           path: out/uploaded-${{ matrix.arch }}
-          retention-days: 1
+          retention-days: 7
           if-no-files-found: error
 
   report:
