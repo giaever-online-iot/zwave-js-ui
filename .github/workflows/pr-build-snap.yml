@@ -97,13 +97,25 @@ jobs:
           fi
           bash .github/scripts/snap-create-track.sh "$SNAP_NAME" "$TRACK"
 
-  build:
-    needs: meta
+  # One job per arch that BUILDS *and* PUBLISHES, so each arch ships the moment its
+  # own build finishes — no waiting on sibling arches (GitHub has no per-matrix-leg
+  # dependencies, so a separate `upload` job that `needs: build` would block on ALL
+  # build legs). The snap is uploaded to the store straight off the runner: no GitHub
+  # artifact round-trip for it, which also removes the `download-artifact` digest-
+  # mismatch failure class. `needs: ensure-track` only so the store upload can't race
+  # a missing track; on workflow_dispatch the publish step is skipped (build-only).
+  build-publish:
+    needs: [meta, ensure-track]
+    # Run when the build ran (meta succeeded); tolerate ensure-track being skipped
+    # on workflow_dispatch. !cancelled() keeps it alive when a needed job is skipped.
+    if: ${{ !cancelled() && needs.meta.result == 'success' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false           # a dead arch must not cancel its siblings
       matrix:
         arch: ${{ fromJSON(needs.meta.outputs.archs) }}
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -118,7 +130,33 @@ jobs:
       - name: Remote-build ${{ matrix.arch }}
         id: build
         run: .github/scripts/remote-build.sh "${{ matrix.arch }}"
-      - name: Upload snap artifact
+      - name: Publish ${{ matrix.arch }} to v<MM>/edge/<PR>
+        id: publish
+        # PR-only (no PR number on dispatch) and only with a valid snap + a track.
+        if: ${{ github.event_name == 'pull_request' && needs.ensure-track.result == 'success' && steps.build.outputs.snaps != '0' }}
+        run: |
+          set -euo pipefail
+          TRACK="${{ needs.meta.outputs.track }}"
+          PR="${{ github.event.pull_request.number }}"
+          CHAN="$TRACK/edge/$PR"
+          ARCH="${{ matrix.arch }}"
+          f="$(ls -1 "${SNAP_NAME}"*"${ARCH}".snap 2>/dev/null | head -n1 || true)"
+          if [ -z "$f" ]; then echo "::error::No snap artifact for ${ARCH}."; exit 1; fi
+          echo "Uploading $f -> $CHAN"
+          .github/scripts/retry.sh 3 15 -- snapcraft upload "$f" --release="$CHAN"
+      - name: Mark published
+        if: ${{ steps.publish.outcome == 'success' }}
+        run: |
+          mkdir -p out && : > "out/uploaded-${{ matrix.arch }}"
+      - name: Upload published marker
+        if: ${{ steps.publish.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: uploaded-${{ matrix.arch }}
+          path: out/uploaded-${{ matrix.arch }}
+          retention-days: 7
+          if-no-files-found: error
+      - name: Snap artifact (record; off the publish path)
         if: ${{ steps.build.outputs.snaps != '0' }}
         uses: actions/upload-artifact@v7
         with:
@@ -148,60 +186,20 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
           overwrite: true   # "Re-run failed jobs" re-runs this leg; replace the prior attempt's log
-
-  upload:
-    needs: [meta, build, ensure-track]
-    # Run even though `build` reports failure from a sibling arch (!cancelled),
-    # but only once the track exists.
-    if: ${{ !cancelled() && needs.ensure-track.result == 'success' }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: ${{ fromJSON(needs.meta.outputs.archs) }}
-    env:
-      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-    steps:
-      - uses: actions/checkout@v7
-      - name: Install snapcraft
-        run: sudo snap install snapcraft --classic
-      - name: Download snap artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: snap-${{ matrix.arch }}
-          path: .
-        continue-on-error: true   # missing => this arch's build failed; handled below
-      - name: Upload to v<MM>/edge/<PR>
+      - name: Require this arch to have published (build PRs)
+        # Make THIS arch's leg red when it didn't publish, so a transient gets a
+        # targeted "Re-run failed jobs" and the failure is visible per-arch. The
+        # cross-arch completeness decision still lives in `report`/`gate`.
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.ensure-track.result == 'success' }}
         run: |
-          set -euo pipefail
-          TRACK="${{ needs.meta.outputs.track }}"
-          PR="${{ github.event.pull_request.number }}"
-          CHAN="$TRACK/edge/$PR"
-          ARCH="${{ matrix.arch }}"
-          f="$(ls -1 "${SNAP_NAME}"*"${ARCH}".snap 2>/dev/null | head -n1 || true)"
-          # FAIL (not no-op) when the artifact is missing, so "Re-run failed jobs"
-          # re-pairs a rebuilt arch with its upload instead of silently skipping it.
-          if [ -z "$f" ]; then
-            echo "::error::No snap artifact for ${ARCH} — its build did not succeed."
+          if [ "${{ steps.publish.outcome }}" != "success" ]; then
+            echo "::error::${{ matrix.arch }}: build/publish did not succeed (snaps=${{ steps.build.outputs.snaps }}, publish=${{ steps.publish.outcome }})."
             exit 1
           fi
-          echo "Uploading $f -> $CHAN"
-          .github/scripts/retry.sh 3 15 -- snapcraft upload "$f" --release="$CHAN"
-      - name: Mark published
-        if: ${{ success() }}
-        run: |
-          mkdir -p out && : > "out/uploaded-${{ matrix.arch }}"
-      - name: Upload published marker
-        if: ${{ success() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: uploaded-${{ matrix.arch }}
-          path: out/uploaded-${{ matrix.arch }}
-          retention-days: 7
-          if-no-files-found: error
+          echo "${{ matrix.arch }} published."
 
   report:
-    needs: [changes, meta, build, ensure-track, upload]
+    needs: [changes, meta, ensure-track, build-publish]
     if: ${{ always() && github.event_name == 'pull_request' && needs.changes.outputs.build == 'true' }}
     runs-on: ubuntu-latest
     steps:
