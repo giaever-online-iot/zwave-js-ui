@@ -23,3 +23,5 @@ EOF
 }
 
 catalog_keys() { settings_catalog | cut -f1; }
+
+catalog_row() { settings_catalog | awk -F'\t' -v k="$1" '$1==k'; }   # the TSV row for one key

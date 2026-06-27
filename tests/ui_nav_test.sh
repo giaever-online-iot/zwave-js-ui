@@ -62,4 +62,38 @@ assert_contains "$out" "RAN_daemonize" "Service > Enable runs daemonize"
 printf '%s\n' "Restart" > "$QS"
 assert_contains "$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$QS" nav_service 2>&1)" "RAN_restart" "Service > Restart runs restart"
 
+# --- catalog_row ---
+assert_eq "$(catalog_row server.port | cut -f2)" "int" "catalog_row server.port type"
+assert_eq "$(catalog_row server.ssl | cut -f3)" "false" "catalog_row server.ssl default"
+assert_eq "$(catalog_row nope)" "" "catalog_row unknown -> empty"
+
+# --- Settings: edit a bool, apply via snapctl set ---
+SET_LOG="$SNAP_DATA/set.log"; : > "$SET_LOG"
+snapctl() {
+    case "$1" in
+        services) printf 'Service  Startup  Current  Notes\nzwave-js-ui.zwave-js-ui  enabled  active  -\n' ;;
+        get) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;;
+        set)   printf 'set %s\n' "$2" >> "$SET_LOG"; [ -n "${SNAPCTL_SET_FAIL:-}" ] && { echo "configure: bad value" >&2; return 1; }; return 0 ;;
+        unset) printf 'unset %s\n' "$2" >> "$SET_LOG"; return 0 ;;
+        *) : ;;
+    esac
+}
+# browse server.ssl -> Edit -> choose "true" -> Back; then Back out of settings
+CQ="$SNAP_DATA/setc.q"; printf '%s\n' "server.ssl" "Edit" "true" "← Back" > "$CQ"
+out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings 2>&1)"
+assert_contains "$(cat "$SET_LOG")" "set server.ssl=true" "Edit bool -> snapctl set key=value"
+assert_contains "$out" "set" "success surfaced"
+
+# rejection: configure hook says no -> ui_err, message shown, value not claimed applied
+# server.port is int -> the value comes from ui_input (GUM_INPUT_QUEUE), NOT the choose queue.
+: > "$SET_LOG"; printf '%s\n' "server.port" "Edit" "← Back" > "$CQ"
+INQ="$SNAP_DATA/in.q"; printf '99999\n' > "$INQ"
+out="$(UI_ASSUME_TTY=1 SNAPCTL_SET_FAIL=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings 2>&1)"
+assert_contains "$out" "configure: bad value" "rejection surfaces the hook message"
+
+# reset to default -> snapctl unset
+: > "$SET_LOG"; printf '%s\n' "mqtt.name" "Reset to default" "← Back" > "$CQ"
+UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings >/dev/null 2>&1
+assert_contains "$(cat "$SET_LOG")" "unset mqtt.name" "Reset -> snapctl unset"
+
 finish

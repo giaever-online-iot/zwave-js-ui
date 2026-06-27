@@ -6,7 +6,47 @@ source "$SNAP/helper/ui"
 source "$SNAP/helper/catalog"
 
 # --- section stubs (replaced in Tasks 2-5) ---
-nav_settings() { ui_warn "Settings: not implemented yet."; }
+nav_settings() {               # browse the catalog; edit via snapctl (configure hook validates)
+    local choice key type def desc cur act new
+    while true; do
+        # build the key list with current values inline (gum choose filters as you type)
+        local items=() k v
+        while IFS= read -r k; do
+            v="$(snapctl get "$k" 2>/dev/null)"; [ "$k" = session.secret ] && [ -n "$v" ] && v="(hidden)"
+            items+=("$k = ${v:-(unset)}")
+        done < <(catalog_keys)
+        choice="$(ui_choose "Setting (type to filter)" "" "${items[@]}" "← Back")" || return
+        [ "$choice" = "← Back" ] && return
+        key="${choice%% = *}"
+        IFS=$'\t' read -r _ type def desc < <(catalog_row "$key")
+        cur="$(snapctl get "$key" 2>/dev/null)"; [ "$key" = session.secret ] && [ -n "$cur" ] && cur="(hidden)"
+        ui_kv "key" "$key" "current" "${cur:-(unset)}" "default" "$def" "type" "$type" "description" "$desc"
+        act="$(ui_choose "Action for $key" "" "Edit" "Reset to default" "← Back")" || continue
+        case "$act" in
+            Edit)
+                if [ "$type" = bool ]; then
+                    new="$(ui_choose "$key =" "" "true" "false")" || continue
+                else
+                    new="$(ui_input "$key = ")" || continue
+                fi
+                nav_set_apply "$key" "$new" set ;;
+            "Reset to default") nav_set_apply "$key" "" unset ;;
+            *) : ;;
+        esac
+    done
+}
+
+nav_set_apply() {              # $1 key, $2 value, $3 set|unset — run snapctl, surface configure's verdict
+    local key="$1" val="$2" mode="$3" out rc
+    if [ "$mode" = unset ]; then out="$(snapctl unset "$key" 2>&1)"; rc=$?
+    else out="$(snapctl set "$key=$val" 2>&1)"; rc=$?; fi
+    if [ "$rc" -eq 0 ]; then
+        if [ "$mode" = unset ]; then ui_ok "$key reset to default"; else ui_ok "$key set to $val"; fi
+    else
+        ui_err "Rejected — $key unchanged"
+        [ -n "$out" ] && ui_print "$out"
+    fi
+}
 nav_service() {                # browse status; act via the existing service bins
     local bindir="${NAV_BIN:-$SNAP/bin}" choice
     while true; do

@@ -6,7 +6,7 @@
 _pop() {
     local q="$1" line
     { [ -n "$q" ] && [ -s "$q" ]; } || exit 130
-    line="$(head -n1 "$q")"; tail -n +2 "$q" > "$q.r" && mv "$q.r" "$q"
+    line="$(head -n1 "$q")"; awk 'NR>1' "$q" > "$q.r" && mv "$q.r" "$q"
     printf '%s\n' "$line"
 }
 cmd="${1:-}"; shift || true
