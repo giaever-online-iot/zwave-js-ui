@@ -7,22 +7,27 @@
 # breaks mid-stream ("Connection broken: IncompleteRead"). That leaves a
 # truncated .snap on disk which later fails to unsquash at upload — a passing
 # build turned red by a network blip. We validate every fetched snap, drop any
-# that are truncated/corrupt, and re-fetch via `--recover` (which reuses the
-# existing Launchpad build — NO rebuild) until every requested arch has a VALID
-# snap or the attempts are exhausted.
+# that are truncated/corrupt, and retry with a FRESH `snapcraft remote-build`
+# until every requested arch has a VALID snap or the attempts are exhausted.
+#
+# We do NOT use `--recover`: snapcraft deletes the temporary Launchpad repo after
+# each run, so `--recover` finds nothing ("Could not find repository") and re-
+# fetches nothing — a proven no-op (see PR #213's log). The truncation is
+# intermittent ACROSS runs, so a fresh remote-build is what actually clears it.
+# A retry therefore costs a full rebuild; the default cap is one retry.
 #
 # A genuine single-arch BUILD failure stays tolerated: we keep whatever valid
 # snaps exist and let the caller's completeness gate decide. So this never makes
 # a previously-passing build fail; it only rescues transient download breakage.
 #
 # Usage:  remote-build.sh <comma-separated-archs>        # e.g. amd64,arm64,armhf
-# Env:    MAX_ATTEMPTS (default 3), RETRY_DELAY seconds (default 15)
+# Env:    MAX_ATTEMPTS (default 2 = one retry), RETRY_DELAY seconds (default 15)
 #         GITHUB_OUTPUT (optional) — receives "snaps=<valid-count>"
 # Exit:   0 always (partial-tolerant).
 set -uo pipefail
 
 ARCHS="${1:?usage: remote-build.sh <archs>, e.g. amd64,arm64,armhf}"
-MAX_ATTEMPTS="${MAX_ATTEMPTS:-3}"
+MAX_ATTEMPTS="${MAX_ATTEMPTS:-2}"
 RETRY_DELAY="${RETRY_DELAY:-15}"
 
 IFS=',' read -ra WANT <<< "$ARCHS"
@@ -55,14 +60,10 @@ valid_count() {                # number of *.snap files in the current directory
 attempt=1
 while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
     echo "::group::remote-build attempt ${attempt}/${MAX_ATTEMPTS} (${ARCHS})"
-    # First pass builds + fetches; retries recover the SAME Launchpad build and
-    # only re-download — no rebuild. `|| true`: a partial-arch failure must not
-    # abort, and a transient fetch error is handled by the validate+retry below.
-    if [ "$attempt" -eq 1 ]; then
-        snapcraft remote-build -v --launchpad-accept-public-upload --build-for="$ARCHS" || true
-    else
-        snapcraft remote-build -v --launchpad-accept-public-upload --build-for="$ARCHS" --recover || true
-    fi
+    # A FRESH build every attempt (no `--recover`: it's a no-op — see the header).
+    # `|| true`: a partial-arch failure must not abort, and a transient fetch
+    # error is handled by the validate+retry below.
+    snapcraft remote-build -v --launchpad-accept-public-upload --build-for="$ARCHS" || true
     echo "::endgroup::"
 
     prune_corrupt
@@ -71,7 +72,7 @@ while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
     [ "$count" -ge "$want" ] && break
 
     if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
-        echo "incomplete (${count}/${want}) — re-fetching in ${RETRY_DELAY}s"
+        echo "incomplete (${count}/${want}) — rebuilding in ${RETRY_DELAY}s"
         sleep "$RETRY_DELAY"
     fi
     attempt=$((attempt + 1))
