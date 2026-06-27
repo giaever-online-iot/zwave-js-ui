@@ -144,6 +144,13 @@ if command -v script >/dev/null 2>&1; then
             main zui
         ' /dev/null 2>&1; echo "rc=$?")"
     assert_contains "$(cat "$LESS_LOG" 2>/dev/null)" "+F -R" "viewer: TTY run launches less +F -R"
+    # The viewport is a FIFO, which real less refuses without -f ("not a regular
+    # file") — the pager MUST pass -f, or the whole command breaks on a TTY.
+    assert_contains "$(cat "$LESS_LOG" 2>/dev/null)" "-f" "viewer: less gets -f (FIFO is non-regular)"
+    case "$out" in
+        *"is not a regular file"*) FAIL=$((FAIL+1)); echo "FAIL: viewer hit less 'not a regular file' (needs -f on the FIFO)" >&2 ;;
+        *) PASS=$((PASS+1)) ;;
+    esac
     assert_contains "$out" "rc=0" "viewer: paged run exits cleanly (no hang)"
 fi
 

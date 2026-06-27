@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
-# Fake less for unit tests: record argv, then consume input so the producer never
-# blocks, then exit (simulates the user quitting). Handles both call shapes:
-#   logs viewer:  less +F -R <fifo>      -> last arg is a file/pipe; drain a few lines
+# Fake less for unit tests: record argv, mimic the real-less behaviour the callers
+# depend on, then consume input so the producer never blocks, then exit.
+#
+# Real less REFUSES a non-regular file (the log-viewer FIFO) unless -f/--force is
+# given — "<f> is not a regular file (use -f to see it)". Enforce that here so a
+# missing -f fails the test instead of silently passing (the bug this guards). Shapes:
+#   logs viewer:  less +F -R -f <fifo>   -> file arg present; drain a few lines
 #   ui_pager:     <content> | less -R    -> no file arg; drain stdin
 [ -n "${LESS_LOG:-}" ] && printf '%s\n' "$*" >> "$LESS_LOG"
+has_f=0
+for a in "$@"; do case "$a" in -f|--force) has_f=1 ;; --*) ;; -*f*) has_f=1 ;; esac; done
 f="${*: -1}"
+if { [ -p "$f" ] || { [ -e "$f" ] && [ ! -f "$f" ]; }; } && [ "$has_f" -eq 0 ]; then
+    printf '%s is not a regular file (use -f to see it)\n' "$f" >&2
+    exit 1
+fi
 if [ -f "$f" ] || [ -p "$f" ]; then
     n=0; while [ "$n" -lt 3 ] && IFS= read -r _; do n=$((n+1)); done < "$f" 2>/dev/null
 else
