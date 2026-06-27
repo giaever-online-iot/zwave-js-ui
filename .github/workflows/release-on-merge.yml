@@ -71,6 +71,17 @@ jobs:
             exit 0
           fi
 
+          # Guard: the revision sitting in $BRANCH must be the version we just merged.
+          # A PR built on a stale base (snapcraft.yaml behind main) and merged without a
+          # rebuild leaves an OLDER version in its branch channel; promoting that would
+          # push the old build into latest/* and the track's stable, silently regressing
+          # the channels. Refuse, and tell the maintainer how to recover.
+          BRANCH_VER="$("$SR" channel-version "$BRANCH" <<<"$INFO")"
+          if [ "$BRANCH_VER" != "$V" ]; then
+            echo "::error::release-on-merge: ${BRANCH} holds ${BRANCH_VER:-<none>}, but the merged snapcraft.yaml version is ${V}. Refusing to promote a stale/mismatched build — rebase the PR on current main and re-run its build, or release the correct revision manually (snapcraft revisions ${SNAP} -> snapcraft release ${SNAP} <rev> ${TRACK}/stable,latest/candidate,latest/edge)."
+            exit 1
+          fi
+
           CAND="$("$SR" channel-version latest/candidate <<<"$INFO")"
           echo "Merged $V; current latest/candidate=${CAND:-<none>}"
 
