@@ -46,4 +46,20 @@ assert_status "$st" "0" "interactive loop exits 0 on Quit"
 assert_contains "$out" "NAV_SERVICE_RAN" "Service menu entry dispatches nav_service"
 assert_contains "$out" "$SNAP_NAME" "header shows the snap name"
 
+# Restore real nav_service (the spy above shadowed it; existing tests have all passed)
+# shellcheck source=/dev/null
+source "$ROOT/src/bin/ui"
+
+# --- Service section ---
+# Shim the service bins under $SNAP_DATA and point nav_service at them via NAV_BIN
+# (no writing into $SNAP/fixtures). nav_service loops; a single choice then a drained
+# queue (exit 130 -> ui_choose returns 2 -> `|| return`) backs out cleanly.
+SVC="$SNAP_DATA/svcbin"; mkdir -p "$SVC"
+for b in daemonize de-daemonize restart; do printf '#!/usr/bin/env bash\necho "RAN_%s"\n' "$b" > "$SVC/$b"; chmod +x "$SVC/$b"; done
+QS="$SNAP_DATA/svc.q"; printf '%s\n' "Enable" > "$QS"
+out="$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$QS" nav_service 2>&1)"
+assert_contains "$out" "RAN_daemonize" "Service > Enable runs daemonize"
+printf '%s\n' "Restart" > "$QS"
+assert_contains "$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$QS" nav_service 2>&1)" "RAN_restart" "Service > Restart runs restart"
+
 finish

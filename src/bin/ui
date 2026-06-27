@@ -7,7 +7,19 @@ source "$SNAP/helper/catalog"
 
 # --- section stubs (replaced in Tasks 2-5) ---
 nav_settings() { ui_warn "Settings: not implemented yet."; }
-nav_service()  { ui_warn "Service: not implemented yet."; }
+nav_service() {                # browse status; act via the existing service bins
+    local bindir="${NAV_BIN:-$SNAP/bin}" choice
+    while true; do
+        ui_kv "service" "$SNAP_NAME" "state" "$(service_state)"
+        choice="$(ui_choose "Service action" "" "Enable" "Disable" "Restart" "← Back")" || return
+        case "$choice" in
+            Enable)  "$bindir/daemonize" ;;
+            Disable) "$bindir/de-daemonize" ;;
+            Restart) "$bindir/restart" ;;
+            *)       return ;;
+        esac
+    done
+}
 nav_plugs()    { ui_warn "Plugs: not implemented yet."; }
 nav_logs()     { ui_warn "Live logs: not implemented yet."; }
 nav_help()     { ui_warn "Help: not implemented yet."; }
