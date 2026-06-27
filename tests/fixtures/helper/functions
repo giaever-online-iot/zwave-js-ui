@@ -3,6 +3,14 @@ SNAP_NAME="zwave-js-ui"
 lprint() { echo "$*"; }
 require_root() { :; }   # no-op under test
 
+snap_version() { yq eval '.version' "$SNAP/meta/snap.yaml"; }
+
+service_state() {              # "enabled active", "disabled inactive", or "unknown"
+    local line
+    line="$(snapctl services "$SNAP_NAME.$SNAP_NAME" 2>/dev/null | awk 'NR==2 { print $2 " " $3 }')"
+    echo "${line:-unknown}"
+}
+
 # Mirrors the real helper's contract (prints connect instructions, returns 1)
 # without snapctl: a plug counts as connected iff listed in $TEST_CONNECTED_PLUGS.
 plug_connected() {
