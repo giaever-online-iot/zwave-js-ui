@@ -14,6 +14,11 @@ Usage: ${SNAP_NAME}.logs [zui|--zui|zwjs|--zwjs]
   zui  | --zui    follow the Z-Wave JS UI application log only
   zwjs | --zwjs   follow the Z-Wave JS driver log only
   -h   | --help   show this help
+
+On an interactive terminal the logs open in a scrollable viewer:
+  Ctrl-C  stop following and scroll back through the whole session
+  F       resume live following
+  q       quit
 EOF
 }
 
@@ -188,6 +193,14 @@ run_followers() {              # launch every resolved follower, reap on exit, t
     wait
 }
 
+log_viewer_hint() {            # legend line leading the paged buffer, so the scroll/follow/quit
+                               # keys are discoverable when the user scrolls to the top (the
+                               # "read the whole session" gesture). Coloured on a TTY; reads
+                               # main's use_color via dynamic scope (like run_followers).
+    local msg='──── live logs · Ctrl-C: scroll back · F: resume follow · q: quit ────'
+    if [ "${use_color:-0}" = 1 ]; then printf '\033[33m%s\033[0m\n' "$msg"; else printf '%s\n' "$msg"; fi
+}
+
 main() {
     # Help works without root and before arg validation. (Only -h/--help; no bare alias.)
     case "${1:-}" in -h|--help) usage; exit 0 ;; esac
@@ -242,7 +255,7 @@ main() {
     if logs_should_page; then
         local fifo; fifo="$(mktemp -u "${SNAP_COMMON:-${TMPDIR:-/tmp}}/.zlogs.XXXXXX")"
         if ! mkfifo "$fifo" 2>/dev/null; then run_followers; return; fi
-        run_followers >"$fifo" &
+        { log_viewer_hint; run_followers; } >"$fifo" &
         local producer=$!
         less +F -R -f "$fifo"
         kill -TERM "$producer" 2>/dev/null
