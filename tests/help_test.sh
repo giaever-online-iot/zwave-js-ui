@@ -46,6 +46,7 @@ assert_contains "$out" "== zwave-js-ui · v0.0.0-test · enabled active ==" "hea
 assert_contains "$out" "server.host" "settings table present"
 assert_contains "$out" "snap set zwave-js-ui" "set-hint present"
 assert_contains "$out" "zwave-js-ui.logs" "commands table present"
+assert_contains "$(commands_rows)" "$SNAP_NAME.ui" "help lists the ui command"
 assert_contains "$out" "serial-port" "serial footnote present"
 
 # --- drift guard ----------------------------------------------------------------

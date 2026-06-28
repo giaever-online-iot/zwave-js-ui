@@ -20,6 +20,7 @@ commands_rows() {
         "$SNAP_NAME.disable	stop + de-daemonize the service" \
         "$SNAP_NAME.restart	restart the service" \
         "$SNAP_NAME.exec	run the app in the foreground (debug boot issues)" \
+        "$SNAP_NAME.ui	interactive navigator — browse & change settings, service, plugs, logs" \
         "$SNAP_NAME.logs [zui|zwjs]	follow live logs (merged by default)" \
         "$SNAP_NAME.backup …	ship backups off-box; see $SNAP_NAME.backup --help" \
         "$SNAP_NAME.help	this overview"
