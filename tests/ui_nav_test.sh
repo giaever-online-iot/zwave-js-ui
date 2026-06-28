@@ -14,6 +14,7 @@ SNAP_DATA="$(mktemp -d)"; export SNAP_DATA
 trap 'rm -rf "$SNAP_DATA"' EXIT
 export PATH="$HERE/fixtures/bin:$PATH"     # stub gum/less on PATH
 export GUM_LOG="$SNAP_DATA/gum.log"; : > "$GUM_LOG"
+export UI_NO_PAUSE=1                        # ui_pause must not block the suite (no real keypress)
 
 snapctl() {
     case "$1" in
@@ -123,5 +124,9 @@ assert_contains "$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$LQ" nav_log
 printf '%s\n' "all" > "$LQ"
 assert_contains "$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$LQ" nav_logs 2>&1)" "RAN_logs all" "Live logs > all runs logs all"
 assert_contains "$(NAV_BIN="$SVC" nav_help 2>&1)" "RAN_help" "Help runs help"
+
+# navigator wipes the screen on each styled view (ui_clear wired into the loops)
+cqx="$SNAP_DATA/clear.q"; printf '%s\n' "Enable" > "$cqx"
+assert_contains "$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$cqx" nav_service 2>&1)" "$(printf '\033[2J')" "nav: styled view clears the screen"
 
 finish

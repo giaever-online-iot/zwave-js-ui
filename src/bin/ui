@@ -9,6 +9,7 @@ source "$SNAP/helper/catalog"
 nav_settings() {               # browse the catalog; edit via snapctl (configure hook validates)
     local choice key type def desc cur act new
     while true; do
+        ui_clear
         # build the key list with current values inline (gum choose filters as you type)
         local items=() k v
         while IFS= read -r k; do
@@ -55,11 +56,13 @@ nav_set_apply() {              # $1 key, $2 value, $3 set|unset — run snapctl,
         ui_err "Rejected — $key unchanged"
         [ -n "$out" ] && ui_print "$out"
     fi
+    ui_pause
 }
 
 nav_service() {                # browse status; act via the existing service bins
     local bindir="${NAV_BIN:-$SNAP/bin}" choice
     while true; do
+        ui_clear
         ui_kv "service" "$SNAP_NAME" "state" "$(service_state)"
         choice="$(ui_choose "Service action" "" "Enable" "Disable" "Restart" "← Back")" || return
         case "$choice" in
@@ -68,6 +71,7 @@ nav_service() {                # browse status; act via the existing service bin
             Restart) "$bindir/restart" ;;
             *)       return ;;
         esac
+        ui_pause
     done
 }
 nav_plugs() {                  # browse interface status; guide the connect commands (never auto-connect)
@@ -79,6 +83,7 @@ log-observe	read journald logs when 'log to file' is off
 gpg-public-keys	the backup key picker"
     local choice plug purpose
     while true; do
+        ui_clear
         local items=() p rest mark
         while IFS=$'\t' read -r p rest; do
             snapctl is-connected "$p" 2>/dev/null && mark="✓" || mark="✗"
@@ -96,6 +101,7 @@ gpg-public-keys	the backup key picker"
             ui_print "  sudo snap connect $SNAP_NAME:$plug"
             [ "$plug" = serial-port ] && ui_print "  (first: sudo snap set system experimental.hotplug=true && sudo systemctl restart snapd)"
         fi
+        ui_pause
     done
 }
 nav_logs() {                   # choose a stream, hand off to the existing logs viewer
@@ -114,6 +120,7 @@ main() {
     fi
     local choice
     while true; do
+        ui_clear
         ui_header "$SNAP_NAME" "$(snap_version) · $(service_state)"
         choice="$(ui_choose "What do you want to do?" \
             "this menu needs a terminal; use the other $SNAP_NAME.* commands non-interactively" \
