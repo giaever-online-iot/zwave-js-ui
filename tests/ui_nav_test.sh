@@ -96,4 +96,14 @@ assert_contains "$out" "configure: bad value" "rejection surfaces the hook messa
 UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings >/dev/null 2>&1
 assert_contains "$(cat "$SET_LOG")" "unset mqtt.name" "Reset -> snapctl unset"
 
+# session.secret value is masked in the success banner (not leaked)
+# Re-source src/bin/ui to clear any spy overrides left by prior tests
+# shellcheck source=/dev/null
+source "$ROOT/src/bin/ui"
+SQ="$SNAP_DATA/sec.q"; printf '%s\n' "session.secret" "Edit" "← Back" > "$SQ"
+SIQ="$SNAP_DATA/sec.in"; printf 'supersecretvalue\n' > "$SIQ"
+out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$SQ" GUM_INPUT_QUEUE="$SIQ" nav_settings 2>&1)"
+case "$out" in *supersecretvalue*) FAIL=$((FAIL+1)); echo "FAIL: session.secret leaked in banner" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+assert_contains "$out" "(hidden)" "session.secret edit shows (hidden) in banner"
+
 finish

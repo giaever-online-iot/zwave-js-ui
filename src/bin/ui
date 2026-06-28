@@ -41,12 +41,18 @@ nav_set_apply() {              # $1 key, $2 value, $3 set|unset — run snapctl,
     if [ "$mode" = unset ]; then out="$(snapctl unset "$key" 2>&1)"; rc=$?
     else out="$(snapctl set "$key=$val" 2>&1)"; rc=$?; fi
     if [ "$rc" -eq 0 ]; then
-        if [ "$mode" = unset ]; then ui_ok "$key reset to default"; else ui_ok "$key set to $val"; fi
+        if [ "$mode" = unset ]; then
+            ui_ok "$key reset to default"
+        else
+            local shown="$val"; [ "$key" = session.secret ] && [ -n "$val" ] && shown="(hidden)"
+            ui_ok "$key set to $shown"
+        fi
     else
         ui_err "Rejected — $key unchanged"
         [ -n "$out" ] && ui_print "$out"
     fi
 }
+
 nav_service() {                # browse status; act via the existing service bins
     local bindir="${NAV_BIN:-$SNAP/bin}" choice
     while true; do
