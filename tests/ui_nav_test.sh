@@ -106,4 +106,13 @@ out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$SQ" GUM_INPUT_QUEUE="$SIQ" nav_setting
 case "$out" in *supersecretvalue*) FAIL=$((FAIL+1)); echo "FAIL: session.secret leaked in banner" >&2 ;; *) PASS=$((PASS+1)) ;; esac
 assert_contains "$out" "(hidden)" "session.secret edit shows (hidden) in banner"
 
+# --- Plugs section ---
+snapctl() { case "$1" in is-connected) [ "$2" = hardware-observe ] && return 0 || return 1 ;; *) : ;; esac; }
+PQ="$SNAP_DATA/plug.q"; printf '%s\n' "raw-usb" "← Back" > "$PQ"     # pick a disconnected plug
+out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$PQ" nav_plugs 2>&1)"
+assert_contains "$out" "snap connect $SNAP_NAME:raw-usb" "disconnected plug shows the connect command"
+printf '%s\n' "hardware-observe" "← Back" > "$PQ"                    # connected plug
+out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$PQ" nav_plugs 2>&1)"
+case "$out" in *"snap connect $SNAP_NAME:hardware-observe"*) FAIL=$((FAIL+1)); echo "FAIL: connected plug should not show connect cmd" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+
 finish

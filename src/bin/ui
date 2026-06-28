@@ -66,7 +66,34 @@ nav_service() {                # browse status; act via the existing service bin
         esac
     done
 }
-nav_plugs()    { ui_warn "Plugs: not implemented yet."; }
+nav_plugs() {                  # browse interface status; guide the connect commands (never auto-connect)
+    # plug -> purpose (the connect-relevant interfaces)
+    local catalog="hardware-observe	the Z-Wave controller (required, with raw-usb or serial-port)
+raw-usb	USB Z-Wave stick access
+serial-port	serial Z-Wave stick (needs experimental hotplug)
+log-observe	read journald logs when 'log to file' is off
+gpg-public-keys	the backup key picker"
+    local choice plug purpose
+    while true; do
+        local items=() p rest mark
+        while IFS=$'\t' read -r p rest; do
+            snapctl is-connected "$p" 2>/dev/null && mark="✓" || mark="✗"
+            items+=("$mark $p")
+        done <<< "$catalog"
+        choice="$(ui_choose "Interface (✓ connected)" "" "${items[@]}" "← Back")" || return
+        [ "$choice" = "← Back" ] && return
+        plug="${choice#* }"
+        purpose="$(printf '%s\n' "$catalog" | awk -F'\t' -v k="$plug" '$1==k{print $2}')"
+        ui_kv "plug" "$plug" "purpose" "$purpose"
+        if snapctl is-connected "$plug" 2>/dev/null; then
+            ui_ok "$plug is connected."
+        else
+            ui_warn "$plug is not connected. Connect it from the host:"
+            ui_print "  sudo snap connect $SNAP_NAME:$plug"
+            [ "$plug" = serial-port ] && ui_print "  (first: sudo snap set system experimental.hotplug=true && sudo systemctl restart snapd)"
+        fi
+    done
+}
 nav_logs()     { ui_warn "Live logs: not implemented yet."; }
 nav_help()     { ui_warn "Help: not implemented yet."; }
 
