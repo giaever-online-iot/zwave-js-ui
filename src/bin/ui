@@ -27,7 +27,11 @@ nav_settings() {               # browse the catalog; edit via snapctl (configure
                 if [ "$type" = bool ]; then
                     new="$(ui_choose "$key =" "" "true" "false")" || continue
                 else
-                    new="$(ui_input "$key = ")" || continue
+                    if [ "$key" = session.secret ]; then
+                        new="$(ui_input --password "$key = ")" || continue
+                    else
+                        new="$(ui_input "$key = ")" || continue
+                    fi
                 fi
                 nav_set_apply "$key" "$new" set ;;
             "Reset to default") nav_set_apply "$key" "" unset ;;
@@ -97,10 +101,7 @@ gpg-public-keys	the backup key picker"
 nav_logs() {                   # choose a stream, hand off to the existing logs viewer
     local bindir="${NAV_BIN:-$SNAP/bin}" sel
     sel="$(ui_choose "Follow which logs?" "" "all" "zui" "zwjs")" || return
-    case "$sel" in
-        all) "$bindir/logs" ;;
-        *)   "$bindir/logs" "$sel" ;;
-    esac
+    "$bindir/logs" "$sel"
 }
 
 nav_help() { "${NAV_BIN:-$SNAP/bin}/help"; }

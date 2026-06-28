@@ -121,7 +121,7 @@ printf '#!/usr/bin/env bash\necho "RAN_help"\n' > "$SVC/help"; chmod +x "$SVC/he
 LQ="$SNAP_DATA/logs.q"; printf '%s\n' "zui" > "$LQ"
 assert_contains "$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$LQ" nav_logs 2>&1)" "RAN_logs zui" "Live logs > zui runs logs zui"
 printf '%s\n' "all" > "$LQ"
-assert_contains "$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$LQ" nav_logs 2>&1)" "RAN_logs" "Live logs > all runs logs (no target)"
+assert_contains "$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$LQ" nav_logs 2>&1)" "RAN_logs all" "Live logs > all runs logs all"
 assert_contains "$(NAV_BIN="$SVC" nav_help 2>&1)" "RAN_help" "Help runs help"
 
 finish
