@@ -127,6 +127,14 @@ jobs:
           set -euo pipefail
           mkdir -p ~/.local/share/snapcraft
           printf '%s\n' "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
+      # GitHub runners have no working IPv6 route, but launchpad.net publishes AAAA
+      # records — so snapcraft's artifact download intermittently dies with
+      # "[Errno 101] Network is unreachable" when a fetch resolves IPv6 first (seen
+      # 6x consecutively on amd64 in PR #228, while arm64/armhf fetched the same host
+      # over IPv4 fine). snapcraft is a classic snap, so it honours the host's
+      # /etc/gai.conf; prefer IPv4 to force the reachable address.
+      - name: Prefer IPv4 for the Launchpad fetch
+        run: echo 'precedence ::ffff:0:0/96 100' | sudo tee -a /etc/gai.conf
       - name: Remote-build ${{ matrix.arch }}
         id: build
         run: .github/scripts/remote-build.sh "${{ matrix.arch }}"
