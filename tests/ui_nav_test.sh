@@ -115,4 +115,13 @@ printf '%s\n' "hardware-observe" "← Back" > "$PQ"                    # connect
 out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$PQ" nav_plugs 2>&1)"
 case "$out" in *"snap connect $SNAP_NAME:hardware-observe"*) FAIL=$((FAIL+1)); echo "FAIL: connected plug should not show connect cmd" >&2 ;; *) PASS=$((PASS+1)) ;; esac
 
+# --- Live logs + Help ---
+mkdir -p "$SVC"; printf '#!/usr/bin/env bash\necho "RAN_logs $*"\n' > "$SVC/logs"; chmod +x "$SVC/logs"
+printf '#!/usr/bin/env bash\necho "RAN_help"\n' > "$SVC/help"; chmod +x "$SVC/help"
+LQ="$SNAP_DATA/logs.q"; printf '%s\n' "zui" > "$LQ"
+assert_contains "$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$LQ" nav_logs 2>&1)" "RAN_logs zui" "Live logs > zui runs logs zui"
+printf '%s\n' "all" > "$LQ"
+assert_contains "$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$LQ" nav_logs 2>&1)" "RAN_logs" "Live logs > all runs logs (no target)"
+assert_contains "$(NAV_BIN="$SVC" nav_help 2>&1)" "RAN_help" "Help runs help"
+
 finish

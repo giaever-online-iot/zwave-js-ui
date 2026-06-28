@@ -94,8 +94,16 @@ gpg-public-keys	the backup key picker"
         fi
     done
 }
-nav_logs()     { ui_warn "Live logs: not implemented yet."; }
-nav_help()     { ui_warn "Help: not implemented yet."; }
+nav_logs() {                   # choose a stream, hand off to the existing logs viewer
+    local bindir="${NAV_BIN:-$SNAP/bin}" sel
+    sel="$(ui_choose "Follow which logs?" "" "all" "zui" "zwjs")" || return
+    case "$sel" in
+        all) "$bindir/logs" ;;
+        *)   "$bindir/logs" "$sel" ;;
+    esac
+}
+
+nav_help() { "${NAV_BIN:-$SNAP/bin}/help"; }
 
 main() {
     require_root
