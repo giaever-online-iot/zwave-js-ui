@@ -106,6 +106,10 @@ apps:
       - hardware-observe
   help:
     command: bin/help
+  ui:
+    command: bin/ui
+    plugs:
+      - log-observe
   enable:
     command: bin/daemonize
   disable:

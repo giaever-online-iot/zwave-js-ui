@@ -8,9 +8,10 @@ source "$SNAP/helper/ui"
 
 usage() {
     ui_usage <<EOF
-Usage: ${SNAP_NAME}.logs [zui|--zui|zwjs|--zwjs]
+Usage: ${SNAP_NAME}.logs [all|zui|--zui|zwjs|--zwjs]
 
   (no arg)        follow both streams, merged (interactive terminals get a picker)
+  all  | --all    follow both streams, merged
   zui  | --zui    follow the Z-Wave JS UI application log only
   zwjs | --zwjs   follow the Z-Wave JS driver log only
   -h   | --help   show this help
@@ -29,6 +30,7 @@ sel_to_target() {              # picker label -> follower target
 normalize_target() {           # $1 raw token; echoes both|zui|zwjs; status 2 if unknown
     case "${1#--}" in
         "")   echo both ;;
+        all)  echo both ;;
         zui)  echo zui ;;
         zwjs) echo zwjs ;;
         *)    return 2 ;;

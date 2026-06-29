@@ -2,15 +2,22 @@
 # Fake gum for unit tests: records argv to $GUM_LOG, emits canned results via GUM_* env.
 [ -n "${GUM_LOG:-}" ] && printf '%s\n' "$*" >> "$GUM_LOG"
 [ -n "${GUM_ABORT:-}" ] && exit 130
+# Pop the next line from a queue file ($1); exit 130 (abort) when drained/missing.
+_pop() {
+    local q="$1" line
+    { [ -n "$q" ] && [ -s "$q" ]; } || exit 130
+    line="$(head -n1 "$q")"; awk 'NR>1' "$q" > "$q.r" && mv "$q.r" "$q"
+    printf '%s\n' "$line"
+}
 cmd="${1:-}"; shift || true
 case "$cmd" in
-    choose)  printf '%s\n' "${GUM_CHOOSE:?GUM_CHOOSE not set}" ;;
-    input)   printf '%s\n' "${GUM_INPUT:?GUM_INPUT not set}" ;;
+    choose)  if [ -n "${GUM_CHOOSE_QUEUE:-}" ]; then _pop "$GUM_CHOOSE_QUEUE"; else printf '%s\n' "${GUM_CHOOSE:?GUM_CHOOSE not set}"; fi ;;
+    input)   if [ -n "${GUM_INPUT_QUEUE:-}" ];  then _pop "$GUM_INPUT_QUEUE";  else printf '%s\n' "${GUM_INPUT:?GUM_INPUT not set}"; fi ;;
     confirm) exit "${GUM_CONFIRM:-0}" ;;
     spin)    while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do shift; done; shift; "$@" ;;
     table)   sed 's/^/[table] /' ;;
     pager)   sed 's/^/[pager] /' ;;
     format)  sed 's/^/[format] /' ;;
-    style)   printf '[style] %s\n' "${*: -1}" ;;   # assumes text is the LAST arg — true for all ui_* call shapes
+    style)   printf '[style] %s\n' "${*: -1}" ;;
     *)       exit 64 ;;
 esac

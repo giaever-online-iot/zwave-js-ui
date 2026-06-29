@@ -230,4 +230,15 @@ plain="$(printf '%s\n' "$big" | NO_COLOR=1 UI_LINES=10 ui_pager)"
 assert_contains "$plain" "50" "pager: plain passthrough keeps content"
 assert_eq "$(cat "$LESS_LOG")" "" "pager: plain -> less NOT invoked"
 
+# --- ui_clear: wipe the screen on a styled TTY; no-op (zero bytes) otherwise ----
+assert_contains "$(UI_ASSUME_TTY=1 ui_clear)" "$(printf '\033[2J')" "clear: styled emits the clear sequence"
+assert_eq "$(NO_COLOR=1 ui_clear)" "" "clear: plain ctx -> no-op"
+assert_eq "$(TERM=dumb ui_clear)" "" "clear: TERM=dumb -> no-op"
+
+# --- ui_pause: hold for a key on a styled TTY; no-op under UI_NO_PAUSE / plain --
+po="$(UI_ASSUME_TTY=1 UI_NO_PAUSE=1 ui_pause 2>&1)"; ps=$?
+assert_status "$ps" "0" "pause: UI_NO_PAUSE -> returns 0 (no hang)"
+assert_eq "$po" "" "pause: UI_NO_PAUSE -> emits nothing"
+assert_eq "$(NO_COLOR=1 ui_pause 2>&1)" "" "pause: plain ctx -> no-op"
+
 finish

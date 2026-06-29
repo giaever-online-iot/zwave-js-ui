@@ -144,3 +144,11 @@ function backup_dir {
     local d; d=$(snapctl get backup.dir 2>/dev/null)
     echo "${d:-$SNAP_DATA/backups}"
 }
+
+snap_version() { yq eval '.version' "$SNAP/meta/snap.yaml"; }
+
+service_state() {              # "enabled active", "disabled inactive", or "unknown"
+    local line
+    line="$(snapctl services "$SNAP_NAME.$SNAP_NAME" 2>/dev/null | awk 'NR==2 { print $2 " " $3 }')"
+    echo "${line:-unknown}"
+}

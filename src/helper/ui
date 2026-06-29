@@ -85,6 +85,19 @@ ui_print() {                   # one plain line, routed per context
     if [ "$(ui_ctx)" = syslog ]; then lprint "$*"; else printf '%s\n' "$*"; fi
 }
 
+ui_clear() {                   # wipe the screen between navigator views; no-op when piped/plain/syslog
+    [ "$(ui_ctx)" = styled ] || return 0
+    printf '\033[2J\033[H'
+}
+
+ui_pause() {                   # hold transient output until a keypress, so the next ui_clear does not
+                               # wipe it unread. No-op when not styled or UI_NO_PAUSE is set (tests).
+    { [ "$(ui_ctx)" = styled ] && [ -z "${UI_NO_PAUSE:-}" ]; } || return 0
+    printf '  — press any key to continue —' >&2
+    read -rsn1 _ </dev/tty 2>/dev/null || true
+    printf '\n' >&2
+}
+
 ui_header() {                  # $1 title, $2 optional subtitle
     local text="$1${2:+ · $2}"
     case "$(ui_ctx)" in

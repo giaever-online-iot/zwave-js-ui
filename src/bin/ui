@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# ui — interactive navigator: browse & act on settings, service, plugs, logs.
+: "${SNAP:?SNAP must be set}"
+source "$SNAP/helper/functions"
+source "$SNAP/helper/ui"
+source "$SNAP/helper/catalog"
+
+# --- section stubs (replaced in Tasks 2-5) ---
+nav_settings() {               # browse the catalog; edit via snapctl (configure hook validates)
+    local choice key type def desc cur act new
+    while true; do
+        ui_clear
+        # build the key list with current values inline (gum choose filters as you type)
+        local items=() k v
+        while IFS= read -r k; do
+            v="$(snapctl get "$k" 2>/dev/null)"; [ "$k" = session.secret ] && [ -n "$v" ] && v="(hidden)"
+            items+=("$k = ${v:-(unset)}")
+        done < <(catalog_keys)
+        choice="$(ui_choose "Setting (type to filter)" "" "${items[@]}" "← Back")" || return
+        [ "$choice" = "← Back" ] && return
+        key="${choice%% = *}"
+        IFS=$'\t' read -r _ type def desc < <(catalog_row "$key")
+        cur="$(snapctl get "$key" 2>/dev/null)"; [ "$key" = session.secret ] && [ -n "$cur" ] && cur="(hidden)"
+        ui_kv "key" "$key" "current" "${cur:-(unset)}" "default" "$def" "type" "$type" "description" "$desc"
+        act="$(ui_choose "Action for $key" "" "Edit" "Reset to default" "← Back")" || continue
+        case "$act" in
+            Edit)
+                if [ "$type" = bool ]; then
+                    new="$(ui_choose "$key =" "" "true" "false")" || continue
+                else
+                    if [ "$key" = session.secret ]; then
+                        new="$(ui_input --password "$key = ")" || continue
+                    else
+                        new="$(ui_input "$key = ")" || continue
+                    fi
+                fi
+                nav_set_apply "$key" "$new" set ;;
+            "Reset to default") nav_set_apply "$key" "" unset ;;
+            *) : ;;
+        esac
+    done
+}
+
+nav_set_apply() {              # $1 key, $2 value, $3 set|unset — run snapctl, surface configure's verdict
+    local key="$1" val="$2" mode="$3" out rc
+    if [ "$mode" = unset ]; then out="$(snapctl unset "$key" 2>&1)"; rc=$?
+    else out="$(snapctl set "$key=$val" 2>&1)"; rc=$?; fi
+    if [ "$rc" -eq 0 ]; then
+        if [ "$mode" = unset ]; then
+            ui_ok "$key reset to default"
+        else
+            local shown="$val"; [ "$key" = session.secret ] && [ -n "$val" ] && shown="(hidden)"
+            ui_ok "$key set to $shown"
+        fi
+    else
+        ui_err "Rejected — $key unchanged"
+        [ -n "$out" ] && ui_print "$out"
+    fi
+    ui_pause
+}
+
+nav_service() {                # browse status; act via the existing service bins
+    local bindir="${NAV_BIN:-$SNAP/bin}" choice
+    while true; do
+        ui_clear
+        ui_kv "service" "$SNAP_NAME" "state" "$(service_state)"
+        choice="$(ui_choose "Service action" "" "Enable" "Disable" "Restart" "← Back")" || return
+        case "$choice" in
+            Enable)  "$bindir/daemonize" ;;
+            Disable) "$bindir/de-daemonize" ;;
+            Restart) "$bindir/restart" ;;
+            *)       return ;;
+        esac
+        ui_pause
+    done
+}
+nav_plugs() {                  # browse interface status; guide the connect commands (never auto-connect)
+    # plug -> purpose (the connect-relevant interfaces)
+    local catalog="hardware-observe	the Z-Wave controller (required, with raw-usb or serial-port)
+raw-usb	USB Z-Wave stick access
+serial-port	serial Z-Wave stick (needs experimental hotplug)
+log-observe	read journald logs when 'log to file' is off
+gpg-public-keys	the backup key picker"
+    local choice plug purpose
+    while true; do
+        ui_clear
+        local items=() p rest mark
+        while IFS=$'\t' read -r p rest; do
+            snapctl is-connected "$p" 2>/dev/null && mark="✓" || mark="✗"
+            items+=("$mark $p")
+        done <<< "$catalog"
+        choice="$(ui_choose "Interface (✓ connected)" "" "${items[@]}" "← Back")" || return
+        [ "$choice" = "← Back" ] && return
+        plug="${choice#* }"
+        purpose="$(printf '%s\n' "$catalog" | awk -F'\t' -v k="$plug" '$1==k{print $2}')"
+        ui_kv "plug" "$plug" "purpose" "$purpose"
+        if snapctl is-connected "$plug" 2>/dev/null; then
+            ui_ok "$plug is connected."
+        else
+            ui_warn "$plug is not connected. Connect it from the host:"
+            ui_print "  sudo snap connect $SNAP_NAME:$plug"
+            [ "$plug" = serial-port ] && ui_print "  (first: sudo snap set system experimental.hotplug=true && sudo systemctl restart snapd)"
+        fi
+        ui_pause
+    done
+}
+nav_logs() {                   # choose a stream, hand off to the existing logs viewer
+    local bindir="${NAV_BIN:-$SNAP/bin}" sel
+    sel="$(ui_choose "Follow which logs?" "" "all" "zui" "zwjs")" || return
+    "$bindir/logs" "$sel"
+}
+
+nav_help() { "${NAV_BIN:-$SNAP/bin}/help"; }
+
+main() {
+    require_root
+    if ! ui_interactive; then
+        ui_print "$SNAP_NAME.ui needs an interactive terminal — see $SNAP_NAME.help" >&2
+        return 2
+    fi
+    local choice
+    while true; do
+        ui_clear
+        ui_header "$SNAP_NAME" "$(snap_version) · $(service_state)"
+        choice="$(ui_choose "What do you want to do?" \
+            "this menu needs a terminal; use the other $SNAP_NAME.* commands non-interactively" \
+            "Settings" "Service" "Plugs" "Live logs" "Help" "Quit")" || break
+        case "$choice" in
+            Settings)    nav_settings ;;
+            Service)     nav_service ;;
+            Plugs)       nav_plugs ;;
+            "Live logs") nav_logs ;;
+            Help)        nav_help ;;
+            Quit|"")     break ;;
+        esac
+    done
+}
+
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi

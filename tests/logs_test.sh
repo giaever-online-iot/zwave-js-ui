@@ -13,6 +13,8 @@ source "$ROOT/src/bin/logs"
 
 # --- tests appended by later tasks ---
 assert_eq "$(normalize_target '')"      "both" "empty -> both"
+assert_eq "$(normalize_target 'all')"   "both" "all -> both"
+assert_eq "$(normalize_target '--all')" "both" "--all -> both"
 assert_eq "$(normalize_target 'zui')"   "zui"  "zui -> zui"
 assert_eq "$(normalize_target '--zui')" "zui"  "--zui -> zui"
 assert_eq "$(normalize_target 'zwjs')"  "zwjs" "zwjs -> zwjs"
