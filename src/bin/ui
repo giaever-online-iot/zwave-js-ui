@@ -115,8 +115,9 @@ nav_help() { "${NAV_BIN:-$SNAP/bin}/help"; }
 mqtt_file() { printf '%s\n' "${SNAP_DATA}/settings.json"; }
 
 mqtt_get() {                   # $1 mqtt.<field> -> current value or empty
-    local f; f="$(mqtt_file)"; [ -f "$f" ] || { echo ""; return; }
-    yq -p=json -r ".$1 // \"\"" "$f" 2>/dev/null
+    local f v; f="$(mqtt_file)"; [ -f "$f" ] || { echo ""; return; }
+    v="$(yq -p=json -r ".$1" "$f" 2>/dev/null)"; [ "$v" = null ] && v=""
+    printf '%s\n' "$v"
 }
 
 mqtt_set() {                   # $1 mqtt.<field>, $2 value, $3 type -> atomic write; rc 1 on failure
