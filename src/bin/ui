@@ -13,14 +13,14 @@ nav_settings() {               # browse the catalog; edit via snapctl (configure
         # build the key list with current values inline (gum choose filters as you type)
         local items=() k v
         while IFS= read -r k; do
-            v="$(snapctl get "$k" 2>/dev/null)"; [ "$k" = session.secret ] && [ -n "$v" ] && v="(hidden)"
+            v="$(snapctl get "$k" 2>/dev/null)"; catalog_is_secret "$k" && [ -n "$v" ] && v="(hidden)"
             items+=("$k = ${v:-(unset)}")
         done < <(catalog_keys)
         choice="$(ui_choose "Setting (type to filter)" "" "${items[@]}" "← Back")" || return
         [ "$choice" = "← Back" ] && return
         key="${choice%% = *}"
-        IFS=$'\t' read -r _ type def desc < <(catalog_row "$key")
-        cur="$(snapctl get "$key" 2>/dev/null)"; [ "$key" = session.secret ] && [ -n "$cur" ] && cur="(hidden)"
+        IFS=$'\t' read -r _ type def desc _ < <(catalog_row "$key")
+        cur="$(snapctl get "$key" 2>/dev/null)"; catalog_is_secret "$key" && [ -n "$cur" ] && cur="(hidden)"
         ui_kv "key" "$key" "current" "${cur:-(unset)}" "default" "$def" "type" "$type" "description" "$desc"
         act="$(ui_choose "Action for $key" "" "Edit" "Reset to default" "← Back")" || continue
         case "$act" in
@@ -28,7 +28,7 @@ nav_settings() {               # browse the catalog; edit via snapctl (configure
                 if [ "$type" = bool ]; then
                     new="$(ui_choose "$key =" "" "true" "false")" || continue
                 else
-                    if [ "$key" = session.secret ]; then
+                    if catalog_is_secret "$key"; then
                         new="$(ui_input --password "$key = ")" || continue
                     else
                         new="$(ui_input "$key = ")" || continue
@@ -49,7 +49,7 @@ nav_set_apply() {              # $1 key, $2 value, $3 set|unset — run snapctl,
         if [ "$mode" = unset ]; then
             ui_ok "$key reset to default"
         else
-            local shown="$val"; [ "$key" = session.secret ] && [ -n "$val" ] && shown="(hidden)"
+            local shown="$val"; catalog_is_secret "$key" && [ -n "$val" ] && shown="(hidden)"
             ui_ok "$key set to $shown"
         fi
     else
