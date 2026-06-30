@@ -23,3 +23,7 @@ plug_connected() {
     echo "$ sudo snap connect ${SNAP_NAME}:$1"
     return 1
 }
+
+plugs_connected() { return 0; }   # always-connected stub for process-level tests
+
+backup_dir() { echo "${SNAP_DATA:-/tmp}/backups"; }

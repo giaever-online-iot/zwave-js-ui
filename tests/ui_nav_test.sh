@@ -129,4 +129,26 @@ assert_contains "$(NAV_BIN="$SVC" nav_help 2>&1)" "RAN_help" "Help runs help"
 cqx="$SNAP_DATA/clear.q"; printf '%s\n' "Enable" > "$cqx"
 assert_contains "$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$cqx" nav_service 2>&1)" "$(printf '\033[2J')" "nav: styled view clears the screen"
 
+# secret-typed zwave key is masked in the banner and never leaked (type=secret, not by name)
+# Re-source src/bin/ui to clear any spy overrides left by prior tests
+# shellcheck source=/dev/null
+source "$ROOT/src/bin/ui"
+SKQ="$SNAP_DATA/sk.q"; printf '%s\n' "zwave.s2-unauthenticated" "Edit" "← Back" > "$SKQ"
+SKI="$SNAP_DATA/sk.in"; printf 'AABBCCDD\n' > "$SKI"
+out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$SKQ" GUM_INPUT_QUEUE="$SKI" nav_settings 2>&1)"
+case "$out" in *AABBCCDD*) FAIL=$((FAIL+1)); echo "FAIL: secret zwave key leaked" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+assert_contains "$out" "(hidden)" "secret zwave key shows (hidden) in banner"
+
+# --- nav_mqtt: edits settings.json mqtt.* via yq (stubbed) ---
+SF="$SNAP_DATA/settings.json"; printf '%s' '{"mqtt":{"host":"old"}}' > "$SF"
+YQ_LOG="$SNAP_DATA/yq.log"; : > "$YQ_LOG"
+# stub yq: log the expression+file; for reads (-e '.mqtt.host') echo a canned current value; writes succeed
+yq() { printf '%s\n' "$*" >> "$YQ_LOG"; case "$*" in *'-o=json'*|*' = '*) cat "${@: -1}" 2>/dev/null || true ;; *) printf 'old\n' ;; esac; }
+export -f yq 2>/dev/null || true
+MQ="$SNAP_DATA/mqtt.q"; printf '%s\n' "mqtt.host" "← Back" > "$MQ"
+MI="$SNAP_DATA/mqtt.in"; printf 'broker.local\n' > "$MI"
+# decline the restart prompt
+GUM_CONFIRM=1 UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$MQ" GUM_INPUT_QUEUE="$MI" SNAP_DATA="$SNAP_DATA" nav_mqtt >/dev/null 2>&1
+assert_contains "$(cat "$YQ_LOG")" ".mqtt.host" "nav_mqtt writes mqtt.host via yq"
+
 finish
