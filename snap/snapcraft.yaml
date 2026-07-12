@@ -166,7 +166,12 @@ parts:
       - yq
     plugin: npm
     npm-include-node: true
-    npm-node-version: 22.20.0
+    # Latest Node 22 LTS. Stay on 22.x: it is the newest line that still ships an
+    # official linux-armv7l build, which the armhf snap downloads here. Node 24+
+    # dropped 32-bit ARM, so bumping the major silently breaks the armhf build.
+    # Renovate tracks 22.x security releases (allowedVersions "<23" in renovate.json).
+    # Revisit when Node 22 reaches EOL (2027-04-30): either drop armhf or move the line.
+    npm-node-version: 22.23.1
     source: src/node
     override-build: | # shell
       ZUIV="${SNAPCRAFT_PROJECT_VERSION#v}" yq -i '.version=env(ZUIV),.dependencies.zwave-js-ui=env(ZUIV)' -o=j "${CRAFT_PART_BUILD}/package.json"
