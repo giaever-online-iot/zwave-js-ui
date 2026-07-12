@@ -23,8 +23,20 @@ source "$ROOT/src/bin/help"     # sources stub functions + real ui/catalog via $
 # --- catalog -----------------------------------------------------------------
 assert_contains "$(catalog_keys)" "server.port"   "catalog has server.port"
 assert_contains "$(catalog_keys)" "backup.target" "catalog has backup.target"
-settings_catalog | awk -F'\t' 'NF != 4 { exit 1 }'
-assert_status "$?" "0" "every catalog row has exactly 4 fields"
+# every catalog row has exactly 5 TAB fields (key type default description scope)
+settings_catalog | awk -F'\t' 'NF != 5 { exit 1 }'
+assert_status "$?" "0" "every catalog row has exactly 5 fields"
+# scope is common|advanced; type includes the secret pseudo-type
+settings_catalog | awk -F'\t' '$5 != "common" && $5 != "advanced" { exit 1 }'
+assert_status "$?" "0" "every row scope is common|advanced"
+assert_eq "$(catalog_row session.secret | cut -f2)" "secret" "session.secret is type=secret"
+assert_contains "$(catalog_keys)" "zwave.serial-port" "catalog has zwave.serial-port"
+# help table shows ONLY common keys — advanced zwave keys are omitted
+assert_contains "$(settings_rows)" "server.port"        "help table includes a common key"
+case "$(settings_rows)" in *zwave.serial-port*) FAIL=$((FAIL+1)); echo "FAIL: advanced key leaked into help" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+# catalog_is_secret
+( catalog_is_secret session.secret ); assert_status "$?" "0" "catalog_is_secret: session.secret -> yes"
+( catalog_is_secret server.port );    assert_status "$?" "1" "catalog_is_secret: server.port -> no"
 
 # --- help helpers --------------------------------------------------------------
 assert_eq "$(snap_version)" "v0.0.0-test" "version from meta/snap.yaml"

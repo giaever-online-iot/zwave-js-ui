@@ -13,14 +13,14 @@ nav_settings() {               # browse the catalog; edit via snapctl (configure
         # build the key list with current values inline (gum choose filters as you type)
         local items=() k v
         while IFS= read -r k; do
-            v="$(snapctl get "$k" 2>/dev/null)"; [ "$k" = session.secret ] && [ -n "$v" ] && v="(hidden)"
+            v="$(snapctl get "$k" 2>/dev/null)"; catalog_is_secret "$k" && [ -n "$v" ] && v="(hidden)"
             items+=("$k = ${v:-(unset)}")
         done < <(catalog_keys)
         choice="$(ui_choose "Setting (type to filter)" "" "${items[@]}" "← Back")" || return
         [ "$choice" = "← Back" ] && return
         key="${choice%% = *}"
-        IFS=$'\t' read -r _ type def desc < <(catalog_row "$key")
-        cur="$(snapctl get "$key" 2>/dev/null)"; [ "$key" = session.secret ] && [ -n "$cur" ] && cur="(hidden)"
+        IFS=$'\t' read -r _ type def desc _ < <(catalog_row "$key")
+        cur="$(snapctl get "$key" 2>/dev/null)"; catalog_is_secret "$key" && [ -n "$cur" ] && cur="(hidden)"
         ui_kv "key" "$key" "current" "${cur:-(unset)}" "default" "$def" "type" "$type" "description" "$desc"
         act="$(ui_choose "Action for $key" "" "Edit" "Reset to default" "← Back")" || continue
         case "$act" in
@@ -28,7 +28,7 @@ nav_settings() {               # browse the catalog; edit via snapctl (configure
                 if [ "$type" = bool ]; then
                     new="$(ui_choose "$key =" "" "true" "false")" || continue
                 else
-                    if [ "$key" = session.secret ]; then
+                    if catalog_is_secret "$key"; then
                         new="$(ui_input --password "$key = ")" || continue
                     else
                         new="$(ui_input "$key = ")" || continue
@@ -49,7 +49,7 @@ nav_set_apply() {              # $1 key, $2 value, $3 set|unset — run snapctl,
         if [ "$mode" = unset ]; then
             ui_ok "$key reset to default"
         else
-            local shown="$val"; [ "$key" = session.secret ] && [ -n "$val" ] && shown="(hidden)"
+            local shown="$val"; catalog_is_secret "$key" && [ -n "$val" ] && shown="(hidden)"
             ui_ok "$key set to $shown"
         fi
     else
@@ -112,6 +112,62 @@ nav_logs() {                   # choose a stream, hand off to the existing logs 
 
 nav_help() { "${NAV_BIN:-$SNAP/bin}/help"; }
 
+mqtt_file() { printf '%s\n' "${SNAP_DATA}/settings.json"; }
+
+mqtt_get() {                   # $1 mqtt.<field> -> current value or empty
+    local f v; f="$(mqtt_file)"; [ -f "$f" ] || { echo ""; return; }
+    v="$(yq -p=json -r ".$1" "$f" 2>/dev/null)"; [ "$v" = null ] && v=""
+    printf '%s\n' "$v"
+}
+
+mqtt_set() {                   # $1 mqtt.<field>, $2 value, $3 type -> atomic write; rc 1 on failure
+    local path="$1" val="$2" type="$3" f tmp expr
+    f="$(mqtt_file)"; [ -f "$f" ] || echo '{}' > "$f"
+    case "$type" in
+        int)  expr=".$path = (strenv(V) | tonumber)" ;;
+        bool) expr=".$path = (strenv(V) == \"true\")" ;;
+        *)    expr=".$path = strenv(V)" ;;
+    esac
+    tmp="$(mktemp "${f}.XXXX")"
+    if V="$val" yq -p=json -o=json "$expr" "$f" > "$tmp" 2>/dev/null && yq -p=json '.' "$tmp" >/dev/null 2>&1; then
+        mv "$tmp" "$f"; return 0
+    fi
+    rm -f "$tmp"; return 1
+}
+
+nav_mqtt() {                   # edit the MQTT broker connection in settings.json (no env var for these)
+    local fields="mqtt.host	string
+mqtt.port	int
+mqtt.auth	bool
+mqtt.username	string
+mqtt.password	secret"
+    local choice path type cur new
+    while true; do
+        ui_clear
+        ui_warn "Editing settings.json. If the daemon is running it may overwrite changes on its own saves."
+        local items=() p t v
+        while IFS=$'\t' read -r p t; do
+            v="$(mqtt_get "$p")"; [ "$t" = secret ] && [ -n "$v" ] && v="(hidden)"
+            items+=("$p = ${v:-(unset)}")
+        done <<< "$fields"
+        choice="$(ui_choose "MQTT broker (settings.json)" "" "${items[@]}" "← Back")" || return
+        [ "$choice" = "← Back" ] && return
+        path="${choice%% = *}"
+        type="$(printf '%s\n' "$fields" | awk -F'\t' -v k="$path" '$1==k{print $2}')"
+        if [ "$type" = bool ]; then new="$(ui_choose "$path =" "" "true" "false")" || continue
+        elif [ "$type" = secret ]; then new="$(ui_input --password "$path = ")" || continue
+        else new="$(ui_input "$path = ")" || continue; fi
+        if mqtt_set "$path" "$new" "$type"; then
+            local shown="$new"; [ "$type" = secret ] && [ -n "$new" ] && shown="(hidden)"
+            ui_ok "$path set to $shown"
+            if ui_confirm "Restart $SNAP_NAME to apply?"; then "${NAV_BIN:-$SNAP/bin}/restart"; fi
+        else
+            ui_err "Could not write $path — settings.json unchanged"
+        fi
+        ui_pause
+    done
+}
+
 main() {
     require_root
     if ! ui_interactive; then
@@ -124,14 +180,15 @@ main() {
         ui_header "$SNAP_NAME" "$(snap_version) · $(service_state)"
         choice="$(ui_choose "What do you want to do?" \
             "this menu needs a terminal; use the other $SNAP_NAME.* commands non-interactively" \
-            "Settings" "Service" "Plugs" "Live logs" "Help" "Quit")" || break
+            "Settings" "Service" "Plugs" "Live logs" "MQTT broker" "Help" "Quit")" || break
         case "$choice" in
-            Settings)    nav_settings ;;
-            Service)     nav_service ;;
-            Plugs)       nav_plugs ;;
-            "Live logs") nav_logs ;;
-            Help)        nav_help ;;
-            Quit|"")     break ;;
+            Settings)      nav_settings ;;
+            Service)       nav_service ;;
+            Plugs)         nav_plugs ;;
+            "Live logs")   nav_logs ;;
+            "MQTT broker") nav_mqtt ;;
+            Help)          nav_help ;;
+            Quit|"")       break ;;
         esac
     done
 }

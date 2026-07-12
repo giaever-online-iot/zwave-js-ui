@@ -5,11 +5,12 @@ source "$SNAP/helper/functions"
 source "$SNAP/helper/ui"
 source "$SNAP/helper/catalog"
 
-settings_rows() {              # catalog + live values -> TSV: key, value, default, description
-    local key def desc cur
-    while IFS=$'\t' read -r key _ def desc; do
+settings_rows() {              # catalog (common only) + live values -> TSV: key, value, default, description
+    local key type def desc scope cur
+    while IFS=$'\t' read -r key type def desc scope; do
+        [ "$scope" = common ] || continue           # advanced keys stay out of the help table
         cur="$(snapctl get "$key" 2>/dev/null)"
-        [ "$key" = "session.secret" ] && [ -n "$cur" ] && cur="(hidden)"
+        [ "$type" = secret ] && [ -n "$cur" ] && cur="(hidden)"
         printf '%s\t%s\t%s\t%s\n' "$key" "${cur:-(unset)}" "$def" "$desc"
     done < <(settings_catalog)
 }

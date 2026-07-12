@@ -37,6 +37,20 @@ if [ -z "${MQTT_NAME}" ]; then
     unset MQTT_NAME
 fi
 
+# zwave.* (advanced snap config) -> ZUI env vars. Omit when empty so an unset
+# snap key never force-blanks a value configured elsewhere (the MQTT_NAME pattern).
+zwave_env() {                  # $1 snap key, $2 env var name
+    local v; v="$(snapctl get "$1")"
+    [ -n "$v" ] && export "$2"="$v"
+}
+zwave_env zwave.serial-port            ZWAVE_PORT
+zwave_env zwave.s2-unauthenticated     KEY_S2_Unauthenticated
+zwave_env zwave.s2-authenticated       KEY_S2_Authenticated
+zwave_env zwave.s2-access-control      KEY_S2_AccessControl
+zwave_env zwave.s2-lr-authenticated    KEY_LR_S2_Authenticated
+zwave_env zwave.s2-lr-access-control   KEY_LR_S2_AccessControl
+zwave_env zwave.s0-legacy              KEY_S0_Legacy
+
 if [ -n "$(snapctl get timezone)" ]; then
     TZ=$(snapctl get timezone); export TZ
 fi

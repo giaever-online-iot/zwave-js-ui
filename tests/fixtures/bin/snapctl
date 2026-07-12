@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Fake snapctl for process-level tests (env-wrapper). `get <key>` echoes
+# $SNAPCTL_<key with . and - as _>; everything else is a quiet no-op.
+case "${1:-}" in
+    get) k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;;
+    *)   : ;;
+esac

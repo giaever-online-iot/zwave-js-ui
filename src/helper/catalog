@@ -1,27 +1,35 @@
 #!/usr/bin/env bash
 # catalog — single source of truth for user-settable snap config.
-# TAB-separated rows: key, type, default, description. Drives the help settings
-# table now and the phase-2 navigator later. Defaults must stay in sync with
-# test_default_config (helper/functions) and the backup defaults (bin/backup).
+# TAB-separated rows: key, type, default, description, scope.
+#   type:  string | int | bool | secret   (secret => masked + --password everywhere)
+#   scope: common | advanced              (help shows common only; the ui navigator shows all)
+# Defaults must stay in sync with test_default_config (helper/functions) and bin/backup.
 settings_catalog() {
 	cat <<'EOF'
-server.host	string	0.0.0.0	IP address the web UI binds to
-server.port	int	8091	Port for the web UI
-server.ssl	bool	false	Serve the web UI over HTTPS
-server.force-disable-ssl	bool	false	Force-disable SSL even when enabled
-session.secret	string	(generated)	Session secret (a UUID is generated on install)
-session.cookie-secure	bool	(= server.ssl)	Secure session cookie (see expressjs/session#cookiesecure)
-mqtt.name	string	(unset)	Client name when connecting to the MQTT broker
-timezone	string	Europe/Oslo	Timezone exported to the app as TZ
-backup.target	string	(unset)	Duplicity target URL for off-box backups
-backup.dir	string	$SNAP_DATA/backups	Directory shipped by the backup command
-backup.encrypt	bool	(unset)	Set false to opt out of backup encryption
-backup.encrypt-key	string	(unset)	GPG fingerprint backups are encrypted to
-backup.full-if-older-than	string	7D	Force a full backup after this age
-backup.retention	int	3	Full backup chains kept on the target
+server.host	string	0.0.0.0	IP address the web UI binds to	common
+server.port	int	8091	Port for the web UI	common
+server.ssl	bool	false	Serve the web UI over HTTPS	common
+server.force-disable-ssl	bool	false	Force-disable SSL even when enabled	common
+session.secret	secret	(generated)	Session secret (a UUID is generated on install)	common
+session.cookie-secure	bool	(= server.ssl)	Secure session cookie (see expressjs/session#cookiesecure)	common
+mqtt.name	string	(unset)	Client name when connecting to the MQTT broker	common
+timezone	string	Europe/Oslo	Timezone exported to the app as TZ	common
+backup.target	string	(unset)	Duplicity target URL for off-box backups	common
+backup.dir	string	$SNAP_DATA/backups	Directory shipped by the backup command	common
+backup.encrypt	bool	(unset)	Set false to opt out of backup encryption	common
+backup.encrypt-key	string	(unset)	GPG fingerprint backups are encrypted to	common
+backup.full-if-older-than	string	7D	Force a full backup after this age	common
+backup.retention	int	3	Full backup chains kept on the target	common
+zwave.serial-port	string	(unset)		advanced
+zwave.s2-unauthenticated	secret	(unset)		advanced
+zwave.s2-authenticated	secret	(unset)		advanced
+zwave.s2-access-control	secret	(unset)		advanced
+zwave.s2-lr-authenticated	secret	(unset)		advanced
+zwave.s2-lr-access-control	secret	(unset)		advanced
+zwave.s0-legacy	secret	(unset)		advanced
 EOF
 }
 
 catalog_keys() { settings_catalog | cut -f1; }
-
-catalog_row() { settings_catalog | awk -F'\t' -v k="$1" '$1==k'; }   # the TSV row for one key
+catalog_row()  { settings_catalog | awk -F'\t' -v k="$1" '$1==k'; }   # the TSV row for one key
+catalog_is_secret() { [ "$(catalog_row "$1" | cut -f2)" = secret ]; } # exit 0 iff type=secret
