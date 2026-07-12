@@ -24,9 +24,36 @@
         "# renovate: depName=(?<depName>[^\\s]+)\\n\\s+source-tag: (?<currentValue>v[\\d.]+)"
       ],
       "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^snap/snapcraft\\.yaml$/"
+      ],
+      "matchStrings": [
+        "npm-node-version: (?<currentValue>[\\d.]+)"
+      ],
+      "depNameTemplate": "node",
+      "datasourceTemplate": "node-version"
     }
   ],
   "packageRules": [
+    {
+      "matchDatasources": [
+        "node-version"
+      ],
+      "matchPackageNames": [
+        "node"
+      ],
+      "allowedVersions": "<23",
+      "commitMessageTopic": "Node.js",
+      "labels": [
+        "dependencies"
+      ],
+      "prBodyNotes": [
+        "Stays on the Node 22 LTS line: 22.x is the newest line with an official linux-armv7l build (needed by the armhf snap). Node 24+ dropped 32-bit ARM, so the `allowedVersions: <23` ceiling prevents an armhf-breaking major bump. Revisit at Node 22 EOL (2027-04-30)."
+      ]
+    },
     {
       "matchPackageNames": [
         "zwave-js/zwave-js-ui"
