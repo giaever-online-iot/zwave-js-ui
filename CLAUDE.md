@@ -87,7 +87,7 @@ All bin commands render through `src/helper/ui` (uniform headers/tables/status l
 
 ### Paths & layout
 
-`STORE_DIR=$SNAP_DATA`, external config at `$SNAP_DATA/.ext-config`. The npm cache is redirected via a `layout:` bind to `$SNAP/.cache/npm` to keep it out of the writable store dir. The `store-dir` content slot exposes `$SNAP_DATA` for the optional `code-server` integration.
+`STORE_DIR=$SNAP_DATA`, external config at `$SNAP_DATA/.ext-config`. The npm cache is redirected via a `layout:` bind to `$SNAP/.cache/npm` to keep it out of the writable store dir; a second `layout:` bind maps `/usr/share/iproute2` to the staged copy so the bundled `ip` (compiled-in host path) doesn't spam AppArmor denials into the journal. The `store-dir` content slot exposes `$SNAP_DATA` for the optional `code-server` integration.
 
 ## CI / contribution rules
 
