@@ -142,6 +142,11 @@ layout:
   # Cache is set to (env) something outside the rw mount, to prevent storing it inside the store dir.
   /usr/local/share/.cache/npm:
     bind: $SNAP/.cache/npm
+  # The staged `ip` (dependencies part) has /usr/share/iproute2 compiled in and falls
+  # back to the host path, which strict confinement denies — ~12 AppArmor journal
+  # entries/min while the app polls `ip -o link show`. Bind it to the staged copy.
+  /usr/share/iproute2:
+    bind: $SNAP/usr/share/iproute2
   #/usr/local/share/.yarn: ?? Do we need this? Leave until proper testing is OK
     #symlink: $SNAP/lib/node_modules
 
