@@ -36,6 +36,8 @@ assert_eq "$(parse_sub 'import-key')" "import-key" "import-key"
 parse_sub bogus >/dev/null 2>&1; assert_status "$?" "2" "unknown -> 2"
 
 assert_eq "$(SNAPCTL_backup_encrypt_key=ABC123 encryption_args)" "--encrypt-key ABC123" "enc key"
+assert_eq "$(SNAPCTL_backup_encrypt_key='KEY;touch /tmp/pwn' encryption_args)" \
+    "--encrypt-key $(printf '%q' 'KEY;touch /tmp/pwn')" "enc key %q-escaped (hostile value)"
 assert_eq "$(SNAPCTL_backup_encrypt=false encryption_args)"      "--no-encryption"       "no-encryption opt-out"
 encryption_args >/dev/null 2>&1; assert_status "$?" "2" "neither set -> refuse"
 assert_eq "$(SNAPCTL_backup_target=file:///b cfg target)" "file:///b" "cfg reads target"
@@ -57,6 +59,8 @@ assert_contains "$l" "$(printf '%q' "$SNAP/usr/bin/python3") -m duplicity collec
 # shellcheck disable=SC2034  # DUP_PY is consumed inside build_backup_cmd (sourced)
 hb="$( (DUP_PY='/tmp/evil path/python3'; SNAPCTL_backup_encrypt_key=KEY SNAPCTL_backup_target=file:///tgt build_backup_cmd "$src") )"
 assert_contains "$hb" "/tmp/evil\\ path/python3 -m duplicity backup " "backup: interpreter %q-escaped (hostile path)"
+hf="$(SNAPCTL_backup_encrypt_key=KEY SNAPCTL_backup_target=file:///tgt SNAPCTL_backup_full_if_older_than='7D;id' build_backup_cmd "$src")"
+assert_contains "$hf" "--full-if-older-than $(printf '%q' '7D;id')" "backup: full-if-older %q-escaped (hostile value)"
 
 rm -rf "$SNAP_DATA/backups"
 has_backups; assert_status "$?" "1" "absent dir -> no backups"

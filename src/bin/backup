@@ -369,7 +369,8 @@ cfg() { snapctl get "backup.$1" 2>/dev/null; }    # $1 = key suffix, e.g. target
 encryption_args() {            # echoes "--encrypt-key X" or "--no-encryption"; status 2 if neither
     local key; key=$(cfg encrypt-key)
     if [ -n "$key" ]; then
-        echo "--encrypt-key $key"
+        # %q: the value is user-set config interpolated into an eval'd command string
+        printf -- '--encrypt-key %q' "$key"
     elif [ "$(cfg encrypt)" = false ]; then
         echo "--no-encryption"
     else
@@ -414,7 +415,7 @@ build_backup_cmd() {           # $1 source dir -> duplicity backup command strin
     # snap revision (e.g. .../x4/backups). snapd copies it forward on refresh, so the
     # path changes between revisions for the SAME logical backup; without this flag
     # duplicity aborts with "Backup source directory has changed" after every refresh.
-    printf '%q -m duplicity backup %s --allow-source-mismatch --full-if-older-than %s --archive-dir %q %q %q' \
+    printf '%q -m duplicity backup %s --allow-source-mismatch --full-if-older-than %q --archive-dir %q %q %q' \
         "$DUP_PY" "$(encryption_args)" "$(full_if_older)" "$ARCHIVE_DIR" "$1" "$(cfg target)"
 }
 
