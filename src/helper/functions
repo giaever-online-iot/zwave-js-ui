@@ -63,10 +63,14 @@ function require_root {
 }
 
 function testnset_config {
-    lprint "Testing ${1}, or setting ${2}"
+    # Hooks run with DAEMONIZED=1, so these lprints land in syslog — never log
+    # secret values (session.secret would end up world-readable in the journal).
+    local shown="${2}"
+    case "${1}" in *secret*) shown="(redacted)" ;; esac
+    lprint "Testing ${1}, or setting ${shown}"
     RES=$(snapctl get ${1})
     if [ $? -ne 0 ] || [ -z "${RES}" ]; then
-        lprint "Setting ${1}=${2}"
+        lprint "Setting ${1}=${shown}"
         RES=$(snapctl set ${1}=${2})
         if [ $? -ne 0 ]; then
             lprint "${RES}"
