@@ -1,11 +1,10 @@
 name: Lint & test
+# Runs on every PR (it's cheap) so `lint-test` can be a required status check —
+# a path-filtered workflow that never starts would leave the check "expected"
+# forever and deadlock auto-merge on PRs that don't touch its paths.
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - '.github/workflows/lint-test.yml'
   workflow_dispatch:
 
 jobs:

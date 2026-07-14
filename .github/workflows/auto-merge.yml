@@ -1,0 +1,49 @@
+name: Auto-merge collaborator PRs
+
+# Arms GitHub's native auto-merge (squash) on PRs opened by human collaborators,
+# so they merge themselves once main's required checks pass — CI success is the
+# only gate. Bots are excluded on purpose: Renovate arms its own automerge
+# selectively via renovate.json, and outsider/fork PRs are auto-closed by
+# block-fork-prs.yml before this could matter.
+#
+# Token: uses the AUTOMERGE_TOKEN secret (fine-grained PAT of a maintainer:
+# Contents R/W + Pull requests R/W on this repo) and NOT the default
+# GITHUB_TOKEN. Native auto-merge attributes the eventual merge to whoever
+# armed it, and events caused by GITHUB_TOKEN never trigger other workflows —
+# a github-actions[bot] merge would silently skip release-on-merge (the store
+# promotion). With a maintainer PAT the merge fires it like a manual merge.
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions: {}
+
+jobs:
+  arm:
+    if: >-
+      !github.event.pull_request.draft
+      && github.event.pull_request.user.type != 'Bot'
+      && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable auto-merge (squash)
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::AUTOMERGE_TOKEN is not set; cannot arm auto-merge. Do not fall back to GITHUB_TOKEN — a github-actions[bot] merge would not trigger release-on-merge."
+            exit 1
+          fi
+          # If every required check already passed by the time this runs, the PR
+          # is in "clean status" and arming is rejected — merge directly instead.
+          if ! gh pr merge --auto --squash "$PR_URL" 2>err.log; then
+            if grep -qi 'clean status' err.log; then
+              gh pr merge --squash "$PR_URL"
+            else
+              cat err.log >&2
+              exit 1
+            fi
+          fi

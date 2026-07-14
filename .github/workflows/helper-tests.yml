@@ -1,13 +1,12 @@
 name: Helper tests
 
 # Guards the CI helpers (snap version/channel math; the retry-fetch remote-build
-# wrapper). Runs only when a helper, its tests, or its fixtures change.
+# wrapper). Runs on every PR (seconds) so `test` can be a required status check —
+# a path-filtered workflow that never starts would leave the check "expected"
+# forever and deadlock auto-merge on PRs that don't touch its paths.
 on:
   pull_request:
     branches: [main]
-    paths:
-      - '.github/scripts/**'
-      - '.github/workflows/helper-tests.yml'
   workflow_dispatch:
 
 permissions:
