@@ -46,6 +46,7 @@
         "node"
       ],
       "allowedVersions": "<23",
+      "automerge": true,
       "commitMessageTopic": "Node.js",
       "labels": [
         "dependencies"
@@ -63,6 +64,7 @@
         "minor",
         "patch"
       ],
+      "automerge": true,
       "commitMessageTopic": "zwave-js-ui",
       "labels": [
         "dependencies",
