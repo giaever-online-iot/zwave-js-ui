@@ -8,6 +8,7 @@
 #   major <ver>                        v12.0.0 -> 12                 (""->"")
 #   channel-version <channel>          (stdin: `snapcraft status`) -> version or "" (^/--/- -> "")
 #   branch-has-revisions <track> <pr>  (stdin: `snapcraft status`) -> yes|no
+#                                      (PR branch channel is <track>/edge/pr-<pr>)
 #   needs-stable-bump <new> <cand>     yes iff cand set & major(new)>major(cand)
 #   is-at-least <ver> <floor>          yes iff ver>=floor  (floor "" -> yes)
 #   latest-targets <new> <cand> <edge> latest/* channels <new> may land on, each gated by
@@ -50,7 +51,7 @@ case "$cmd" in
     printf '%s\n' "${in%%.*}"
     ;;
   channel-version)
-    # stdin = `snapcraft status`; arg = channel like latest/candidate or v11.20/edge/204.
+    # stdin = `snapcraft status`; arg = channel like latest/candidate or v11.20/edge/pr-204.
     # Columns: Track Arch Channel Version Revision Progress Expires-at. Robust to BOTH
     # layouts snapcraft emits: captured non-interactively (CI: `$(...)` => no TTY) it
     # repeats Track+Arch on every row; in a terminal it blanks them on continuation rows.
@@ -63,9 +64,11 @@ case "$cmd" in
     ;;
   branch-has-revisions)
     # stdin = `snapcraft status`; args = track pr. Re-use channel-version via `bash "$0"`
-    # so this works whether or not the script's exec bit is set.
+    # so this works whether or not the script's exec bit is set. The branch is named
+    # pr-<pr>, not the bare number: store branch names must be >= 2 characters, so a
+    # single-digit PR (e.g. #2) is rejected with "Invalid branch name".
     info="$(cat)"
-    ver="$(bash "$0" channel-version "${1:-}/edge/${2:-}" <<<"$info")"
+    ver="$(bash "$0" channel-version "${1:-}/edge/pr-${2:-}" <<<"$info")"
     if [ -n "$ver" ]; then echo yes; else echo no; fi
     ;;
   needs-stable-bump)
