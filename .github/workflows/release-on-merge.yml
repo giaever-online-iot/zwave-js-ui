@@ -57,7 +57,7 @@ jobs:
           V="${{ steps.meta.outputs.version }}"
           TRACK="${{ steps.meta.outputs.track }}"
           PR="${{ steps.meta.outputs.pr }}"
-          BRANCH="$TRACK/edge/$PR"
+          BRANCH="$TRACK/edge/pr-$PR"
 
           INFO="$(snapcraft status "$SNAP")"
 

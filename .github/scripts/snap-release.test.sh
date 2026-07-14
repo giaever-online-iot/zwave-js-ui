@@ -28,7 +28,7 @@ check "major empty"      ""   "$("$SR" major "")"
 check "channel-version candidate"  "v11.20.0" "$("$SR" channel-version latest/candidate <"$INFO")"
 check "channel-version stable"     "v11.14.0" "$("$SR" channel-version latest/stable <"$INFO")"
 check "channel-version inherited"  ""         "$("$SR" channel-version latest/beta <"$INFO")"
-check "channel-version branch"     "v11.20.0" "$("$SR" channel-version v11.20/edge/204 <"$INFO")"
+check "channel-version branch"     "v11.20.0" "$("$SR" channel-version v11.20/edge/pr-204 <"$INFO")"
 check "channel-version absent"     ""         "$("$SR" channel-version v99.9/stable <"$INFO")"
 
 check "branch-has-revisions yes"   "yes" "$("$SR" branch-has-revisions v11.20 204 <"$INFO")"
@@ -39,7 +39,7 @@ check "branch-has-revisions no"    "no"  "$("$SR" branch-has-revisions v11.20 99
 # but the parser is hardened for both — these lock that in.
 TTY="$HERE/fixtures/snapcraft-status-tty.txt"
 check "tty channel-version candidate" "v11.20.0" "$("$SR" channel-version latest/candidate <"$TTY")"
-check "tty channel-version branch"    "v11.20.0" "$("$SR" channel-version v11.20/edge/204 <"$TTY")"
+check "tty channel-version branch"    "v11.20.0" "$("$SR" channel-version v11.20/edge/pr-204 <"$TTY")"
 check "tty channel-version inherited" ""         "$("$SR" channel-version latest/beta <"$TTY")"
 check "tty branch-has-revisions yes"  "yes"      "$("$SR" branch-has-revisions v11.20 204 <"$TTY")"
 

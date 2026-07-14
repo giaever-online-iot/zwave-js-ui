@@ -138,7 +138,7 @@ jobs:
       - name: Remote-build ${{ matrix.arch }}
         id: build
         run: .github/scripts/remote-build.sh "${{ matrix.arch }}"
-      - name: Publish ${{ matrix.arch }} to v<MM>/edge/<PR>
+      - name: Publish ${{ matrix.arch }} to v<MM>/edge/pr-<PR>
         id: publish
         # PR-only (no PR number on dispatch) and only with a valid snap + a track.
         if: ${{ github.event_name == 'pull_request' && needs.ensure-track.result == 'success' && steps.build.outputs.snaps != '0' }}
@@ -146,7 +146,8 @@ jobs:
           set -euo pipefail
           TRACK="${{ needs.meta.outputs.track }}"
           PR="${{ github.event.pull_request.number }}"
-          CHAN="$TRACK/edge/$PR"
+          # Branch pr-<PR>, not the bare number: store branch names must be >= 2 chars.
+          CHAN="$TRACK/edge/pr-$PR"
           ARCH="${{ matrix.arch }}"
           f="$(ls -1 "${SNAP_NAME}"*"${ARCH}".snap 2>/dev/null | head -n1 || true)"
           if [ -z "$f" ]; then echo "::error::No snap artifact for ${ARCH}."; exit 1; fi
@@ -232,7 +233,7 @@ jobs:
           set -euo pipefail
           TRACK="${{ needs.meta.outputs.track }}"
           PR="${{ github.event.pull_request.number }}"
-          CHAN="$TRACK/edge/$PR"
+          CHAN="$TRACK/edge/pr-$PR"
           WANTED="${{ needs.meta.outputs.archs_csv }}"
           PUBLISHED="$(ls markers/ 2>/dev/null | sed -n 's/^uploaded-//p' | paste -sd, - || true)"
           BODY="${RUNNER_TEMP}/comment.md"
