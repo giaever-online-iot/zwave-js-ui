@@ -279,7 +279,7 @@ parts:
     plugin: go
     source: https://github.com/charmbracelet/gum.git
     # renovate: depName=charmbracelet/gum
-    source-tag: v0.17.0
+    source-tag: v2.0.1
     build-snaps:
       - go/1.24/stable
     build-environment:
