@@ -26,8 +26,9 @@ CREDS = base64.b64encode(
 ).decode()
 BOUND_DISCHARGE = _root.prepare_for_request(_discharge).serialize()
 
+SNAP = "zwave-js-ui"
 EXCHANGE = "/v1/tokens/dashboard/exchange"
-TRACKS = "/v1/snap/zwave-js-ui/tracks"
+TRACKS = f"/v1/snap/{SNAP}/tracks"
 EX_OK = httpx.Response(200, json={"macaroon": "tok"})
 CREATED = httpx.Response(201, json={"num-tracks-created": 1})
 HTML_502 = httpx.Response(502, text="<html>Bad Gateway</html>")
@@ -66,7 +67,7 @@ def run(track="v11.20", creds=CREDS, exchange_resp=EX_OK, tracks_resp=CREATED, a
         contextlib.redirect_stdout(out),
         contextlib.redirect_stderr(out),
     ):
-        rc = sct.main(argv or ["snap-create-track.py", "zwave-js-ui", track])
+        rc = sct.main(argv or ["snap-create-track.py", SNAP, track])
     return rc, out.getvalue(), requests
 
 
@@ -167,33 +168,57 @@ class CreateTrackTest(unittest.TestCase):
     def test_create_unreachable(self):
         self.assertFails(
             run(tracks_resp=httpx.ReadTimeout("slow")),
-            "create-track zwave-js-ui/v11.20: store unreachable (ReadTimeout)",
+            f"create-track {SNAP}/v11.20: store unreachable (ReadTimeout)",
             [EXCHANGE, TRACKS],
         )
 
     def test_create_html_502(self):
-        out = self.assertFails(run(tracks_resp=HTML_502), "create-track zwave-js-ui/v11.20 failed:", [EXCHANGE, TRACKS])
+        out = self.assertFails(run(tracks_resp=HTML_502), f"create-track {SNAP}/v11.20 failed:", [EXCHANGE, TRACKS])
         self.assertNotIn("can't manage", out)
 
-    def test_invalid_track_name_never_posts(self):
-        self.assertFails(run(track="v1-" + "x" * 30), "create-track zwave-js-ui/v1-", [EXCHANGE])
+    def test_invalid_track_name_skips_tracks_post(self):
+        self.assertFails(run(track="v1-" + "x" * 30), f"create-track {SNAP}/v1-", [EXCHANGE])
 
     def test_zero_created(self):
         self.assertFails(
             run(tracks_resp=httpx.Response(200, json={"num-tracks-created": 0})),
-            "create-track zwave-js-ui/v11.20 returned success but created no track",
+            f"create-track {SNAP}/v11.20 returned success but created no track",
             [EXCHANGE, TRACKS],
         )
 
     def test_unauthorized_gets_hint(self):
         out = self.assertFails(
-            run(tracks_resp=store_error(403, "nope")), "create-track zwave-js-ui/v11.20 failed:", [EXCHANGE, TRACKS]
+            run(tracks_resp=store_error(403, "nope")), f"create-track {SNAP}/v11.20 failed:", [EXCHANGE, TRACKS]
         )
         self.assertIn("can't manage this snap's tracks", out)
 
+    def test_create_null_error_list(self):
+        out = self.assertFails(
+            run(tracks_resp=httpx.Response(422, json={"error-list": None})),
+            f"create-track {SNAP}/v11.20 failed: HTTP 422, unparseable error body",
+            [EXCHANGE, TRACKS],
+        )
+        self.assertNotIn("Traceback", out)
+
+    def test_existing_track_with_odd_body_is_success(self):
+        rc, out, _ = run(tracks_resp=httpx.Response(409, json=[1]))
+        self.assertEqual(rc, 0, out)
+        self.assertIn("already exists", out)
+
+    def test_multiline_store_error_stays_one_annotation(self):
+        two = httpx.Response(
+            500,
+            json={"error-list": [{"code": "a", "message": "first"}, {"code": "b", "message": "second"}]},
+        )
+        rc, out, _ = run(tracks_resp=two)
+        self.assertEqual(rc, 1, out)
+        annotations = [line for line in out.splitlines() if line.startswith("::error::")]
+        self.assertEqual(len(annotations), 1, out)
+        self.assertIn("%0A- b: second", annotations[0])
+
     def test_server_error_has_no_auth_hint(self):
         out = self.assertFails(
-            run(tracks_resp=store_error(500, "oops")), "create-track zwave-js-ui/v11.20 failed:", [EXCHANGE, TRACKS]
+            run(tracks_resp=store_error(500, "oops")), f"create-track {SNAP}/v11.20 failed:", [EXCHANGE, TRACKS]
         )
         self.assertNotIn("can't manage", out)
 

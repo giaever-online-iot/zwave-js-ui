@@ -1,4 +1,7 @@
-# Direct deps of snap-create-track.py. Lock into requirements-store.txt with:
+# Direct deps of snap-create-track.py. Unlike requirements-duplicity.txt (deps come
+# from debs, --no-deps), this installs a full tree into a CI venv, so it is a compiled
+# lock. The lock targets the runner's python3, which must be >= 3.12 (ubuntu-24.04).
+# Lock into requirements-store.txt with:
 #   uv pip compile --universal --python-version 3.12 --generate-hashes \
 #     .github/scripts/requirements-store.in -o .github/scripts/requirements-store.txt
 craft-store==3.4.0

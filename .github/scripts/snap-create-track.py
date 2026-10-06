@@ -77,9 +77,9 @@ def exchange(creds: str) -> str:
     except httpx.HTTPError as exc:
         raise TrackError(f"token exchange: store unreachable ({type(exc).__name__}).") from None
     status = resp.status_code
-    refresh = "SNAPCRAFT_STORE_CREDENTIALS is invalid or expired; refresh it with `snapcraft export-login`."
+    refresh_hint = "SNAPCRAFT_STORE_CREDENTIALS is invalid or expired; refresh it with `snapcraft export-login`."
     if status in (401, 403):
-        raise TrackError(f"token exchange rejected (HTTP {status}: {error_messages(resp)}) — {refresh}")
+        raise TrackError(f"token exchange rejected (HTTP {status}: {error_messages(resp)}) — {refresh_hint}")
     if not resp.is_success:
         raise TrackError(f"token exchange: store error (HTTP {status}: {error_messages(resp)}).")
     try:
@@ -87,7 +87,7 @@ def exchange(creds: str) -> str:
     except (ValueError, AttributeError):
         raise TrackError(f"token exchange: unparseable response (HTTP {status}).") from None
     if not token:
-        raise TrackError(f"token exchange returned no token (HTTP {status}) — {refresh}")
+        raise TrackError(f"token exchange returned no token (HTTP {status}) — {refresh_hint}")
     print(f"::add-mask::{token}")
     return token
 
@@ -99,14 +99,16 @@ def create_track(snap: str, track: str, creds: str) -> None:
         created = gateway.create_tracks(snap, {"name": track})
     except httpx.HTTPError as exc:
         raise TrackError(f"create-track {snap}/{track}: store unreachable ({type(exc).__name__}).") from None
-    except errors.CraftStoreError as exc:
+    # TypeError/AttributeError: craft-store's error parser chokes on an odd error-list shape.
+    except (errors.CraftStoreError, TypeError, AttributeError) as exc:
         if auth.status == 409:
             print(f"Track {track} already exists.")
             return
+        detail = exc if isinstance(exc, errors.CraftStoreError) else f"HTTP {auth.status}, unparseable error body"
         hint = ""
         if auth.status in (401, 403):
             hint = " The credentials can't manage this snap's tracks, or the name misses its track-creation guardrails."
-        raise TrackError(f"create-track {snap}/{track} failed: {exc}{hint}") from None
+        raise TrackError(f"create-track {snap}/{track} failed: {detail}{hint}") from None
     if created < 1:
         raise TrackError(f"create-track {snap}/{track} returned success but created no track.")
     print(f"Track {track} created (num-tracks-created={created}).")
@@ -125,7 +127,9 @@ def main(argv: list[str]) -> int:
             )
         create_track(snap, track, creds)
     except TrackError as exc:
-        print(f"::error::{exc}", file=sys.stderr)
+        # A workflow command ends at the first newline; craft-store messages can span several.
+        message = str(exc).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+        print(f"::error::{message}", file=sys.stderr)
         return 1
     return 0
 
