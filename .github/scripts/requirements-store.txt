@@ -1,0 +1,2 @@
+# Snap Store client for snap-create-track.py (pip-installed into a venv by CI).
+craft-store==3.4.0

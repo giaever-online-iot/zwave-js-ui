@@ -94,10 +94,9 @@ jobs:
             echo "Track $TRACK already exists."
             exit 0
           fi
-          # pymacaroons binds the store credentials for the publisher-gateway token exchange.
           python3 -m venv "$RUNNER_TEMP/venv"
-          "$RUNNER_TEMP/venv/bin/pip" install -q pymacaroons==0.13.0
-          PYTHON="$RUNNER_TEMP/venv/bin/python" bash .github/scripts/snap-create-track.sh "$SNAP_NAME" "$TRACK"
+          "$RUNNER_TEMP/venv/bin/pip" install -q -r .github/scripts/requirements-store.txt
+          "$RUNNER_TEMP/venv/bin/python" .github/scripts/snap-create-track.py "$SNAP_NAME" "$TRACK"
 
   # One job per arch that BUILDS *and* PUBLISHES, so each arch ships the moment its
   # own build finishes — no waiting on sibling arches (GitHub has no per-matrix-leg
