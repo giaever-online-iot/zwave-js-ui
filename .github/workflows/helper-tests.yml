@@ -2,8 +2,9 @@ name: Helper tests
 
 # Guards the CI helpers (snap version/channel math; the retry-fetch remote-build
 # wrapper; store track creation). Runs on every PR (seconds) so `test` can be a
-# required status check — a path-filtered workflow that never starts would leave the check "expected"
-# forever and deadlock auto-merge on PRs that don't touch its paths.
+# required status check — a path-filtered workflow that never starts would leave
+# the check "expected" forever and deadlock auto-merge on PRs that don't touch its
+# paths.
 on:
   pull_request:
     branches: [main]
@@ -32,7 +33,7 @@ jobs:
       - name: Run Python helper unit tests
         run: |
           python3 -m venv "$RUNNER_TEMP/venv"
-          "$RUNNER_TEMP/venv/bin/pip" install -q -r .github/scripts/requirements-store.txt
+          "$RUNNER_TEMP/venv/bin/pip" install -q --require-hashes -r .github/scripts/requirements-store.txt
           for t in .github/scripts/*.test.py; do
             echo "== $t"
             "$RUNNER_TEMP/venv/bin/python" "$t" || exit 1

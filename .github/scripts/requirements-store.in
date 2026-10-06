@@ -1,0 +1,6 @@
+# Direct deps of snap-create-track.py. Lock into requirements-store.txt with:
+#   uv pip compile --universal --python-version 3.12 --generate-hashes \
+#     .github/scripts/requirements-store.in -o .github/scripts/requirements-store.txt
+craft-store==3.4.0
+httpx
+pymacaroons
