@@ -1,9 +1,10 @@
 name: Helper tests
 
 # Guards the CI helpers (snap version/channel math; the retry-fetch remote-build
-# wrapper). Runs on every PR (seconds) so `test` can be a required status check —
-# a path-filtered workflow that never starts would leave the check "expected"
-# forever and deadlock auto-merge on PRs that don't touch its paths.
+# wrapper; store track creation). Runs on every PR (seconds) so `test` can be a
+# required status check — a path-filtered workflow that never starts would leave
+# the check "expected" forever and deadlock auto-merge on PRs that don't touch its
+# paths.
 on:
   pull_request:
     branches: [main]
@@ -28,3 +29,10 @@ jobs:
             echo "== $t"
             bash "$t" || exit 1
           done
+
+      - name: Run store-client helper unit tests
+        run: |
+          python3 -m venv "$RUNNER_TEMP/store-venv"
+          .github/scripts/retry.sh 3 15 -- "$RUNNER_TEMP/store-venv/bin/pip" install -q --require-hashes -r .github/scripts/requirements-store.txt \
+            || { echo "::error::could not install the store client (pip, requirements-store.txt)."; exit 1; }
+          "$RUNNER_TEMP/store-venv/bin/python" .github/scripts/snap-create-track.test.py
