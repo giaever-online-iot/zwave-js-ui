@@ -95,7 +95,8 @@ jobs:
             exit 0
           fi
           python3 -m venv "$RUNNER_TEMP/venv"
-          "$RUNNER_TEMP/venv/bin/pip" install -q --require-hashes -r .github/scripts/requirements-store.txt
+          .github/scripts/retry.sh 3 15 -- "$RUNNER_TEMP/venv/bin/pip" install -q --require-hashes -r .github/scripts/requirements-store.txt \
+            || { echo "::error::could not install the store client (pip, requirements-store.txt) — not a credentials problem."; exit 1; }
           # A 409 (track appeared meanwhile) exits 0, so retrying a half-done create is safe.
           .github/scripts/retry.sh 3 15 -- "$RUNNER_TEMP/venv/bin/python" .github/scripts/snap-create-track.py "$SNAP_NAME" "$TRACK"
 
