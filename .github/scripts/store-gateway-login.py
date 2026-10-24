@@ -6,13 +6,15 @@ feeds the SNAPCRAFT_GATEWAY_CREDENTIALS repo secret, which snap-create-track.py 
 gateway.
 
 Renewal, about once a year (snap-create-track.py --check warns 30 days ahead):
-  1. Run:  .github/scripts/store-gateway-login.py gateway.creds
-  2. Tap the Candid link it prints, on any device, and sign in with Ubuntu One.
-  3. Run the `gh secret set` command it then prints.
+  1. Use a venv with the store client: pip install --require-hashes -r .github/scripts/requirements-store.txt
+  2. Run:  .github/scripts/store-gateway-login.py gateway.creds   (*.creds is gitignored)
+  3. Tap the Candid link it prints, on any device, and sign in with Ubuntu One.
+  4. Run the `gh secret set` command it then prints.
 
 craft-store prints the login URL itself and also tries to open it through Python's `webbrowser`,
 which honours $BROWSER; point $BROWSER at a stand-in script to capture the URL instead of opening
-a tab. The helper never prints the credential: it writes it to <out-file> with mode 0600.
+a tab. The helper never prints the credential: it writes it to <out-file> with mode 0600. The file
+is opened before the login, so an unwritable path fails before you tap the link.
 
 The login parameters below reproduce the login verified against the live gateway on 2026-10-25.
 Do not change them casually: a scoped or differently-permissioned token is unverified against the
@@ -47,12 +49,15 @@ def login() -> str:
     return client.login(permissions=PERMISSIONS, description=DESCRIPTION, ttl=TTL_SECONDS)
 
 
-def write_credential(path: str, blob: str) -> None:
-    """Write the blob owner-only, replacing any existing file."""
+def open_credential(path: str):
+    """Open the credential file for writing, owner-only and truncated; the caller writes the blob."""
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
+    try:
         os.fchmod(fd, 0o600)  # the mode above only applies when the file is created
-        f.write(blob)
+    except OSError:
+        os.close(fd)
+        raise
+    return os.fdopen(fd, "w")
 
 
 def main(argv: list[str]) -> int:
@@ -60,8 +65,14 @@ def main(argv: list[str]) -> int:
         print("usage: store-gateway-login.py <out-file>", file=sys.stderr)
         return 2
     path = argv[1]
-    print("Starting the Candid login; craft-store prints the URL to open (tap it on your phone and sign in with Ubuntu One).", flush=True)
-    write_credential(path, login())
+    try:
+        out = open_credential(path)  # before the login: a bad path must not cost a tap
+    except OSError as exc:
+        print(f"store-gateway-login.py: cannot write {path}: {exc.strerror}", file=sys.stderr)
+        return 1
+    with out:  # a failed login leaves this file empty, which is harmless
+        print("Starting the Candid login; craft-store prints the URL to open (tap it on your phone and sign in with Ubuntu One).", flush=True)
+        out.write(login())
     print(f"Credential written to {path} (0600; valid 365 days). Set the repo secret with:")
     print(f"  gh secret set {SECRET} --repo {REPO} < {shlex.quote(path)}")
     return 0

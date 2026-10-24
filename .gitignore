@@ -10,6 +10,8 @@ actionlint
 
 # Snap Store credentials — never commit (e.g. `snapcraft export-login` output)
 login
+# Gateway credentials written by .github/scripts/store-gateway-login.py (live publisher macaroons)
+*.creds
 
 # Claude Code local state (settings, worktrees, logs)
 .claude/
