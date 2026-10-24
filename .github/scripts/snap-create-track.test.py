@@ -7,6 +7,7 @@ import io
 import json
 import pathlib
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 import httpx
@@ -18,19 +19,22 @@ spec = importlib.util.spec_from_file_location(
 sct = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sct)
 
-_root = Macaroon(location="dashboard.snapcraft.io", identifier="root", key="root-key")
-_root.add_third_party_caveat("login.ubuntu.com", "caveat-key", "caveat-id")
-_discharge = Macaroon(location="login.ubuntu.com", identifier="caveat-id", key="caveat-key")
-CREDS = base64.b64encode(
-    json.dumps({"t": "u1-macaroon", "v": {"r": _root.serialize(), "d": _discharge.serialize()}}).encode()
-).decode()
-BOUND_DISCHARGE = _root.prepare_for_request(_discharge).serialize()
+NOW = datetime(2026, 10, 25, 0, 0, tzinfo=timezone.utc)
+
+
+def make_blob(expires="2027-10-24T22:04:54.745950Z", t="macaroon"):
+    """A gateway credential as store-gateway-login.py writes it: base64 of {"t", "v": v2 macaroon}."""
+    macaroon = Macaroon(location="api.snapcraft.io", identifier="zui", key="k", version=2)
+    if expires is not None:
+        macaroon.add_first_party_caveat(f"time-before {expires}")
+    return base64.b64encode(json.dumps({"t": t, "v": macaroon.serialize()}).encode()).decode()
+
 
 SNAP = "zwave-js-ui"
-EXCHANGE = "/v1/tokens/dashboard/exchange"
 TRACKS = f"/v1/snap/{SNAP}/tracks"
-EX_OK = httpx.Response(200, json={"macaroon": "tok"})
+WHOAMI = "/v1/tokens/whoami"
 CREATED = httpx.Response(201, json={"num-tracks-created": 1})
+WHOAMI_OK = httpx.Response(200, json={"account": {"username": "giaever-online"}})
 HTML_502 = httpx.Response(502, text="<html>Bad Gateway</html>")
 
 
@@ -42,33 +46,156 @@ def _no_network(*_args, **_kwargs):
     raise AssertionError("a request bypassed the fake store")
 
 
-def run(track="v11.20", creds=CREDS, exchange_resp=EX_OK, tracks_resp=CREATED, argv=None):
+def run(track="v11.20", creds=make_blob(), tracks_resp=CREATED, whoami_resp=WHOAMI_OK, argv=None):
     """Run main() against a fake store; return (rc, stdout+stderr, requests made).
 
     A response may be an exception instance, which the fake transport raises instead.
+    The clock is pinned to NOW.
     """
     requests = []
 
     def handler(request):
         requests.append(request)
-        answer = {EXCHANGE: exchange_resp, TRACKS: tracks_resp}[request.url.path]
+        answer = {TRACKS: tracks_resp, WHOAMI: whoami_resp}[request.url.path]
         if isinstance(answer, Exception):
             raise answer
         return answer
 
     real_client = httpx.Client
-    env = {} if creds is None else {"SNAPCRAFT_STORE_CREDENTIALS": creds}
+    env = {} if creds is None else {"SNAPCRAFT_GATEWAY_CREDENTIALS": creds}
     out = io.StringIO()
     with (
         mock.patch.object(httpx, "Client", lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw)),
         # If craft-store ever builds its client another way, fail instead of reaching the real store.
         mock.patch.object(httpx.HTTPTransport, "handle_request", _no_network),
+        mock.patch.object(sct, "utcnow", lambda: NOW),
         mock.patch.dict("os.environ", env, clear=True),
         contextlib.redirect_stdout(out),
         contextlib.redirect_stderr(out),
     ):
         rc = sct.main(argv or ["snap-create-track.py", SNAP, track])
     return rc, out.getvalue(), requests
+
+
+class LoadCredentialTest(unittest.TestCase):
+    def test_decodes_v2_blob_and_expiry(self):
+        cred = sct.load_credential(make_blob())
+        self.assertTrue(cred.token.startswith("Ag"))
+        self.assertEqual(cred.expires, datetime(2027, 10, 24, 22, 4, 54, 745950, tzinfo=timezone.utc))
+
+    def test_missing_time_before_is_unknown(self):
+        self.assertIsNone(sct.load_credential(make_blob(expires=None)).expires)
+
+    def test_expiry_is_normalised_to_utc(self):
+        offset = sct.load_credential(make_blob(expires="2027-10-24T23:30:00+02:00")).expires
+        self.assertEqual(offset, datetime(2027, 10, 24, 21, 30, tzinfo=timezone.utc))
+        self.assertEqual(offset.utcoffset(), timedelta(0))
+        naive = sct.load_credential(make_blob(expires="2027-10-24T23:30:00")).expires
+        self.assertEqual(naive, datetime(2027, 10, 24, 23, 30, tzinfo=timezone.utc))
+
+    def test_binary_third_party_caveat_does_not_hide_expiry(self):
+        macaroon = Macaroon(location="api.snapcraft.io", identifier="zui", key="k", version=2)
+        macaroon.add_third_party_caveat("login.example", "caveat-key", b"\xff\xfe-binary-id")
+        macaroon.add_first_party_caveat("time-before 2027-10-24T22:04:54.745950Z")
+        blob = base64.b64encode(json.dumps({"t": "macaroon", "v": macaroon.serialize()}).encode()).decode()
+        self.assertEqual(
+            sct.load_credential(blob).expires, datetime(2027, 10, 24, 22, 4, 54, 745950, tzinfo=timezone.utc)
+        )
+
+    def test_u1_blob_is_rejected_without_leak(self):
+        u1 = base64.b64encode(
+            json.dumps({"t": "u1-macaroon", "v": {"r": "secret-r", "d": "secret-d"}}).encode()
+        ).decode()
+        with self.assertRaises(sct.TrackError) as cm:
+            sct.load_credential(u1)
+        self.assertIn("expected the file written by store-gateway-login.py", str(cm.exception))
+        self.assertNotIn("secret-r", str(cm.exception))
+
+    def test_wrong_type_tag_is_rejected_even_with_a_valid_macaroon(self):
+        with self.assertRaises(sct.TrackError) as cm:
+            sct.load_credential(make_blob(t="u1-macaroon"))
+        self.assertIn("could not read SNAPCRAFT_GATEWAY_CREDENTIALS", str(cm.exception))
+
+    def test_non_string_macaroon_is_rejected_without_leak(self):
+        blob = base64.b64encode(json.dumps({"t": "macaroon", "v": {"r": "secret-r"}}).encode()).decode()
+        with self.assertRaises(sct.TrackError) as cm:
+            sct.load_credential(blob)
+        self.assertIn("could not read SNAPCRAFT_GATEWAY_CREDENTIALS", str(cm.exception))
+        self.assertNotIn("secret-r", str(cm.exception))
+
+    def test_undecodable_hides_content(self):
+        with self.assertRaises(sct.TrackError) as cm:
+            sct.load_credential(base64.b64encode(b"\xffsecret-macaroon").decode())
+        self.assertIn("could not read SNAPCRAFT_GATEWAY_CREDENTIALS", str(cm.exception))
+        self.assertNotIn("secret-macaroon", str(cm.exception))
+
+    def test_malformed_macaroon_reports_type_only(self):
+        blob = base64.b64encode(json.dumps({"t": "macaroon", "v": "!!secret-v!!"}).encode()).decode()
+        with self.assertRaises(sct.TrackError) as cm:
+            sct.load_credential(blob)
+        self.assertRegex(str(cm.exception), r"store-gateway-login\.py \(\w+\)\.$")
+        self.assertNotIn("secret-v", str(cm.exception))
+
+    def test_blank_is_empty_error(self):
+        with self.assertRaises(sct.TrackError) as cm:
+            sct.load_credential(" \n")
+        self.assertEqual(
+            str(cm.exception), "SNAPCRAFT_GATEWAY_CREDENTIALS is empty or unset — cannot authenticate."
+        )
+
+
+class ExpiryStatusTest(unittest.TestCase):
+    def test_ok(self):
+        level, msg = sct.expiry_status(datetime(2027, 10, 24, tzinfo=timezone.utc), NOW)
+        self.assertEqual((level, msg), ("ok", "SNAPCRAFT_GATEWAY_CREDENTIALS expires in 364 days (2027-10-24)"))
+
+    def test_exactly_warn_days_left_is_ok(self):
+        self.assertEqual(sct.expiry_status(NOW + timedelta(days=30), NOW)[0], "ok")
+
+    def test_just_under_warn_days_is_warning(self):
+        level, msg = sct.expiry_status(NOW + timedelta(days=30) - timedelta(seconds=1), NOW)
+        self.assertEqual(level, "warning")
+        self.assertIn("expires in 29 days (2026-11-23)", msg)
+
+    def test_warn_days_is_configurable(self):
+        self.assertEqual(sct.expiry_status(NOW + timedelta(days=10), NOW, warn_days=7)[0], "ok")
+        self.assertEqual(sct.expiry_status(NOW + timedelta(days=10), NOW, warn_days=11)[0], "warning")
+
+    def test_warning_under_30_days(self):
+        level, msg = sct.expiry_status(NOW + timedelta(days=12, hours=5), NOW)
+        self.assertEqual(level, "warning")
+        self.assertEqual(msg, f"SNAPCRAFT_GATEWAY_CREDENTIALS expires in 12 days (2026-11-06) — {sct.RENEW}")
+
+    def test_zero_days_left_is_warning(self):
+        level, msg = sct.expiry_status(NOW + timedelta(hours=3), NOW)
+        self.assertEqual(level, "warning")
+        self.assertIn("expires in 0 days (2026-10-25)", msg)
+
+    def test_expired(self):
+        level, msg = sct.expiry_status(NOW - timedelta(seconds=1), NOW)
+        self.assertEqual(
+            (level, msg), ("error", f"SNAPCRAFT_GATEWAY_CREDENTIALS expired on 2026-10-24 — {sct.RENEW}")
+        )
+
+    def test_expiring_exactly_now_is_expired(self):
+        self.assertEqual(sct.expiry_status(NOW, NOW)[0], "error")
+
+    def test_unknown(self):
+        level, msg = sct.expiry_status(None, NOW)
+        self.assertEqual(
+            (level, msg),
+            ("warning", f"SNAPCRAFT_GATEWAY_CREDENTIALS has no time-before caveat; expiry unknown — {sct.RENEW}"),
+        )
+
+    def test_renew_hint_text(self):
+        self.assertEqual(
+            sct.RENEW,
+            "renew: run .github/scripts/store-gateway-login.py locally (tap the Candid link on your phone), "
+            "then `gh secret set SNAPCRAFT_GATEWAY_CREDENTIALS < gateway.creds`",
+        )
+
+    def test_utcnow_is_timezone_aware(self):
+        self.assertEqual(sct.utcnow().utcoffset(), timedelta(0))
 
 
 class CreateTrackTest(unittest.TestCase):
@@ -82,18 +209,16 @@ class CreateTrackTest(unittest.TestCase):
     def test_creates_track(self):
         rc, out, requests = run()
         self.assertEqual(rc, 0, out)
-        self.assertEqual([r.url.path for r in requests], [EXCHANGE, TRACKS])
-        self.assertIn("::add-mask::tok", out)
+        self.assertEqual([r.url.path for r in requests], [TRACKS])
         self.assertIn("num-tracks-created=1", out)
-        ex, post = requests
-        self.assertEqual(ex.headers["Authorization"], f"macaroon root={_root.serialize()}, discharge={BOUND_DISCHARGE}")
-        self.assertEqual(post.headers["Authorization"], "Macaroon tok")
+        (post,) = requests
+        self.assertEqual(post.headers["Authorization"], "Macaroon " + sct.load_credential(make_blob()).token)
         self.assertEqual(json.loads(post.content), [{"name": "v11.20"}])
 
     def test_existing_track_is_success(self):
         rc, out, requests = run(tracks_resp=store_error(409, "exists"))
         self.assertEqual(rc, 0, out)
-        self.assertEqual(len(requests), 2)
+        self.assertEqual(len(requests), 1)
         self.assertIn("already exists", out)
 
     def test_usage(self):
@@ -102,93 +227,43 @@ class CreateTrackTest(unittest.TestCase):
         self.assertIn("usage:", out)
 
     def test_unset_creds_fail_fast(self):
-        self.assertFails(run(creds=None), "SNAPCRAFT_STORE_CREDENTIALS is empty", [])
+        self.assertFails(run(creds=None), "SNAPCRAFT_GATEWAY_CREDENTIALS is empty", [])
 
     def test_blank_creds_fail_fast(self):
-        self.assertFails(run(creds=" \n"), "SNAPCRAFT_STORE_CREDENTIALS is empty", [])
+        self.assertFails(run(creds=" \n"), "SNAPCRAFT_GATEWAY_CREDENTIALS is empty", [])
 
     def test_undecodable_creds_hide_content(self):
         out = self.assertFails(
             run(creds=base64.b64encode(b"\xffsecret-macaroon").decode()),
-            "could not read SNAPCRAFT_STORE_CREDENTIALS",
+            "could not read SNAPCRAFT_GATEWAY_CREDENTIALS",
             [],
         )
         self.assertNotIn("secret-macaroon", out)
-
-    def test_malformed_macaroon(self):
-        creds = base64.b64encode(json.dumps({"v": {"r": "!!!!", "d": "!!!!"}}).encode()).decode()
-        self.assertFails(
-            run(creds=creds),
-            "could not read SNAPCRAFT_STORE_CREDENTIALS — expected the output of `snapcraft export-login` (IndexError)",
-            [],
-        )
-
-    def test_exchange_rejected_blames_credentials(self):
-        self.assertFails(
-            run(exchange_resp=store_error(401, "bad macaroon")),
-            "token exchange rejected (HTTP 401: bad macaroon) — SNAPCRAFT_STORE_CREDENTIALS is invalid",
-            [EXCHANGE],
-        )
-
-    def test_exchange_outage_does_not_blame_credentials(self):
-        out = self.assertFails(
-            run(exchange_resp=HTML_502), "token exchange: store error (HTTP 502: unparseable body)", [EXCHANGE]
-        )
-        self.assertNotIn("SNAPCRAFT_STORE_CREDENTIALS", out)
-
-    def test_exchange_null_error_list(self):
-        self.assertFails(
-            run(exchange_resp=httpx.Response(503, json={"error-list": None})),
-            "token exchange: store error (HTTP 503: no error-list)",
-            [EXCHANGE],
-        )
-
-    def test_exchange_without_token_hides_body(self):
-        out = self.assertFails(
-            run(exchange_resp=httpx.Response(200, json={"token": "leak-me"})),
-            "token exchange returned no token (HTTP 200)",
-            [EXCHANGE],
-        )
-        self.assertNotIn("leak-me", out)
-
-    def test_exchange_non_json(self):
-        self.assertFails(
-            run(exchange_resp=httpx.Response(200, text="<html>")),
-            "token exchange: unparseable response (HTTP 200)",
-            [EXCHANGE],
-        )
-
-    def test_exchange_unreachable(self):
-        self.assertFails(
-            run(exchange_resp=httpx.ConnectError("down")),
-            "token exchange: store unreachable (ConnectError)",
-            [EXCHANGE],
-        )
 
     def test_create_unreachable(self):
         self.assertFails(
             run(tracks_resp=httpx.ReadTimeout("slow")),
             f"create-track {SNAP}/v11.20: store unreachable (ReadTimeout)",
-            [EXCHANGE, TRACKS],
+            [TRACKS],
         )
 
     def test_create_html_502(self):
-        out = self.assertFails(run(tracks_resp=HTML_502), f"create-track {SNAP}/v11.20 failed:", [EXCHANGE, TRACKS])
+        out = self.assertFails(run(tracks_resp=HTML_502), f"create-track {SNAP}/v11.20 failed:", [TRACKS])
         self.assertNotIn("can't manage", out)
 
     def test_invalid_track_name_skips_tracks_post(self):
-        self.assertFails(run(track="v1-" + "x" * 30), f"create-track {SNAP}/v1-", [EXCHANGE])
+        self.assertFails(run(track="v1-" + "x" * 30), f"create-track {SNAP}/v1-", [])
 
     def test_zero_created(self):
         self.assertFails(
             run(tracks_resp=httpx.Response(200, json={"num-tracks-created": 0})),
             f"create-track {SNAP}/v11.20 returned success but created no track",
-            [EXCHANGE, TRACKS],
+            [TRACKS],
         )
 
     def test_unauthorized_gets_hint(self):
         out = self.assertFails(
-            run(tracks_resp=store_error(403, "nope")), f"create-track {SNAP}/v11.20 failed:", [EXCHANGE, TRACKS]
+            run(tracks_resp=store_error(403, "nope")), f"create-track {SNAP}/v11.20 failed:", [TRACKS]
         )
         self.assertIn("can't manage this snap's tracks", out)
 
@@ -196,7 +271,7 @@ class CreateTrackTest(unittest.TestCase):
         out = self.assertFails(
             run(tracks_resp=httpx.Response(422, json={"error-list": None})),
             f"create-track {SNAP}/v11.20 failed: HTTP 422, unparseable error body",
-            [EXCHANGE, TRACKS],
+            [TRACKS],
         )
         self.assertNotIn("Traceback", out)
 
@@ -218,7 +293,7 @@ class CreateTrackTest(unittest.TestCase):
 
     def test_server_error_has_no_auth_hint(self):
         out = self.assertFails(
-            run(tracks_resp=store_error(500, "oops")), f"create-track {SNAP}/v11.20 failed:", [EXCHANGE, TRACKS]
+            run(tracks_resp=store_error(500, "oops")), f"create-track {SNAP}/v11.20 failed:", [TRACKS]
         )
         self.assertNotIn("can't manage", out)
 

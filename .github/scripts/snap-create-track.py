@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-"""Create a Snap Store version track with SNAPCRAFT_STORE_CREDENTIALS.
+"""Create a Snap Store version track with SNAPCRAFT_GATEWAY_CREDENTIALS.
 
 `snapcraft` has no create-track command, so this calls the publisher gateway through
-craft-store's PublisherGateway.create_tracks. The `snapcraft export-login` blob holds
-dashboard macaroons, which the gateway only accepts after an exchange at
-/v1/tokens/dashboard/exchange: the flow snapcraft.io runs behind its "create track"
-button. craft-store's UbuntuOneAuth exchanges at /v1/tokens/usso/exchange instead,
-which is meant for craft-store's own Ubuntu One logins, hence the exchange here.
-craft-store still owns the track call: name validation, error parsing and the
-num-tracks-created check stay Canonical's code rather than a copy of it.
+craft-store's PublisherGateway.create_tracks. The credential is a Candid macaroon for that
+gateway, written by store-gateway-login.py and presented to the gateway as it is: nothing
+is swapped for another token here. craft-store still owns the track call: name validation,
+error parsing and the num-tracks-created check stay Canonical's code rather than a copy of it.
 
 Usage: snap-create-track.py <snap-name> <track>
 Exit:  0 = track created or already exists; 1 = failure, with a ::error:: explaining the cause.
@@ -18,6 +15,8 @@ import base64
 import json
 import os
 import sys
+from datetime import datetime, timezone
+from typing import NamedTuple
 
 import httpx
 from craft_store import errors
@@ -27,6 +26,13 @@ from pymacaroons import Macaroon
 # The publisher gateway serves snaps as well as charms; it only lives on the charmhub host.
 GATEWAY = "https://api.charmhub.io"
 TIMEOUT_S = 60.0
+
+ENV_VAR = "SNAPCRAFT_GATEWAY_CREDENTIALS"
+RENEW = (
+    "renew: run .github/scripts/store-gateway-login.py locally (tap the Candid link on your phone), "
+    f"then `gh secret set {ENV_VAR} < gateway.creds`"
+)
+EXPIRY_CAVEAT = b"time-before "
 
 
 class TrackError(Exception):
@@ -54,46 +60,58 @@ def error_messages(resp: httpx.Response) -> str:
         return "unparseable body"
 
 
-def exchange_header(creds: str) -> str:
-    """Authorization value for the exchange: the root macaroon plus its bound discharge."""
+class Credential(NamedTuple):
+    token: str
+    expires: datetime | None  # tz-aware UTC; None when the macaroon has no time-before caveat
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def load_credential(blob: str) -> Credential:
+    """Decode the base64 `{"t": "macaroon", "v": <v2 macaroon>}` file store-gateway-login.py writes."""
+    blob = blob.strip()
+    if not blob:
+        raise TrackError(f"{ENV_VAR} is empty or unset — cannot authenticate.")
     try:
-        macaroons = json.loads(base64.b64decode(creds))["v"]  # {"t": "u1-macaroon", "v": {"r", "d"}}
-        root, discharge = macaroons["r"], macaroons["d"]
-        bound = Macaroon.deserialize(root).prepare_for_request(Macaroon.deserialize(discharge))
+        obj = json.loads(base64.b64decode(blob))
+        if obj["t"] != "macaroon" or not isinstance(obj["v"], str):
+            raise ValueError("not a gateway macaroon credential")
+        token = obj["v"]
+        expires = None
+        for caveat in Macaroon.deserialize(token).caveats:
+            # Raw bytes: third-party caveat ids are binary and would not decode.
+            if caveat.caveat_id_bytes.startswith(EXPIRY_CAVEAT):
+                expires = datetime.fromisoformat(caveat.caveat_id_bytes.removeprefix(EXPIRY_CAVEAT).decode())
+                if expires.tzinfo is None:
+                    expires = expires.replace(tzinfo=timezone.utc)
+                expires = expires.astimezone(timezone.utc)
+                break
     except Exception as exc:  # noqa: BLE001 — decode-only block: any failure means unreadable credentials
         # Type only: the message of a decode error can carry the decoded secret.
         raise TrackError(
-            "could not read SNAPCRAFT_STORE_CREDENTIALS — expected the output of "
-            f"`snapcraft export-login` ({type(exc).__name__})."
+            f"could not read {ENV_VAR} — expected the file written by store-gateway-login.py ({type(exc).__name__})."
         ) from None
-    return f"macaroon root={root}, discharge={bound.serialize()}"
+    return Credential(token, expires)
 
 
-def exchange(creds: str) -> str:
-    header = exchange_header(creds)
-    try:
-        with httpx.Client(timeout=TIMEOUT_S) as client:
-            resp = client.post(f"{GATEWAY}/v1/tokens/dashboard/exchange", headers={"Authorization": header}, json={})
-    except httpx.HTTPError as exc:
-        raise TrackError(f"token exchange: store unreachable ({type(exc).__name__}).") from None
-    status = resp.status_code
-    refresh_hint = "SNAPCRAFT_STORE_CREDENTIALS is invalid or expired; refresh it with `snapcraft export-login`."
-    if status in (401, 403):
-        raise TrackError(f"token exchange rejected (HTTP {status}: {error_messages(resp)}) — {refresh_hint}")
-    if not resp.is_success:
-        raise TrackError(f"token exchange: store error (HTTP {status}: {error_messages(resp)}).")
-    try:
-        token = resp.json().get("macaroon")
-    except (ValueError, AttributeError):
-        raise TrackError(f"token exchange: unparseable response (HTTP {status}).") from None
-    if not token:
-        raise TrackError(f"token exchange returned no token (HTTP {status}) — {refresh_hint}")
-    print(f"::add-mask::{token}")
-    return token
+def expiry_status(expires: datetime | None, now: datetime, warn_days: int = 30) -> tuple[str, str]:
+    """Classify the credential's remaining life as ("ok" | "warning" | "error", message)."""
+    if expires is None:
+        return "warning", f"{ENV_VAR} has no time-before caveat; expiry unknown — {RENEW}"
+    date = expires.date().isoformat()
+    if expires <= now:
+        return "error", f"{ENV_VAR} expired on {date} — {RENEW}"
+    days = (expires - now).days  # whole days, floored
+    message = f"{ENV_VAR} expires in {days} days ({date})"
+    if days < warn_days:
+        return "warning", f"{message} — {RENEW}"
+    return "ok", message
 
 
 def create_track(snap: str, track: str, creds: str) -> None:
-    auth = MacaroonAuth(exchange(creds))
+    auth = MacaroonAuth(load_credential(creds).token)
     gateway = PublisherGateway(GATEWAY, "snap", auth)
     try:
         created = gateway.create_tracks(snap, {"name": track})
@@ -119,12 +137,8 @@ def main(argv: list[str]) -> int:
         print("usage: snap-create-track.py <snap-name> <track>", file=sys.stderr)
         return 1
     snap, track = argv[1], argv[2]
-    creds = os.environ.get("SNAPCRAFT_STORE_CREDENTIALS", "")
+    creds = os.environ.get(ENV_VAR, "")
     try:
-        if not creds.strip():
-            raise TrackError(
-                f"SNAPCRAFT_STORE_CREDENTIALS is empty or unset — cannot authenticate to create track {track}."
-            )
         create_track(snap, track, creds)
     except TrackError as exc:
         # A workflow command ends at the first newline; craft-store messages can span several.
