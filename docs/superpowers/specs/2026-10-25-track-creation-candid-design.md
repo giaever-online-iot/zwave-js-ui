@@ -1,6 +1,6 @@
 # Snap Store track creation from CI via a Candid gateway credential — design
 
-Date: 2026-10-25. Status: draft for review. Supersedes the auth part of
+Date: 2026-10-25. Status: implemented on PR #244. Supersedes the auth part of
 `2026-06-21-snapcraft-track-creation-design.md` and reworks PR #244 (robertsLando).
 Fixes #243 (automated PRs stuck since July 2026).
 
