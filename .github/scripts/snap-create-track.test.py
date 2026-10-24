@@ -23,10 +23,13 @@ NOW = datetime(2026, 10, 25, 0, 0, tzinfo=timezone.utc)
 
 
 def make_blob(expires="2027-10-24T22:04:54.745950Z", t="macaroon"):
-    """A gateway credential as store-gateway-login.py writes it: base64 of {"t", "v": v2 macaroon}."""
+    """A gateway credential as store-gateway-login.py writes it: base64 of {"t", "v": v2 macaroon}.
+
+    `expires` is one time-before timestamp, None for no caveat, or a sequence for several caveats.
+    """
     macaroon = Macaroon(location="api.snapcraft.io", identifier="zui", key="k", version=2)
-    if expires is not None:
-        macaroon.add_first_party_caveat(f"time-before {expires}")
+    for stamp in () if expires is None else (expires,) if isinstance(expires, str) else expires:
+        macaroon.add_first_party_caveat(f"time-before {stamp}")
     return base64.b64encode(json.dumps({"t": t, "v": macaroon.serialize()}).encode()).decode()
 
 
@@ -93,6 +96,15 @@ class LoadCredentialTest(unittest.TestCase):
         self.assertEqual(offset.utcoffset(), timedelta(0))
         naive = sct.load_credential(make_blob(expires="2027-10-24T23:30:00")).expires
         self.assertEqual(naive, datetime(2027, 10, 24, 23, 30, tzinfo=timezone.utc))
+
+    def test_earliest_time_before_governs_in_either_order(self):
+        early, late = "2027-01-01T00:00:00Z", "2027-06-01T00:00:00Z"
+        for order in ((early, late), (late, early)):
+            with self.subTest(order=order):
+                self.assertEqual(
+                    sct.load_credential(make_blob(expires=order)).expires,
+                    datetime(2027, 1, 1, tzinfo=timezone.utc),
+                )
 
     def test_binary_third_party_caveat_does_not_hide_expiry(self):
         macaroon = Macaroon(location="api.snapcraft.io", identifier="zui", key="k", version=2)
@@ -211,27 +223,103 @@ class CreateTrackTest(unittest.TestCase):
         rc, out, requests = run()
         self.assertEqual(rc, 0, out)
         self.assertEqual([r.url.path for r in requests], [TRACKS])
+        # The expected header is derived from the raw blob, not from the code under test.
+        raw_token = json.loads(base64.b64decode(make_blob()))["v"]
+        self.assertEqual(requests[0].headers["Authorization"], "Macaroon " + raw_token)
+        self.assertEqual(json.loads(requests[0].content), [{"name": "v11.20"}])
         self.assertIn("num-tracks-created=1", out)
-        (post,) = requests
-        self.assertEqual(post.headers["Authorization"], "Macaroon " + sct.load_credential(make_blob()).token)
-        self.assertEqual(json.loads(post.content), [{"name": "v11.20"}])
+        self.assertNotIn("::add-mask::", out)
 
-    def test_existing_track_is_success(self):
-        rc, out, requests = run(tracks_resp=store_error(409, "exists"))
+    def test_existing_track_409_is_success(self):
+        conflict = {"error-list": [{"code": "conflicting-tracks", "message": "Conflicting track exists: v11.20"}]}
+        rc, out, requests = run(tracks_resp=httpx.Response(409, json=conflict))
         self.assertEqual(rc, 0, out)
-        self.assertEqual(len(requests), 1)
+        self.assertEqual([r.url.path for r in requests], [TRACKS])
+        self.assertIn("Track v11.20 already exists.", out)
+
+    def test_conflicting_tracks_code_with_other_status_is_success(self):
+        rc, out, _ = run(
+            tracks_resp=httpx.Response(400, json={"error-list": [{"code": "conflicting-tracks", "message": "exists"}]})
+        )
+        self.assertEqual(rc, 0, out)
+        self.assertIn("already exists", out)
+
+    def test_conflicting_code_is_read_from_a_body_that_arrives_unread(self):
+        # Unlike a canned Response, a real one is streamed: .json() only works once the auth flow
+        # has been told to wait for the body (MacaroonAuth.requires_response_body).
+        body = json.dumps({"error-list": [{"code": "conflicting-tracks", "message": "exists"}]}).encode()
+        rc, out, _ = run(tracks_resp=httpx.Response(400, stream=httpx.ByteStream(body)))
+        self.assertEqual(rc, 0, out)
+        self.assertIn("already exists", out)
+
+    def test_other_error_code_with_other_status_is_failure(self):
+        self.assertFails(
+            run(tracks_resp=httpx.Response(400, json={"error-list": [{"code": "api-error", "message": "bad"}]})),
+            f"create-track {SNAP}/v11.20 failed:",
+            [TRACKS],
+        )
+
+    def test_existing_track_with_odd_body_is_success(self):
+        rc, out, _ = run(tracks_resp=httpx.Response(409, json=[1]))
+        self.assertEqual(rc, 0, out)
         self.assertIn("already exists", out)
 
     def test_usage(self):
         rc, out, requests = run(argv=["snap-create-track.py"])
         self.assertEqual((rc, requests), (1, []))
-        self.assertIn("usage:", out)
+        self.assertIn("usage: snap-create-track.py <snap-name> <track> | --check", out)
+
+    def test_dash_arguments_other_than_exact_check_are_usage(self):
+        for args in (["--check", "extra"], ["extra", "--check"], ["--bogus", "v11.20"], [SNAP, "-v"], ["--check=1"]):
+            with self.subTest(args=args):
+                rc, out, requests = run(argv=["snap-create-track.py", *args])
+                self.assertEqual((rc, requests), (1, []))
+                self.assertIn("usage:", out)
+                self.assertNotIn("Track ", out)
+
+    def test_expired_fails_fast_without_request(self):
+        out = self.assertFails(
+            run(creds=make_blob(expires="2026-10-01T00:00:00Z")),
+            f"create-track {SNAP}/v11.20: SNAPCRAFT_GATEWAY_CREDENTIALS expired on 2026-10-01",
+            [],
+        )
+        self.assertIn(sct.RENEW, out)
+
+    def test_near_expiry_warns_and_creates(self):
+        rc, out, requests = run(creds=make_blob(expires="2026-11-06T05:00:00Z"))
+        self.assertEqual((rc, [r.url.path for r in requests]), (0, [TRACKS]))
+        self.assertIn("::warning::SNAPCRAFT_GATEWAY_CREDENTIALS expires in 12 days", out)
+
+    def test_healthy_credential_prints_no_expiry_line(self):
+        rc, out, _ = run()
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("expires in", out)
+        self.assertNotIn("::warning::", out)
+
+    def test_unknown_expiry_still_creates(self):
+        rc, out, requests = run(creds=make_blob(expires=None))
+        self.assertEqual((rc, [r.url.path for r in requests]), (0, [TRACKS]))
+        self.assertIn("::warning::SNAPCRAFT_GATEWAY_CREDENTIALS has no time-before caveat", out)
+
+    def test_store_name_rule_400_is_reported(self):
+        out = self.assertFails(
+            run(tracks_resp=store_error(400, "'v1_' does not match '^[a-zA-Z0-9](?:[_.-]?[a-zA-Z0-9])*$' at /0/name")),
+            f"create-track {SNAP}/v11.20 failed:",
+            [TRACKS],
+        )
+        self.assertIn("does not match", out)
+
+    def test_create_forbidden_gets_hint(self):
+        out = self.assertFails(
+            run(tracks_resp=store_error(403, "nope")), f"create-track {SNAP}/v11.20 failed:", [TRACKS]
+        )
+        self.assertIn("can't manage this snap's tracks", out)
 
     def test_unset_creds_fail_fast(self):
-        self.assertFails(run(creds=None), "SNAPCRAFT_GATEWAY_CREDENTIALS is empty", [])
+        self.assertFails(run(creds=None), "SNAPCRAFT_GATEWAY_CREDENTIALS is empty or unset", [])
 
     def test_blank_creds_fail_fast(self):
-        self.assertFails(run(creds=" \n"), "SNAPCRAFT_GATEWAY_CREDENTIALS is empty", [])
+        self.assertFails(run(creds=" \n"), "SNAPCRAFT_GATEWAY_CREDENTIALS is empty or unset", [])
 
     def test_undecodable_creds_hide_content(self):
         out = self.assertFails(
@@ -262,12 +350,6 @@ class CreateTrackTest(unittest.TestCase):
             [TRACKS],
         )
 
-    def test_unauthorized_gets_hint(self):
-        out = self.assertFails(
-            run(tracks_resp=store_error(403, "nope")), f"create-track {SNAP}/v11.20 failed:", [TRACKS]
-        )
-        self.assertIn("can't manage this snap's tracks", out)
-
     def test_create_null_error_list(self):
         out = self.assertFails(
             run(tracks_resp=httpx.Response(422, json={"error-list": None})),
@@ -275,11 +357,6 @@ class CreateTrackTest(unittest.TestCase):
             [TRACKS],
         )
         self.assertNotIn("Traceback", out)
-
-    def test_existing_track_with_odd_body_is_success(self):
-        rc, out, _ = run(tracks_resp=httpx.Response(409, json=[1]))
-        self.assertEqual(rc, 0, out)
-        self.assertIn("already exists", out)
 
     def test_multiline_store_error_stays_one_annotation(self):
         two = httpx.Response(
@@ -298,6 +375,21 @@ class CreateTrackTest(unittest.TestCase):
         )
         self.assertNotIn("can't manage", out)
 
+    def test_create_never_prints_the_macaroon(self):
+        raw_token = json.loads(base64.b64decode(make_blob()))["v"]
+        variants = (
+            {},
+            {"tracks_resp": store_error(403, "nope")},
+            {"tracks_resp": HTML_502},
+            {"creds": make_blob(expires="2026-10-01T00:00:00Z")},
+            {"creds": make_blob(expires="2026-11-06T05:00:00Z")},
+        )
+        for kwargs in variants:
+            with self.subTest(kwargs=sorted(kwargs)):
+                _, out, _ = run(**kwargs)
+                self.assertNotIn(raw_token, out)
+                self.assertNotIn(kwargs.get("creds", make_blob()), out)
+
 
 class CheckTest(unittest.TestCase):
     def test_check_ok_prints_plain_lines(self):
@@ -309,6 +401,8 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(requests[0].headers["Authorization"], "Macaroon " + raw_token)
         self.assertIn("SNAPCRAFT_GATEWAY_CREDENTIALS expires in 364 days (2027-10-24)", out)
         self.assertIn("gateway accepts the credential (account giaever-online)", out)
+        # Expiry first, so a slow gateway can't hide it.
+        self.assertLess(out.index("expires in"), out.index("gateway accepts"))
         self.assertNotIn("::warning::", out)
         self.assertNotIn("::error::", out)
 
@@ -343,6 +437,15 @@ class CheckTest(unittest.TestCase):
             self.assertEqual(rc, 0, out)
             self.assertIn("gateway accepts the credential (account ?)", out)
             self.assertNotIn("::", out)
+
+    def test_check_whoami_odd_username_is_question_mark(self):
+        for username in (None, 42, "", ["a"], "line one\nline two", "cr\rhere"):
+            with self.subTest(username=username):
+                body = httpx.Response(200, json={"account": {"username": username}})
+                rc, out, _ = run(argv=check_argv, whoami_resp=body)
+                self.assertEqual(rc, 0, out)
+                self.assertIn("gateway accepts the credential (account ?)", out)
+                self.assertEqual(len([line for line in out.splitlines() if "gateway accepts" in line]), 1, out)
 
     def test_check_annotations_stay_one_line(self):
         rc, out, _ = run(argv=check_argv, whoami_resp=store_error(401, "line one\nline two 100%"))

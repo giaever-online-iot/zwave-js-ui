@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""Create a Snap Store version track with SNAPCRAFT_GATEWAY_CREDENTIALS.
+"""Create a Snap Store version track, and check the credential that does it.
 
 `snapcraft` has no create-track command, so this calls the publisher gateway through
-craft-store's PublisherGateway.create_tracks. The credential is a Candid macaroon for that
-gateway, written by store-gateway-login.py and presented to the gateway as it is: nothing
-is swapped for another token here. craft-store still owns the track call: name validation,
-error parsing and the num-tracks-created check stay Canonical's code rather than a copy of it.
+craft-store's PublisherGateway.create_tracks. The credential is the Candid macaroon in
+SNAPCRAFT_GATEWAY_CREDENTIALS, the file store-gateway-login.py writes; it is presented to the
+gateway as it is. craft-store still owns the track call: name validation, error parsing and
+the num-tracks-created check stay Canonical's code rather than a copy of it.
 
-Usage: snap-create-track.py <snap-name> <track>
-Exit:  0 = track created or already exists; 1 = failure, with a ::error:: explaining the cause.
+Usage:
+  snap-create-track.py <snap-name> <track>   strict: exit 0 = track created or already exists,
+                                             1 = any failure, with an ::error:: explaining the cause.
+                                             An expired credential fails before any request.
+  snap-create-track.py --check               credential health (expiry, then gateway whoami) as
+                                             annotations only; always exits 0, so it never blocks CI.
+
+A track already exists when the gateway answers 409 or reports the error code `conflicting-tracks`.
 """
 
 import base64
@@ -41,16 +47,20 @@ class TrackError(Exception):
 
 
 class MacaroonAuth(httpx.Auth):
-    """Gateway auth (`Macaroon <token>`); keeps the status craft-store's errors don't expose."""
+    """Gateway auth (`Macaroon <token>`); keeps the status and error codes craft-store's errors don't expose."""
+
+    requires_response_body = True  # so auth_flow can read the error codes
 
     def __init__(self, token: str) -> None:
         self._token = token
         self.status: int | None = None
+        self.codes: list[str] = []
 
     def auth_flow(self, request):
         request.headers["Authorization"] = f"Macaroon {self._token}"
         response = yield request
         self.status = response.status_code
+        self.codes = error_codes(response)
 
 
 def error_messages(resp: httpx.Response) -> str:
@@ -59,6 +69,14 @@ def error_messages(resp: httpx.Response) -> str:
         return "; ".join(str(e.get("message") or "?") for e in errors_list) or "no error-list"
     except (ValueError, AttributeError, TypeError):
         return "unparseable body"
+
+
+def error_codes(resp: httpx.Response) -> list[str]:
+    """The `error-list[*].code` values of a gateway error body; [] when there are none to read."""
+    try:
+        return [e["code"] for e in resp.json().get("error-list") or [] if isinstance(e.get("code"), str)]
+    except (ValueError, AttributeError, TypeError):
+        return []
 
 
 class Credential(NamedTuple):
@@ -80,15 +98,15 @@ def load_credential(blob: str) -> Credential:
         if obj["t"] != "macaroon" or not isinstance(obj["v"], str):
             raise ValueError("not a gateway macaroon credential")
         token = obj["v"]
-        expires = None
+        stamps = []
         for caveat in Macaroon.deserialize(token).caveats:
             # Raw bytes: third-party caveat ids are binary and would not decode.
             if caveat.caveat_id_bytes.startswith(EXPIRY_CAVEAT):
-                expires = datetime.fromisoformat(caveat.caveat_id_bytes.removeprefix(EXPIRY_CAVEAT).decode())
-                if expires.tzinfo is None:
-                    expires = expires.replace(tzinfo=timezone.utc)
-                expires = expires.astimezone(timezone.utc)
-                break
+                stamp = datetime.fromisoformat(caveat.caveat_id_bytes.removeprefix(EXPIRY_CAVEAT).decode())
+                if stamp.tzinfo is None:
+                    stamp = stamp.replace(tzinfo=timezone.utc)
+                stamps.append(stamp.astimezone(timezone.utc))
+        expires = min(stamps, default=None)  # every caveat must hold, so the earliest governs
     except Exception as exc:  # noqa: BLE001 — decode-only block: any failure means unreadable credentials
         # Type only: the message of a decode error can carry the decoded secret.
         raise TrackError(
@@ -112,7 +130,13 @@ def expiry_status(expires: datetime | None, now: datetime, warn_days: int = 30) 
 
 
 def create_track(snap: str, track: str, creds: str) -> None:
-    auth = MacaroonAuth(load_credential(creds).token)
+    credential = load_credential(creds)
+    level, message = expiry_status(credential.expires, utcnow())
+    if level == "error":
+        raise TrackError(f"create-track {snap}/{track}: {message}")
+    if level == "warning":
+        annotate("warning", message)
+    auth = MacaroonAuth(credential.token)
     gateway = PublisherGateway(GATEWAY, "snap", auth)
     try:
         created = gateway.create_tracks(snap, {"name": track})
@@ -120,7 +144,7 @@ def create_track(snap: str, track: str, creds: str) -> None:
         raise TrackError(f"create-track {snap}/{track}: store unreachable ({type(exc).__name__}).") from None
     # TypeError/AttributeError: craft-store's error parser chokes on an odd error-list shape.
     except (errors.CraftStoreError, TypeError, AttributeError) as exc:
-        if auth.status == 409:
+        if auth.status == 409 or "conflicting-tracks" in auth.codes:
             print(f"Track {track} already exists.")
             return
         detail = exc if isinstance(exc, errors.CraftStoreError) else f"HTTP {auth.status}, unparseable error body"
@@ -152,6 +176,9 @@ def whoami(token: str) -> tuple[str, str]:
             username = resp.json()["account"]["username"]
         except (ValueError, KeyError, TypeError):
             username = "?"
+        # Printed as a plain line, so it must be one non-empty line of text.
+        if not isinstance(username, str) or not username or "\r" in username or "\n" in username:
+            username = "?"
         return "ok", f"gateway accepts the credential (account {username})"
     detail = f"HTTP {status}: {error_messages(resp)}"
     if status in (401, 403):
@@ -161,7 +188,9 @@ def whoami(token: str) -> tuple[str, str]:
 
 def report(level: str, message: str) -> None:
     if level == "ok":
-        print(message, flush=True)  # flushed so it can't trail a later annotation on the unbuffered stderr
+        # Flushed: piped stdout is block-buffered, so an unflushed line could land after a later
+        # annotation on the line-buffered stderr.
+        print(message, flush=True)
     else:
         annotate(level, message)
 
@@ -184,7 +213,7 @@ def check(creds: str) -> int:
 def main(argv: list[str]) -> int:
     if argv[1:] == ["--check"]:
         return check(os.environ.get(ENV_VAR, ""))
-    if len(argv) != 3:
+    if len(argv) != 3 or any(arg.startswith("-") for arg in argv[1:]):
         print("usage: snap-create-track.py <snap-name> <track> | --check", file=sys.stderr)
         return 1
     snap, track = argv[1], argv[2]
