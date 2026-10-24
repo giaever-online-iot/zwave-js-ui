@@ -33,6 +33,7 @@ RENEW = (
     f"then `gh secret set {ENV_VAR} < gateway.creds`"
 )
 EXPIRY_CAVEAT = b"time-before "
+NOT_VERIFIED = "credential not verified — not a credentials problem"
 
 
 class TrackError(Exception):
@@ -132,18 +133,66 @@ def create_track(snap: str, track: str, creds: str) -> None:
     print(f"Track {track} created (num-tracks-created={created}).")
 
 
+def annotate(level: str, message: str) -> None:
+    """Print one GitHub workflow command; it ends at the first newline, so escape %, CR and LF."""
+    message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    print(f"::{level}::{message}", file=sys.stderr)
+
+
+def whoami(token: str) -> tuple[str, str]:
+    """Ask the gateway whose credential this is: ("ok" | "warning" | "error", message)."""
+    try:
+        with httpx.Client(timeout=TIMEOUT_S) as client:
+            resp = client.get(f"{GATEWAY}/v1/tokens/whoami", auth=MacaroonAuth(token))
+    except httpx.HTTPError as exc:
+        return "warning", f"gateway whoami failed ({type(exc).__name__}); {NOT_VERIFIED}"
+    status = resp.status_code
+    if status == 200:
+        try:
+            username = resp.json()["account"]["username"]
+        except (ValueError, KeyError, TypeError):
+            username = "?"
+        return "ok", f"gateway accepts the credential (account {username})"
+    detail = f"HTTP {status}: {error_messages(resp)}"
+    if status in (401, 403):
+        return "error", f"gateway rejected {ENV_VAR} ({detail}) — {RENEW}"
+    return "warning", f"gateway whoami failed ({detail}); {NOT_VERIFIED}"
+
+
+def report(level: str, message: str) -> None:
+    if level == "ok":
+        print(message, flush=True)  # flushed so it can't trail a later annotation on the unbuffered stderr
+    else:
+        annotate(level, message)
+
+
+def check(creds: str) -> int:
+    """Credential health for CI: expiry, then whoami. Annotations only, so it always returns 0."""
+    if not creds.strip():
+        annotate("warning", f"{ENV_VAR} is not set in this context; skipping the gateway credential check")
+        return 0
+    try:
+        credential = load_credential(creds)
+    except TrackError as exc:
+        annotate("error", str(exc))
+        return 0
+    report(*expiry_status(credential.expires, utcnow()))  # before the request, so a slow gateway can't hide it
+    report(*whoami(credential.token))
+    return 0
+
+
 def main(argv: list[str]) -> int:
+    if argv[1:] == ["--check"]:
+        return check(os.environ.get(ENV_VAR, ""))
     if len(argv) != 3:
-        print("usage: snap-create-track.py <snap-name> <track>", file=sys.stderr)
+        print("usage: snap-create-track.py <snap-name> <track> | --check", file=sys.stderr)
         return 1
     snap, track = argv[1], argv[2]
     creds = os.environ.get(ENV_VAR, "")
     try:
         create_track(snap, track, creds)
     except TrackError as exc:
-        # A workflow command ends at the first newline; craft-store messages can span several.
-        message = str(exc).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-        print(f"::error::{message}", file=sys.stderr)
+        annotate("error", str(exc))  # craft-store messages can span several lines
         return 1
     return 0
 

@@ -36,6 +36,7 @@ WHOAMI = "/v1/tokens/whoami"
 CREATED = httpx.Response(201, json={"num-tracks-created": 1})
 WHOAMI_OK = httpx.Response(200, json={"account": {"username": "giaever-online"}})
 HTML_502 = httpx.Response(502, text="<html>Bad Gateway</html>")
+check_argv = ["snap-create-track.py", "--check"]
 
 
 def store_error(status, message):
@@ -296,6 +297,105 @@ class CreateTrackTest(unittest.TestCase):
             run(tracks_resp=store_error(500, "oops")), f"create-track {SNAP}/v11.20 failed:", [TRACKS]
         )
         self.assertNotIn("can't manage", out)
+
+
+class CheckTest(unittest.TestCase):
+    def test_check_ok_prints_plain_lines(self):
+        rc, out, requests = run(argv=check_argv)
+        self.assertEqual(rc, 0, out)
+        self.assertEqual([r.url.path for r in requests], [WHOAMI])
+        # The expected header is derived from the raw blob, not from the code under test.
+        raw_token = json.loads(base64.b64decode(make_blob()))["v"]
+        self.assertEqual(requests[0].headers["Authorization"], "Macaroon " + raw_token)
+        self.assertIn("SNAPCRAFT_GATEWAY_CREDENTIALS expires in 364 days (2027-10-24)", out)
+        self.assertIn("gateway accepts the credential (account giaever-online)", out)
+        self.assertNotIn("::warning::", out)
+        self.assertNotIn("::error::", out)
+
+    def test_check_near_expiry_warns(self):
+        rc, out, _ = run(argv=check_argv, creds=make_blob(expires="2026-11-06T05:00:00Z"))
+        self.assertEqual(rc, 0)
+        self.assertIn(f"::warning::SNAPCRAFT_GATEWAY_CREDENTIALS expires in 12 days (2026-11-06) — {sct.RENEW}", out)
+
+    def test_check_expired_is_error_but_exit_zero(self):
+        rc, out, requests = run(argv=check_argv, creds=make_blob(expires="2026-10-01T00:00:00Z"))
+        self.assertEqual(rc, 0)
+        self.assertIn("::error::SNAPCRAFT_GATEWAY_CREDENTIALS expired on 2026-10-01", out)
+        self.assertEqual(len(requests), 1)
+
+    def test_check_whoami_401_is_error(self):
+        rc, out, _ = run(argv=check_argv, whoami_resp=store_error(401, "macaroon expired"))
+        self.assertEqual(rc, 0)
+        self.assertIn(
+            f"::error::gateway rejected SNAPCRAFT_GATEWAY_CREDENTIALS (HTTP 401: macaroon expired) — {sct.RENEW}", out
+        )
+
+    def test_check_whoami_403_is_error(self):
+        rc, out, _ = run(argv=check_argv, whoami_resp=store_error(403, "forbidden"))
+        self.assertEqual(rc, 0)
+        self.assertIn(
+            f"::error::gateway rejected SNAPCRAFT_GATEWAY_CREDENTIALS (HTTP 403: forbidden) — {sct.RENEW}", out
+        )
+
+    def test_check_whoami_without_username_still_ok(self):
+        for body in (httpx.Response(200, json={}), httpx.Response(200, text="not json"), httpx.Response(200, json=[1])):
+            rc, out, _ = run(argv=check_argv, whoami_resp=body)
+            self.assertEqual(rc, 0, out)
+            self.assertIn("gateway accepts the credential (account ?)", out)
+            self.assertNotIn("::", out)
+
+    def test_check_annotations_stay_one_line(self):
+        rc, out, _ = run(argv=check_argv, whoami_resp=store_error(401, "line one\nline two 100%"))
+        self.assertEqual(rc, 0)
+        annotations = [line for line in out.splitlines() if line.startswith("::")]
+        self.assertEqual(len(annotations), 1, out)
+        self.assertIn("HTTP 401: line one%0Aline two 100%25)", annotations[0])
+
+    def test_check_never_prints_the_macaroon(self):
+        raw_token = json.loads(base64.b64decode(make_blob()))["v"]
+        for kwargs in ({}, {"whoami_resp": store_error(401, "no")}, {"whoami_resp": HTML_502}):
+            rc, out, _ = run(argv=check_argv, **kwargs)
+            self.assertNotIn(raw_token, out)
+            self.assertNotIn(make_blob(), out)
+
+    def test_check_without_expiry_caveat_warns_and_still_asks_gateway(self):
+        rc, out, requests = run(argv=check_argv, creds=make_blob(expires=None))
+        self.assertEqual((rc, len(requests)), (0, 1))
+        self.assertIn("::warning::SNAPCRAFT_GATEWAY_CREDENTIALS has no time-before caveat", out)
+
+    def test_check_blank_is_warning_exit_zero(self):
+        rc, out, requests = run(argv=check_argv, creds=" \n")
+        self.assertEqual((rc, requests), (0, []))
+        self.assertIn("::warning::SNAPCRAFT_GATEWAY_CREDENTIALS is not set in this context", out)
+
+    def test_check_with_extra_args_is_usage(self):
+        rc, out, requests = run(argv=["snap-create-track.py", "--check", "extra", "more"])
+        self.assertEqual((rc, requests), (1, []))
+        self.assertIn("usage: snap-create-track.py <snap-name> <track> | --check", out)
+
+    def test_check_whoami_outage_is_warning(self):
+        rc, out, _ = run(argv=check_argv, whoami_resp=httpx.ConnectError("down"))
+        self.assertEqual(rc, 0)
+        self.assertIn(
+            "::warning::gateway whoami failed (ConnectError); credential not verified — not a credentials problem",
+            out,
+        )
+
+    def test_check_whoami_502_is_warning(self):
+        rc, out, _ = run(argv=check_argv, whoami_resp=HTML_502)
+        self.assertEqual(rc, 0)
+        self.assertIn("::warning::gateway whoami failed (HTTP 502: unparseable body); credential not verified", out)
+
+    def test_check_unset_is_warning_exit_zero(self):
+        rc, out, requests = run(argv=check_argv, creds=None)
+        self.assertEqual((rc, requests), (0, []))
+        self.assertIn("::warning::SNAPCRAFT_GATEWAY_CREDENTIALS is not set in this context", out)
+
+    def test_check_undecodable_is_error_exit_zero(self):
+        rc, out, requests = run(argv=check_argv, creds=base64.b64encode(b"\xffsecret").decode())
+        self.assertEqual((rc, requests), (0, []))
+        self.assertIn("::error::could not read SNAPCRAFT_GATEWAY_CREDENTIALS", out)
+        self.assertNotIn("secret", out)
 
 
 if __name__ == "__main__":
