@@ -81,10 +81,22 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+      SNAPCRAFT_GATEWAY_CREDENTIALS: ${{ secrets.SNAPCRAFT_GATEWAY_CREDENTIALS }}
     steps:
       - uses: actions/checkout@v7
       - name: Install snapcraft
         run: sudo snap install snapcraft --classic
+      - name: Install store client
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/venv"
+          .github/scripts/retry.sh 3 15 -- "$RUNNER_TEMP/venv/bin/pip" install -q --require-hashes -r .github/scripts/requirements-store.txt \
+            || { echo "::error::could not install the store client (pip, requirements-store.txt) — not a credentials problem."; exit 1; }
+      - name: Credential health (annotations only)
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/venv/bin/python" .github/scripts/snap-create-track.py --check
+          { snapcraft whoami 2>/dev/null || true; } | bash .github/scripts/store-login-expiry.sh SNAPCRAFT_STORE_CREDENTIALS 30
       - name: Ensure version track exists
         run: |
           set -euo pipefail
@@ -94,10 +106,7 @@ jobs:
             echo "Track $TRACK already exists."
             exit 0
           fi
-          python3 -m venv "$RUNNER_TEMP/venv"
-          .github/scripts/retry.sh 3 15 -- "$RUNNER_TEMP/venv/bin/pip" install -q --require-hashes -r .github/scripts/requirements-store.txt \
-            || { echo "::error::could not install the store client (pip, requirements-store.txt) — not a credentials problem."; exit 1; }
-          # A 409 (track appeared meanwhile) exits 0, so retrying a half-done create is safe.
+          # "track exists" (409/conflicting-tracks) exits 0, so retrying a half-done create is safe.
           .github/scripts/retry.sh 3 15 -- "$RUNNER_TEMP/venv/bin/python" .github/scripts/snap-create-track.py "$SNAP_NAME" "$TRACK"
 
   # One job per arch that BUILDS *and* PUBLISHES, so each arch ships the moment its
@@ -241,13 +250,13 @@ jobs:
           PUBLISHED="$(ls markers/ 2>/dev/null | sed -n 's/^uploaded-//p' | paste -sd, - || true)"
           BODY="${RUNNER_TEMP}/comment.md"
           SNAP_NAME="$SNAP_NAME" .github/scripts/pr-comment.sh "$CHAN" "$WANTED" "$PUBLISHED" > "$BODY"
-          # When the track couldn't be ensured (e.g. expired SNAPCRAFT_STORE_CREDENTIALS),
+          # When the track couldn't be ensured (e.g. expired SNAPCRAFT_GATEWAY_CREDENTIALS),
           # uploads are skipped even though builds may have succeeded — say so explicitly
           # rather than letting the comment read like a build failure.
           if [ "${{ needs.ensure-track.result }}" != "success" ]; then
             {
               echo
-              echo '⚠️ Release was blocked: the version track could not be ensured (see the **ensure-track** job — e.g. expired `SNAPCRAFT_STORE_CREDENTIALS`). Builds may have succeeded; fix the cause and use "Re-run failed jobs".'
+              echo '⚠️ Release was blocked: the version track could not be ensured (see the **ensure-track** job — e.g. expired `SNAPCRAFT_GATEWAY_CREDENTIALS`; run `.github/scripts/store-gateway-login.py` to renew). Builds may have succeeded; fix the cause and use "Re-run failed jobs".'
             } >> "$BODY"
           fi
           # Fold the build log into the comment only when nothing was published.
