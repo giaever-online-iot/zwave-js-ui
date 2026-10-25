@@ -13,7 +13,13 @@ warn_days="${2:?usage: store-login-expiry.sh <label> <warn-days>}"
 now="${NOW_EPOCH:-$(date -u +%s)}"
 hint="refresh it with \`snapcraft export-login\`"
 
-line="$(grep -m1 '^expires:' || true)"
+input="$(cat)"
+if [[ -z $input ]]; then
+  # `snapcraft whoami` fails with no output when the login is expired or rejected.
+  echo "::warning::$label: snapcraft whoami printed nothing (login expired or rejected?)"
+  exit 0
+fi
+line="$(grep -m1 '^expires:' <<<"$input" || true)"
 read -r _ expires <<<"$line"
 
 # Require a leading ISO date: GNU date also accepts "", "now", "tomorrow" ...

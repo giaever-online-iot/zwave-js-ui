@@ -12,6 +12,9 @@ actionlint
 login
 # Gateway credentials written by .github/scripts/store-gateway-login.py (live publisher macaroons)
 *.creds
+# Python bytecode and the local venv for the store helpers (see store-gateway-login.py)
+__pycache__/
+.venv-store/
 
 # Claude Code local state (settings, worktrees, logs)
 .claude/

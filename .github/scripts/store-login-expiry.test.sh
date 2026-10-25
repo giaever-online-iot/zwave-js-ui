@@ -45,6 +45,25 @@ EOT
 check "expired: error annotation"       "::error::store login expired on 2026-10-01 — refresh it with \`snapcraft export-login\`" "$out"
 check "expired: exit 0"                 "0" "$rc"
 
+# Expired by only an hour: left < 0 but days (left/86400) truncates to 0, so a
+# "days < 0" test would wrongly call it a 0-days-left warning.
+out="$("$EXPIRY" "store login" 30 <<EOT
+$FIX
+expires: 2026-10-24T23:00:00Z
+EOT
+)"; rc=$?
+check "expired 1h ago: error annotation" "::error::store login expired on 2026-10-24 — refresh it with \`snapcraft export-login\`" "$out"
+check "expired 1h ago: exit 0"          "0" "$rc"
+
+# Exactly the threshold (30 days left, warn at <30): a plain line, not a warning.
+out="$("$EXPIRY" "store login" 30 <<EOT
+$FIX
+expires: 2026-11-24T00:00:00Z
+EOT
+)"; rc=$?
+check "exactly 30 days: plain line"     "store login expires in 30 days (2026-11-24)" "$out"
+check "exactly 30 days: exit 0"         "0" "$rc"
+
 out="$("$EXPIRY" "store login" 30 <<EOT
 $FIX
 EOT
@@ -59,6 +78,10 @@ EOT
 )"; rc=$?
 check "unparseable expires: warning"    "::warning::store login: could not read the expiry from snapcraft whoami" "$out"
 check "unparseable expires: exit 0"     "0" "$rc"
+
+out="$(printf '' | "$EXPIRY" "store login" 30)"; rc=$?
+check "empty stdin: warning"            "::warning::store login: snapcraft whoami printed nothing (login expired or rejected?)" "$out"
+check "empty stdin: exit 0"             "0" "$rc"
 
 [ "$fail" -eq 0 ] && echo "All store-login-expiry tests passed." || echo "Some store-login-expiry tests FAILED."
 exit "$fail"
