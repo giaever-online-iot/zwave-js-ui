@@ -1,8 +1,9 @@
 name: Helper tests
 
 # Guards the CI helpers (snap version/channel math; the retry-fetch remote-build
-# wrapper; store track creation + credential health). The last step also reports
-# the gateway credential's health as annotations only — it never fails the job.
+# wrapper; store track creation + credential health; the store lock's header, which
+# Renovate re-runs). The last step also reports the gateway credential's health as
+# annotations only — it never fails the job.
 # Runs on every PR (seconds) so `test` can be a required status check — a
 # path-filtered workflow that never starts would leave the check "expected"
 # forever and deadlock auto-merge on PRs that don't touch its paths.
