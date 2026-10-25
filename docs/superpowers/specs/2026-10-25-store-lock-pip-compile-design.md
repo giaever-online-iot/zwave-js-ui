@@ -37,6 +37,7 @@ packages coming through a weekly lock refresh.
 | uv changelog | Relative `exclude-newer` durations since 0.9.17; documented and tested for `uv pip` in 0.11.16. |
 | Renovate's rule engine (`applyPackageRules`, 44.181.5) on the refresh update (2026-10-26) | Manager-wide age rule: the refresh gets `minimumReleaseAge: 7 days`, and the branch worker (`update/branch/index.js`) sets an update without a `releaseTimestamp` to stability `yellow` under the default `timestamp-required`. Age rule scoped to major/minor/patch: refresh gets `automerge: true` and no age; a craft-store minor gets both; a major gets the age only. |
 | Renovate's `updateArtifacts` / `constructPipCompileCmd` | Direct and lock-file-maintenance updates run the header's argv verbatim (maintenance deletes the lock first); `--upgrade-package=` is appended only for indirect lock updates, which stay disabled (D4). So the header survives every update this design produces. |
+| Renovate 44.181.5 `workers/repository/update/pr/index.js` on a failed uv run | Forces a PR open on artifact errors (`:93-95`) and arms platform automerge from config alone (`:28`) — the basis for the pin check in D7 (F1). |
 
 Not verified locally: the hosted Mend app running uv (artifacts are not generated in a
 local dry run), and an out-of-range bump of the pinned `craft-store==3.4.0` (none is
@@ -132,7 +133,10 @@ Mutation-tested: restoring today's header must make it fail. It runs in `helper-
 (the required `test` check), which already runs every `.github/scripts/*.test.sh`.
 It also rejects any option Renovate's parser does not accept for uv (the lists in
 `lib/modules/manager/pip-compile/common.ts`, 44.181.5), because those stall Renovate
-the same way (planner's call, 2026-10-26).
+the same way (planner's call, 2026-10-26). It also fails when an exact `name==version`
+pin in the `.in` is missing from the lock (names PEP 503-normalized). *Added 2026-10-26
+after the final review (F1): a craft-store PR whose uv run failed would otherwise
+automerge an `.in`-only change.*
 
 **D8. Docs follow the change.**
 - The recipe comment in `requirements-store.in`.
@@ -140,7 +144,9 @@ the same way (planner's call, 2026-10-26).
   `.txt` and the `.in` pin must be brought up by hand. It will say:
   - The lock is pip-compile-managed and refreshed weekly by uv.
   - Every package must be 7 days old, manual regenerations included.
-  - An urgent fix younger than 7 days needs a deliberate header change.
+  - An urgent fix younger than 7 days uses a per-package `--exclude-newer-package`
+    override in the recipe and header, removed once 7 days old; the lock is never
+    hand-edited.
   - craft-store bumps edit the `.in`, and its majors are manual.
 
 **D9. Acceptance after merge (the deploy step).**
@@ -149,8 +155,12 @@ the same way (planner's call, 2026-10-26).
 - At the next Monday window, or earlier if the dashboard checkbox is ticked, the refresh
   PR changes only package entries (header unchanged, no duplicates, no pre-release),
   `test` passes, and it merges itself.
-- If the hosted app reports an artifact error instead, nothing merges (the `test` gate
-  still applies), and the result goes back to Joachim before any further change.
+- A refresh whose uv run fails commits nothing, so no refresh PR appears: no refresh PR
+  after the Monday window, or after ticking the dashboard checkbox, is the failure
+  signal. Then read the run's log on developer.mend.io and take the result to Joachim
+  before any further change.
+- A craft-store PR whose uv run fails is opened anyway, with an artifact-error comment
+  and auto-merge armed, and the guard's pin check fails `test`, so it cannot merge.
 
 ## Alternative rejected: per-package indirect updates
 

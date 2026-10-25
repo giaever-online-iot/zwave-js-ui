@@ -341,5 +341,9 @@ Expected: no output from status. The log shows the spec commits plus the two tas
 The spec's D9 acceptance runs after Joachim merges. Renovate closes #251 and #252. The
 Dependency Dashboard (#16) shows the pip-compile refresh awaiting schedule. The first
 refresh PR changes only package entries (header unchanged, no duplicates, no
-pre-releases), passes `test` and merges itself. On an artifact error nothing merges, and
-the result goes back to Joachim.
+pre-releases), passes `test` and merges itself. Two failure signals:
+- No refresh PR after the Monday window, or after ticking the dashboard checkbox: the uv
+  run failed and committed nothing. Read the run's log on developer.mend.io and take it
+  to Joachim before any further change.
+- A craft-store PR opened with an artifact-error comment and auto-merge armed: the
+  guard's pin check fails `test`, so it cannot merge.
