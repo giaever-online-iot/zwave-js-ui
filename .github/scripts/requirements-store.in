@@ -6,6 +6,8 @@
 # must stay in the form Renovate parses: long options, --opt=value, no -o
 # (requirements-store.test.sh checks it). --exclude-newer=P7D makes uv skip
 # anything uploaded in the last 7 days, for Renovate and manual runs alike.
+# For a younger fix, add --exclude-newer-package=NAME=TIME to the recipe and re-run
+# it (see CLAUDE.md); never hand-edit the lock.
 # Lock into requirements-store.txt with:
 #   uv pip compile --universal --python-version=3.12 --exclude-newer=P7D \
 #     --generate-hashes --output-file=.github/scripts/requirements-store.txt \
