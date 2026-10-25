@@ -203,7 +203,8 @@ class ExpiryStatusTest(unittest.TestCase):
     def test_renew_hint_text(self):
         self.assertEqual(
             sct.RENEW,
-            "renew: run .github/scripts/store-gateway-login.py locally (tap the Candid link on your phone), "
+            "renew: run `.github/scripts/store-gateway-login.py gateway.creds` locally with the venv from its header "
+            "(tap the Candid link on your phone), "
             "then `gh secret set SNAPCRAFT_GATEWAY_CREDENTIALS < gateway.creds`",
         )
 

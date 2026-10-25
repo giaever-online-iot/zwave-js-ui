@@ -6,10 +6,11 @@ feeds the SNAPCRAFT_GATEWAY_CREDENTIALS repo secret, which snap-create-track.py 
 gateway.
 
 Renewal, about once a year (snap-create-track.py --check warns 30 days ahead):
-  1. Use a venv with the store client: pip install --require-hashes -r .github/scripts/requirements-store.txt
-  2. Run:  .github/scripts/store-gateway-login.py gateway.creds   (*.creds is gitignored)
+  1. Make a venv with the store client:
+       python3 -m venv .venv-store && .venv-store/bin/pip install --require-hashes -r .github/scripts/requirements-store.txt
+  2. Run:  .venv-store/bin/python .github/scripts/store-gateway-login.py gateway.creds   (*.creds is gitignored)
   3. Tap the Candid link it prints, on any device, and sign in with Ubuntu One.
-  4. Run the `gh secret set` command it then prints.
+  4. Run the `gh secret set` command it then prints, then delete the local copy (`shred -u`).
 
 craft-store prints the login URL itself and also tries to open it through Python's `webbrowser`,
 which honours $BROWSER; point $BROWSER at a stand-in script to capture the URL instead of opening
@@ -75,6 +76,7 @@ def main(argv: list[str]) -> int:
         out.write(login())
     print(f"Credential written to {path} (0600; valid 365 days). Set the repo secret with:")
     print(f"  gh secret set {SECRET} --repo {REPO} < {shlex.quote(path)}")
+    print(f"Then delete the local copy: shred -u {shlex.quote(path)}")
     return 0
 
 

@@ -18,6 +18,7 @@ sgl = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sgl)
 
 GH_SET = "  gh secret set SNAPCRAFT_GATEWAY_CREDENTIALS --repo giaever-online-iot/zwave-js-ui < "
+SHRED = "Then delete the local copy: shred -u "
 
 
 def fake_client(calls):
@@ -72,7 +73,8 @@ class LoginHelperTest(unittest.TestCase):
         self.assertEqual(lines[0], "Starting the Candid login; craft-store prints the URL to open (tap it on your phone and sign in with Ubuntu One).")
         self.assertEqual(lines[1], f"Credential written to {path} (0600; valid 365 days). Set the repo secret with:")
         self.assertEqual(lines[2], GH_SET + shlex.quote(path))
-        self.assertEqual(len(lines), 3)
+        self.assertEqual(lines[3], SHRED + shlex.quote(path))
+        self.assertEqual(len(lines), 4)
         self.assertNotIn("BLOB-NEVER-PRINTED", out)
 
     def test_printed_command_quotes_a_path_with_spaces(self):
@@ -82,6 +84,7 @@ class LoginHelperTest(unittest.TestCase):
             code, out, _ = run_main(path, {})
         self.assertEqual(code, 0)
         self.assertEqual(out.splitlines()[2], GH_SET + shlex.quote(path))
+        self.assertEqual(out.splitlines()[3], SHRED + shlex.quote(path))
 
     def test_overwrite_replaces_content_and_tightens_mode(self):
         with tempfile.TemporaryDirectory() as d:

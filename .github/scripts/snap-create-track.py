@@ -35,7 +35,8 @@ TIMEOUT_S = 60.0
 
 ENV_VAR = "SNAPCRAFT_GATEWAY_CREDENTIALS"
 RENEW = (
-    "renew: run .github/scripts/store-gateway-login.py locally (tap the Candid link on your phone), "
+    "renew: run `.github/scripts/store-gateway-login.py gateway.creds` locally with the venv from its header "
+    "(tap the Candid link on your phone), "
     f"then `gh secret set {ENV_VAR} < gateway.creds`"
 )
 EXPIRY_CAVEAT = b"time-before "
