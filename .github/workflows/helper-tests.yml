@@ -44,7 +44,14 @@ jobs:
             "$RUNNER_TEMP/store-venv/bin/python" "$t" || exit 1
           done
 
+      # Annotations only: a script crash shows as a red step but never blocks the job.
+      # Skipped for bot PRs: Renovate can bump requirements-store.txt, and this step would run
+      # that freshly bumped third-party code with the secret before anyone looked at it. Bot
+      # *build* PRs still get the check in ensure-track (pr-build-snap.yml), which only runs
+      # on snap/src changes.
       - name: Store gateway credential health (annotations only)
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.user.type != 'Bot' }}
+        continue-on-error: true
         env:
           SNAPCRAFT_GATEWAY_CREDENTIALS: ${{ secrets.SNAPCRAFT_GATEWAY_CREDENTIALS }}
         run: |

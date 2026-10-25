@@ -74,7 +74,8 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   # Runs in parallel with the builds: it only needs the track NAME, so a failed
-  # build never blocks or skips it. Idempotent (the script checks existence first).
+  # build never blocks or skips it. Idempotent: the step checks existence first
+  # (`snapcraft tracks`), and the script treats 409/`conflicting-tracks` as "exists".
   ensure-track:
     needs: meta
     if: ${{ github.event_name == 'pull_request' }}
@@ -92,7 +93,9 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/venv"
           .github/scripts/retry.sh 3 15 -- "$RUNNER_TEMP/venv/bin/pip" install -q --require-hashes -r .github/scripts/requirements-store.txt \
             || { echo "::error::could not install the store client (pip, requirements-store.txt) — not a credentials problem."; exit 1; }
+      # Annotations only: a crash shows as a red step but never blocks the job.
       - name: Credential health (annotations only)
+        continue-on-error: true
         run: |
           set -euo pipefail
           "$RUNNER_TEMP/venv/bin/python" .github/scripts/snap-create-track.py --check
