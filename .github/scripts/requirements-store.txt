@@ -594,9 +594,9 @@ pynacl==1.6.2 \
     # via
     #   macaroonbakery
     #   pymacaroons
-pyrfc3339==1.1 \
-    --hash=sha256:67196cb83b470709c580bb4738b83165e67c6cc60e1f2e4f286cfcb402a926f4 \
-    --hash=sha256:81b8cbe1519cdb79bed04910dd6fa4e181faf8c88dff1e1b987b5f7ab23a5b1a
+pyRFC3339==2.1.1 \
+    --hash=sha256:4973172cb8b29c14caca7f76e6a52890d9e59ec2722dd5eb29b7fdd9fda2232f \
+    --hash=sha256:b144d63819bd4c1ebf9cb57e12f4cba567fcf23d6e8f2f829ba9c7810ea4b951
     # via macaroonbakery
 pytz==2026.5 \
     --hash=sha256:e658af3757f9e26a9d25dd2aff38335acd92bc9104f890a894b2c1ba28311b03 \
