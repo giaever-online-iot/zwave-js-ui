@@ -1,8 +1,10 @@
 name: Helper tests
 
 # Guards the CI helpers (snap version/channel math; the retry-fetch remote-build
-# wrapper). Runs on every PR (seconds) so `test` can be a required status check —
-# a path-filtered workflow that never starts would leave the check "expected"
+# wrapper; store track creation + credential health). The last step also reports
+# the gateway credential's health as annotations only — it never fails the job.
+# Runs on every PR (seconds) so `test` can be a required status check — a
+# path-filtered workflow that never starts would leave the check "expected"
 # forever and deadlock auto-merge on PRs that don't touch its paths.
 on:
   pull_request:
@@ -28,3 +30,29 @@ jobs:
             echo "== $t"
             bash "$t" || exit 1
           done
+
+      - name: Install store client
+        run: |
+          python3 -m venv "$RUNNER_TEMP/store-venv"
+          .github/scripts/retry.sh 3 15 -- "$RUNNER_TEMP/store-venv/bin/pip" install -q --require-hashes -r .github/scripts/requirements-store.txt \
+            || { echo "::error::could not install the store client (pip, requirements-store.txt)."; exit 1; }
+
+      - name: Run store-client helper unit tests
+        run: |
+          for t in .github/scripts/*.test.py; do
+            echo "== $t"
+            "$RUNNER_TEMP/store-venv/bin/python" "$t" || exit 1
+          done
+
+      # Annotations only: a script crash shows as a red step but never blocks the job.
+      # Skipped for bot PRs: Renovate can bump requirements-store.txt, and this step would run
+      # that freshly bumped third-party code with the secret before anyone looked at it. Bot
+      # *build* PRs still get the check in ensure-track (pr-build-snap.yml), which only runs
+      # on snap/src changes.
+      - name: Store gateway credential health (annotations only)
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.user.type != 'Bot' }}
+        continue-on-error: true
+        env:
+          SNAPCRAFT_GATEWAY_CREDENTIALS: ${{ secrets.SNAPCRAFT_GATEWAY_CREDENTIALS }}
+        run: |
+          "$RUNNER_TEMP/store-venv/bin/python" .github/scripts/snap-create-track.py --check
