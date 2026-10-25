@@ -3,6 +3,14 @@
   "extends": [
     "config:recommended"
   ],
+  "constraints": {
+    "uv": ">=0.11.16"
+  },
+  "pip-compile": {
+    "managerFilePatterns": [
+      "/^\\.github/scripts/requirements-store\\.txt$/"
+    ]
+  },
   "customManagers": [
     {
       "customType": "regex",
@@ -76,23 +84,47 @@
       ]
     },
     {
-      "description": "Store client lock: CI-only, but it runs next to the live store credentials, so take a release only once it is 7 days old. Grouped into one PR; minor/patch automerge once the required helper tests (`test`: --require-hashes install + unit tests) pass. Majors stay manual.",
+      "description": "The pip-compile manager owns the store client lock; pip_requirements' hash refresher (hashin) mangles entries uv spells differently from PyPI (pydantic-core, jaraco-*), #251.",
       "matchManagers": [
         "pip_requirements"
       ],
       "matchFileNames": [
         ".github/scripts/requirements-store.txt"
       ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
+      "enabled": false
+    },
+    {
+      "description": "The store client lock is CI-only but runs next to the live store credentials, and uv re-runs the header command for every change.",
+      "matchManagers": [
+        "pip-compile"
       ],
-      "groupName": "store client",
-      "minimumReleaseAge": "7 days",
-      "automerge": true,
       "labels": [
         "dependencies"
       ]
+    },
+    {
+      "description": "A craft-store release (the .in pin) is taken once it is 7 days old, the header's --exclude-newer=P7D cutoff. The rule is not on lockFileMaintenance: that update has no release timestamp, so an age rule would leave the weekly refresh pending forever; uv's cutoff ages it instead.",
+      "matchManagers": [
+        "pip-compile"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch"
+      ],
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "craft-store minor/patch and the weekly lock refresh automerge once the required `test` check passes (--require-hashes install + unit tests). The refresh re-resolves every transitive package, majors included (Joachim, 2026-10-25). craft-store majors stay manual.",
+      "matchManagers": [
+        "pip-compile"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "lockFileMaintenance"
+      ],
+      "automerge": true
     },
     {
       "description": "duplicity (+ python-gettext) ship in the snap. The build installs them but never runs them, and duplicity's runtime deps come from debs pip does not check, so only patch releases automerge, on a green build, once 7 days old.",
