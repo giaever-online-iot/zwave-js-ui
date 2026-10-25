@@ -12,6 +12,9 @@ name: Auto-merge collaborator PRs
 # armed it, and events caused by GITHUB_TOKEN never trigger other workflows —
 # a github-actions[bot] merge would silently skip release-on-merge (the store
 # promotion). With a maintainer PAT the merge fires it like a manual merge.
+# If the secret is unset, the job passes with a notice and the PR waits for a
+# manual merge: `arm` is not a required check, and a red X on every
+# collaborator PR read as a broken build.
 
 on:
   pull_request:
@@ -34,8 +37,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${GH_TOKEN}" ]; then
-            echo "::error::AUTOMERGE_TOKEN is not set; cannot arm auto-merge. Do not fall back to GITHUB_TOKEN — a github-actions[bot] merge would not trigger release-on-merge."
-            exit 1
+            echo "::notice::AUTOMERGE_TOKEN is not set; auto-merge not armed, merge this PR by hand. Do not fall back to GITHUB_TOKEN — a github-actions[bot] merge would not trigger release-on-merge."
+            exit 0
           fi
           # If every required check already passed by the time this runs, the PR
           # is in "clean status" and arming is rejected — merge directly instead.
