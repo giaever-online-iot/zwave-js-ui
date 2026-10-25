@@ -74,6 +74,56 @@
       "prBodyNotes": [
         "This PR updates the version of zwave-js-ui in the snapcraft.yaml file to match the latest GitHub release."
       ]
+    },
+    {
+      "description": "Store client lock: CI-only, but it runs next to the live store credentials, so take a release only once it is 7 days old. Grouped into one PR; minor/patch automerge once the required helper tests (`test`: --require-hashes install + unit tests) pass. Majors stay manual.",
+      "matchManagers": [
+        "pip_requirements"
+      ],
+      "matchFileNames": [
+        ".github/scripts/requirements-store.txt"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "store client",
+      "minimumReleaseAge": "7 days",
+      "automerge": true,
+      "labels": [
+        "dependencies"
+      ]
+    },
+    {
+      "description": "duplicity (+ python-gettext) ship in the snap. The build installs them but never runs them, and duplicity's runtime deps come from debs pip does not check, so only patch releases automerge, on a green build, once 7 days old.",
+      "matchManagers": [
+        "pip_requirements"
+      ],
+      "matchFileNames": [
+        "requirements-duplicity.txt"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "minimumReleaseAge": "7 days",
+      "automerge": true,
+      "labels": [
+        "dependencies"
+      ]
+    },
+    {
+      "description": "gum ships in the snap and is only compiled by the build, never run, so only patch releases automerge, on a green build, once 7 days old.",
+      "matchPackageNames": [
+        "charmbracelet/gum"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "minimumReleaseAge": "7 days",
+      "automerge": true,
+      "labels": [
+        "dependencies"
+      ]
     }
   ]
 }
