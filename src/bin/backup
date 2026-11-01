@@ -386,6 +386,11 @@ cmd_export_key() {
     # A failed write (disk full, closed pipe) must stop here: never offer deletion of the
     # only copy when the exported one did not land.
     printf '%s\n' "$exported" || { ui_err "Writing the key failed — the private key has NOT been deleted."; exit 1; }
+    # Deleting the only copy needs a person at a terminal (spec D6): a piped answer keeps it.
+    if [ ! -t 0 ]; then
+        ui_print "Kept the private key in the snap keyring." >&2
+        return 0
+    fi
     printf '%s' "Delete the private key from THIS device now? [y/N] " >&2
     IFS= read -r answer || answer=""
     printf '\n' >&2

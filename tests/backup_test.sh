@@ -220,8 +220,26 @@ assert_status "$rc" 0 "X2: export ok"; assert_contains "$xo" "BEGIN PGP PRIVATE 
 assert_contains "$(cat "$GPG_LOG")" "--pinentry-mode loopback" "X2: loopback (no pinentry in the snap, A4)"; assert_contains "$(cat "$GPG_LOG")" "--passphrase-fd 0" "X2: passphrase on fd 0"
 assert_not_contains "$(cat "$GPG_LOG")" "hunter2-xyz" "X2: passphrase not on argv"; assert_eq "$(cat "$GPG_IN")" "hunter2-xyz" "X2: passphrase delivered"
 assert_contains "$(cat "$SNAP_COMMON/xerr")" "Passphrase of the backup private key" "X2: prompt on stderr"; assert_not_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X2: 'n' keeps the key"
-: > "$GPG_LOG"; (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\ny\n')) >/dev/null 2>&1
-assert_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X3: 'y' deletes after a verified export"
+# X3: 'y' typed on a terminal deletes (spec D6: deletion only when stdin is a terminal).
+# script(1) forwards the piped lines into the pty, so stdin is a terminal and stdout the key file.
+if command -v script >/dev/null 2>&1; then
+  cat > "$SNAP_COMMON/export_pty.sh" <<EOF
+export SNAP="$SNAP" SNAP_COMMON="$SNAP_COMMON"
+snapctl() { case "\$1" in get) printf 'F0F0' ;; *) : ;; esac; }
+source "$ROOT/src/bin/backup"; require_root() { :; }; ensure_agent() { :; }
+gpg() { printf '%s\n' "\$*" >> "$GPG_LOG"; case "\$*" in
+    *--export-secret-keys*) cat >/dev/null; printf -- '-----BEGIN PGP PRIVATE KEY BLOCK-----\nabc\n-----END PGP PRIVATE KEY BLOCK-----\n' ;;
+    esac; }
+( cmd_export_key ); echo "rc=\$?" >&2
+EOF
+  : > "$GPG_LOG"; printf 'hunter2-xyz\ny\n' | timeout 10 script -qec "bash $SNAP_COMMON/export_pty.sh > $SNAP_COMMON/xpty.out" /dev/null >/dev/null 2>&1
+  assert_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X3: 'y' on a terminal deletes after a verified export"
+  assert_contains "$(cat "$SNAP_COMMON/xpty.out")" "BEGIN PGP PRIVATE KEY BLOCK" "X3: key written to the redirected stdout"
+fi
+# X3b: a piped 'y' (no terminal on stdin) never deletes
+: > "$GPG_LOG"; (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\ny\n')) >/dev/null 2>"$SNAP_COMMON/xerr"; assert_status "$?" 0 "X3b: piped y -> rc 0"
+assert_not_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X3b: piped y -> no delete call"
+assert_contains "$(cat "$SNAP_COMMON/xerr")" "Kept the private key in the snap keyring." "X3b: says the key was kept"
 # X6: a failed write of the exported key (disk full) must stop before the delete prompt
 if [ -w /dev/full ]; then
   : > "$GPG_LOG"; (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\ny\n')) >/dev/full 2>"$SNAP_COMMON/xerr"; assert_status "$?" 1 "X6: failed key write -> rc 1"
