@@ -41,4 +41,12 @@ reset_state "${VALID[@]}" session.secret=6ba7b810-9dad-11d1-80b4-00c04fd430c8; r
 assert_contains "$(cat "$SNAPCTL_LOG")" "unset session.secret" "P1: post-refresh removes the seeded v1 UUID"
 assert_eq "$(grep -c "^set session.secret" "$SNAPCTL_LOG")" "0" "P1: nothing re-seeds it"
 assert_not_contains "$(cat "$LOGGER_LOG")" "6ba7b810" "P1: value not in syslog"
+reset_state "${VALID[@]}"; mkdir -p "$SNAP_DATA/.ext-config/devices"; : > "$SNAP_DATA/.ext-config/devices/index.json"
+run_hook post-refresh; [ ! -e "$SNAP_DATA/.ext-config/devices/index.json" ]; assert_status "$?" 0 "A9: index.json removed"
+assert_not_contains "$(cat "$T/stderr")" "null byte" "A9: no bash warning"
+printf '{"mqtt":{"host":"x"}}' > "$SNAP_DATA/settings.json"; cp "$SNAP_DATA/settings.json" "$T/ref.json"; : > "$LOGGER_LOG"
+run_hook post-refresh; cmp -s "$SNAP_DATA/settings.json" "$T/ref.json"; assert_status "$?" 0 "A8: settings.json without the key is untouched"
+assert_not_contains "$(cat "$LOGGER_LOG")" "not writable" "A8: no misleading log line"
+mkdir -p "$T/x43/prio"; printf '{"zwave":{"deviceConfigPriorityDir":"%s/x42/prio"}}' "$T" > "$T/x43/settings.json"
+SNAP_DATA="$T/x43" run_hook post-refresh; assert_eq "$(yq -r '.zwave.deviceConfigPriorityDir' "$T/x43/settings.json")" "$T/x43/prio" "A8: stale revision path still rewritten"
 finish

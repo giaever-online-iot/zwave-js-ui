@@ -39,4 +39,13 @@ assert_contains "$out" "one re-login" "migrate: notice logged"; assert_not_conta
 test_default_config >/dev/null; assert_not_contains "$(cat "$SLOG")" "session.secret" "test_default_config no longer seeds session.secret"
 assert_contains "$(cat "$SLOG")" "set server.port=8091" "test_default_config still seeds server.port"
 rm -f "$SLOG"
+
+PLOG="$(mktemp)"; logger() { printf '%s\n' "$*" >> "$PLOG"; }
+snapctl() { case "$1" in is-connected) [ "$2" != raw-usb ] ;; *) : ;; esac; }     # only raw-usb missing
+( DAEMONIZED=1 plugs_connected ); assert_status "$?" 0 "A7: serial-port + hardware-observe -> connected"
+assert_eq "$(cat "$PLOG")" "" "A7: nothing logged when the alternative plug is present"
+snapctl() { case "$1" in is-connected) [ "$2" = hardware-observe ] ;; *) : ;; esac; } # both alternatives missing
+( DAEMONIZED=1 plugs_connected ); assert_status "$?" 1 "A7: both missing -> fail"
+assert_contains "$(cat "$PLOG")" "Missing plug: «raw-usb»" "A7: raw-usb message logged"; assert_contains "$(cat "$PLOG")" "----- OR -----" "A7: OR line"; assert_contains "$(cat "$PLOG")" "serial-port" "A7: serial-port alternative logged"
+rm -f "$PLOG"
 finish

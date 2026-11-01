@@ -31,10 +31,10 @@ function plug_connected {
 function plugs_connected {
     MISSING=0
 
-    RAW_OUT=$(plug_connected "raw-usb")
+    RAW_OUT=$(DAEMONIZED=0 plug_connected "raw-usb")
     RAW_RES=$?
 
-    SERIAL_OUT=$(plug_connected "serial-port")
+    SERIAL_OUT=$(DAEMONIZED=0 plug_connected "serial-port")
     SERIAL_RES=$?
 
     if [ "$RAW_RES" -ne 0 ] && [ "$SERIAL_RES" -ne 0 ]; then
@@ -107,11 +107,14 @@ function test_device_priority_dir {
         return 0
     fi
 
-    DEV_DIR=$(yq -re '.zwave.deviceConfigPriorityDir' "${ZUI_SETTINGS}" 2>&-)
+    DEV_DIR=$(yq -r '.zwave.deviceConfigPriorityDir // ""' "${ZUI_SETTINGS}" 2>&-)
+    [ -n "${DEV_DIR}" ] || return 0
     NDEV_DIR=${DEV_DIR}
 
     if [[ "${DEV_DIR}" =~ ^"$(dirname ${SNAP_DATA})" ]]; then
-        NDEV_DIR=$(sed -E "s#$(dirname ${SNAP_DATA})/(current|x?[0-9]+)#${SNAP_DATA}#g" <<< $DEV_DIR)
+        # escape ERE metacharacters in the parent path (a "+" in it would act as a quantifier)
+        SNAP_PARENT=$(dirname "${SNAP_DATA}" | sed 's/[][\.*^$+?(){}|#]/\\&/g')
+        NDEV_DIR=$(sed -E "s#${SNAP_PARENT}/(current|x?[0-9]+)#${SNAP_DATA}#g" <<< "${DEV_DIR}")
     fi
 
     if [ -d "${NDEV_DIR}" ] && [ -r "${NDEV_DIR}" ]; then
@@ -122,7 +125,7 @@ function test_device_priority_dir {
         set_device_priority_dir "" "${ZUI_SETTINGS}" || return $?
     fi
 
-    if [ ! -w "${NDEV_DIR}" ]; then 
+    if [ -n "${NDEV_DIR}" ] && [ ! -w "${NDEV_DIR}" ]; then
         lprint ".zwave.deviceConfigPriorityDir not writable: ${NDEV_DIR}"
     fi
     
