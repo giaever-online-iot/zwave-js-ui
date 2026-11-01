@@ -22,8 +22,12 @@ assert_contains "$out" "KEY_S2_Unauthenticated=DEADBEEF" "s2-unauthenticated -> 
 out="$(run_wrapper)"
 case "$out" in *$'\n'ZWAVE_PORT=*|ZWAVE_PORT=*) FAIL=$((FAIL+1)); echo "FAIL: empty serial-port exported ZWAVE_PORT" >&2 ;; *) PASS=$((PASS+1)) ;; esac
 
-# config digest: recorded at every start, 0600, no config values, daemon keys only
+# config digest: recorded at every daemon start, 0600, no config values, daemon keys only
 DF="$SNAP_COMMON/.daemon-config.sha256"
+# E0: `exec` (DAEMONIZED unset) must not record config the running daemon does not have
+(unset DAEMONIZED; SNAPCTL_server_host=10.0.0.7 run_wrapper >/dev/null)
+[ ! -e "$DF" ]; assert_status "$?" 0 "E0: no digest written outside the daemon (exec app)"
+export DAEMONIZED=1   # only the daemon app sets it (snapcraft.yaml environment:)
 SNAPCTL_server_host=10.0.0.7 run_wrapper >/dev/null
 [ -f "$DF" ]; assert_status "$?" 0 "E1: digest file written at start"
 assert_eq "$(stat -c %a "$DF")" "600" "E2: digest file is 0600"
@@ -45,6 +49,7 @@ assert_eq "$(cat "$DF")" "$before" "E5: failed digest computation leaves the exi
 assert_eq "$(grep -cxF "Could not record the config digest in $DF" <<<"$out")" "1" "E5: failure is reported"   # grep, not assert_contains: never echo the whole env on failure
 assert_eq "$(grep -cx 'HOST=10.0.0.9' <<<"$out")" "1" "E5: still execs the app"
 [ ! -e "$DF.tmp" ]; assert_status "$?" 0 "E5: no temp file left behind"
+unset DAEMONIZED
 assert_not_contains "$(run_wrapper)" "SESSION_SECRET=" "unset secret -> not exported"
 assert_contains "$(SNAPCTL_session_secret=abc run_wrapper)" "SESSION_SECRET=abc" "set secret -> exported"
 finish
