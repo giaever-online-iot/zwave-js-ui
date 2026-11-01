@@ -66,10 +66,18 @@ BACKUPS_DIR="$(backup_dir)"; export BACKUPS_DIR
 
 # Record the config this daemon starts with; the configure hook restarts the
 # service only when the digest changes (not on refresh, not for backup-only keys).
+# Compute first, then replace atomically (tmp + mv): the hook may read the file while
+# this runs, and a truncated or empty file would read as "changed" and restart again.
 DIGEST_FILE="$(daemon_digest_file)"
-if ! ( umask 077; daemon_config_digest > "$DIGEST_FILE" ) 2>/dev/null || ! chmod 600 "$DIGEST_FILE" 2>/dev/null; then
+DIGEST="$(daemon_config_digest 2>/dev/null)"
+if ! [[ "$DIGEST" =~ ^[0-9a-f]{64}$ ]] \
+    || ! ( umask 077; printf '%s\n' "$DIGEST" > "${DIGEST_FILE}.tmp" ) 2>/dev/null \
+    || ! chmod 600 "${DIGEST_FILE}.tmp" 2>/dev/null \
+    || ! mv -f "${DIGEST_FILE}.tmp" "$DIGEST_FILE" 2>/dev/null; then
+    rm -f "${DIGEST_FILE}.tmp" 2>/dev/null
     lprint "Could not record the config digest in ${DIGEST_FILE}"
 fi
+unset DIGEST
 
 # When chained ahead of `npm`, run it from the app's module dir so its subcommands
 # resolve; otherwise exec the target as-is. Explicit if/then avoids the `A && B || C`

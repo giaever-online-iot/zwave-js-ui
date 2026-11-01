@@ -37,6 +37,14 @@ SNAPCTL_server_host=10.0.0.7 SNAPCTL_backup_target=file:///x run_wrapper >/dev/n
 assert_eq "$(cat "$DF")" "$d7" "E3: backup-only key does not change the digest"
 out="$(SNAP_COMMON=/nonexistent/no-such-dir run_wrapper)"
 assert_contains "$out" "HOST=" "E4: unwritable SNAP_COMMON still execs the app"
+# E5: a digest computation that yields nothing must not clobber the recorded digest
+mkdir -p "$SNAP_DATA/nosha"; printf '#!/bin/sh\ncat >/dev/null; exit 1\n' > "$SNAP_DATA/nosha/sha256sum"; chmod +x "$SNAP_DATA/nosha/sha256sum"
+SNAPCTL_server_host=10.0.0.7 run_wrapper >/dev/null; before="$(cat "$DF")"
+out="$(PATH="$SNAP_DATA/nosha:$PATH" SNAPCTL_server_host=10.0.0.9 run_wrapper)"
+assert_eq "$(cat "$DF")" "$before" "E5: failed digest computation leaves the existing digest file untouched"
+assert_eq "$(grep -cxF "Could not record the config digest in $DF" <<<"$out")" "1" "E5: failure is reported"   # grep, not assert_contains: never echo the whole env on failure
+assert_eq "$(grep -cx 'HOST=10.0.0.9' <<<"$out")" "1" "E5: still execs the app"
+[ ! -e "$DF.tmp" ]; assert_status "$?" 0 "E5: no temp file left behind"
 assert_not_contains "$(run_wrapper)" "SESSION_SECRET=" "unset secret -> not exported"
 assert_contains "$(SNAPCTL_session_secret=abc run_wrapper)" "SESSION_SECRET=abc" "set secret -> exported"
 finish
