@@ -23,9 +23,9 @@ source "$ROOT/src/bin/help"     # sources stub functions + real ui/catalog via $
 # --- catalog -----------------------------------------------------------------
 assert_contains "$(catalog_keys)" "server.port"   "catalog has server.port"
 assert_contains "$(catalog_keys)" "backup.target" "catalog has backup.target"
-# every catalog row has exactly 5 TAB fields (key type default description scope)
-settings_catalog | awk -F'\t' 'NF != 5 { exit 1 }'
-assert_status "$?" "0" "every catalog row has exactly 5 fields"
+# every catalog row has exactly 6 TAB fields (key type default description scope applies)
+settings_catalog | awk -F'\t' 'NF != 6 { exit 1 }'
+assert_status "$?" "0" "every catalog row has exactly 6 fields"
 # scope is common|advanced; type includes the secret pseudo-type
 settings_catalog | awk -F'\t' '$5 != "common" && $5 != "advanced" { exit 1 }'
 assert_status "$?" "0" "every row scope is common|advanced"
@@ -65,7 +65,7 @@ assert_contains "$out" "serial-port" "serial footnote present"
 # The catalog duplicates defaults that test_default_config (helper/functions)
 # seeds; this converts the catalog's "keep in sync" comment into a CI check.
 # Deliberately only the keys with literal defaults — mqtt.name/session.* use
-# placeholder defaults ("(unset)", "(generated)") that have no literal match.
+# placeholder defaults ("(unset)", "(= server.ssl)") that have no literal match.
 for key in server.host server.port server.ssl timezone; do
     def="$(settings_catalog | awk -F'\t' -v k="$key" '$1 == k { print $3 }')"
     grep -Eq "testnset_config \"$key\" \"?$def\"?" "$ROOT/src/helper/functions"

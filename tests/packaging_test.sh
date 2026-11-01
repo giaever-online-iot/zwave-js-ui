@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -u
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; ROOT="$(cd "$HERE/.." && pwd)"
+source "$HERE/lib/assert.sh"
+Y="$ROOT/snap/snapcraft.yaml"
+assert_not_contains "$(yq '.apps.zwave-js-ui.plugs[]' "$Y")" "log-observe" "D8: daemon app has no log-observe"
+assert_contains "$(yq '.apps.ui.plugs[]' "$Y")" "log-observe" "ui keeps log-observe"; assert_contains "$(yq '.apps.logs.plugs[]' "$Y")" "log-observe" "logs keeps log-observe"
+assert_not_contains "$(yq '.parts.local.stage-packages[]' "$Y")" "uuid" "uuid stage package removed (sole consumer gone)"
+assert_eq "$(grep -rl '\buuid\b' "$ROOT/src" | wc -l)" "0" "nothing in src/ calls uuid"
+assert_contains "$(yq '.description' "$Y")" "sudo zwave-js-ui.enable" "C1: store text has getting started"
+assert_contains "$(yq '.description' "$Y")" "required" "C3: store text says plugs are required"
+assert_not_contains "$(yq '.description' "$Y")" "None of these connections are necessary" "C3: contradiction gone"
+assert_contains "$(yq '.description' "$Y")" '`http://<host>:8091`' "store text: URL in a code span so markdown keeps <host>"
+assert_eq "$(yq '.permissions.contents' "$ROOT/.github/workflows/lint-test.yml")" "read" "D7: lint-test token is read-only"
+R="$ROOT/README.md"; C="$ROOT/CLAUDE.md"
+assert_not_contains "$(cat "$R")" "edge/dev" "B2: no latest/edge/dev"
+assert_contains "$(cat "$R")" "sudo zwave-js-ui.enable" "C1: README getting started"; assert_contains "$(cat "$R")" "http://<host>:8091" "C1: README URL"
+assert_not_contains "$(cat "$R")" "not strictly required" "C3: README no longer calls plugs optional"; assert_contains "$(cat "$R")" "refuses to start" "C3: README says required"
+assert_not_contains "$(cat "$C")" "22.20.0" "B2: no stale Node literal"
+assert_not_contains "$(cat "$C")" '`pre-refresh` — runs `test_device_priority_dir`' "B2: hooks attributed correctly"
+assert_contains "$(cat "$C")" "daemon_config_digest" "CLAUDE.md documents the digest gate"
+finish

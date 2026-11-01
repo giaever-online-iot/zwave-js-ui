@@ -1,35 +1,85 @@
 #!/usr/bin/env bash
 # catalog — single source of truth for user-settable snap config.
-# TAB-separated rows: key, type, default, description, scope.
+# TAB-separated rows: key, type, default, description, scope, applies. No field is ever empty.
 #   type:  string | int | bool | secret   (secret => masked + --password everywhere)
 #   scope: common | advanced              (help shows common only; the ui navigator shows all)
+#   applies: daemon | backup              (who reads the key: daemon = env-wrapper exports it,
+#                                          backup = bin/backup reads it at run time)
 # Defaults must stay in sync with test_default_config (helper/functions) and bin/backup.
 settings_catalog() {
 	cat <<'EOF'
-server.host	string	0.0.0.0	IP address the web UI binds to	common
-server.port	int	8091	Port for the web UI	common
-server.ssl	bool	false	Serve the web UI over HTTPS	common
-server.force-disable-ssl	bool	false	Force-disable SSL even when enabled	common
-session.secret	secret	(generated)	Session secret (a UUID is generated on install)	common
-session.cookie-secure	bool	(= server.ssl)	Secure session cookie (see expressjs/session#cookiesecure)	common
-mqtt.name	string	(unset)	Client name when connecting to the MQTT broker	common
-timezone	string	Europe/Oslo	Timezone exported to the app as TZ	common
-backup.target	string	(unset)	Duplicity target URL for off-box backups	common
-backup.dir	string	$SNAP_DATA/backups	Directory shipped by the backup command	common
-backup.encrypt	bool	(unset)	Set false to opt out of backup encryption	common
-backup.encrypt-key	string	(unset)	GPG fingerprint backups are encrypted to	common
-backup.full-if-older-than	string	7D	Force a full backup after this age	common
-backup.retention	int	3	Full backup chains kept on the target	common
-zwave.serial-port	string	(unset)		advanced
-zwave.s2-unauthenticated	secret	(unset)		advanced
-zwave.s2-authenticated	secret	(unset)		advanced
-zwave.s2-access-control	secret	(unset)		advanced
-zwave.s2-lr-authenticated	secret	(unset)		advanced
-zwave.s2-lr-access-control	secret	(unset)		advanced
-zwave.s0-legacy	secret	(unset)		advanced
+server.host	string	0.0.0.0	IP address the web UI binds to	common	daemon
+server.port	int	8091	Port for the web UI	common	daemon
+server.ssl	bool	false	Serve the web UI over HTTPS	common	daemon
+server.force-disable-ssl	bool	false	Force-disable SSL even when enabled	common	daemon
+session.secret	secret	(unset)	Session secret; leave unset and the app keeps its own 256-bit secret in the store (recommended)	common	daemon
+session.cookie-secure	bool	(= server.ssl)	Secure session cookie (see expressjs/session#cookiesecure)	common	daemon
+mqtt.name	string	(unset)	Client name when connecting to the MQTT broker	common	daemon
+timezone	string	Europe/Oslo	Timezone exported to the app as TZ	common	daemon
+backup.target	string	(unset)	Duplicity target URL for off-box backups	common	backup
+backup.dir	string	$SNAP_DATA/backups	Directory shipped by the backup command	common	daemon
+backup.encrypt	bool	(unset)	Set false to opt out of backup encryption	common	backup
+backup.encrypt-key	string	(unset)	GPG fingerprint backups are encrypted to	common	backup
+backup.full-if-older-than	string	7D	Force a full backup after this age	common	backup
+backup.retention	int	3	Full backup chains kept on the target	common	backup
+zwave.serial-port	string	(unset)	Serial device of the Z-Wave controller (ZWAVE_PORT)	advanced	daemon
+zwave.s2-unauthenticated	secret	(unset)	S2 Unauthenticated network key (KEY_S2_Unauthenticated)	advanced	daemon
+zwave.s2-authenticated	secret	(unset)	S2 Authenticated network key (KEY_S2_Authenticated)	advanced	daemon
+zwave.s2-access-control	secret	(unset)	S2 Access Control network key (KEY_S2_AccessControl)	advanced	daemon
+zwave.s2-lr-authenticated	secret	(unset)	S2 Long Range Authenticated key (KEY_LR_S2_Authenticated)	advanced	daemon
+zwave.s2-lr-access-control	secret	(unset)	S2 Long Range Access Control key (KEY_LR_S2_AccessControl)	advanced	daemon
+zwave.s0-legacy	secret	(unset)	S0 Legacy network key (KEY_S0_Legacy)	advanced	daemon
 EOF
 }
 
 catalog_keys() { settings_catalog | cut -f1; }
 catalog_row()  { settings_catalog | awk -F'\t' -v k="$1" '$1==k'; }   # the TSV row for one key
 catalog_is_secret() { [ "$(catalog_row "$1" | cut -f2)" = secret ]; } # exit 0 iff type=secret
+
+catalog_field() {   # <key> <n> -> field n (1 key 2 type 3 default 4 description 5 scope 6 applies); empty if unknown
+	catalog_row "$1" | awk -F'\t' -v n="$2" '{ print $n }'
+}
+catalog_keys_for() { settings_catalog | awk -F'\t' -v a="$1" '$6==a { print $1 }'; }   # keys with that applies
+
+validate_config() {   # <key> <value> -> rc 0 valid; rc 1 + "!! key must be <rule>, got v" on stderr
+	local key="$1" val="$2" type
+	[ -n "$val" ] || return 0
+	type="$(catalog_field "$key" 2)"
+	case "$type" in
+		int)
+			[[ "$val" =~ ^[0-9]+$ ]] || { echo "!! $key must be a whole number, got $val" >&2; return 1; }
+			;;
+		bool)
+			[ "$val" = true ] || [ "$val" = false ] || { echo "!! $key must be true or false, got $val" >&2; return 1; }
+			;;
+	esac
+	case "$key" in
+		server.port)
+			# length first: an all-digit value too long for [ -ge ] would print a bash error
+			{ [ "${#val}" -le 5 ] && [ "$val" -ge 1 ] && [ "$val" -le 65535 ]; } || { echo "!! $key must be a port number 1-65535, got $val" >&2; return 1; }
+			;;
+		backup.dir)
+			case "$val" in /*) ;; *) echo "!! $key must be an absolute path, got $val" >&2; return 1 ;; esac
+			;;
+	esac
+	return 0
+}
+
+sanitize_config() {   # unset every stored value validate_config rejects (needs lprint from helper/functions)
+	# post-refresh: values an older hook accepted must not fail configure inside the refresh
+	# change (snapd would undo the refresh). Never prints the value: secret keys included.
+	local key
+	for key in $(catalog_keys); do
+		validate_config "$key" "$(snapctl get "$key" 2>/dev/null)" 2>/dev/null && continue
+		snapctl unset "$key" && lprint "$key: removed invalid value; the default applies"
+	done
+	return 0
+}
+
+daemon_config_digest() {   # sha256 of every daemon-applied key=value, in catalog order
+	local k
+	while IFS= read -r k; do
+		printf '%s=%s\n' "$k" "$(snapctl get "$k" 2>/dev/null)"
+	done < <(catalog_keys_for daemon) | sha256sum | cut -d' ' -f1
+}
+daemon_digest_file() { printf '%s\n' "${SNAP_COMMON}/.daemon-config.sha256"; }

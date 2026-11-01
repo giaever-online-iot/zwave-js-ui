@@ -110,7 +110,7 @@ printf '%s' '{"gateway":{"logToFile":true},"zwave":{"logToFile":false}}' > "$SNA
 out="$( ( PATH="$STUB_BIN:$PATH"; export TAIL_SENTINEL="$SNAP_DATA/tail.ran"; export TEST_CONNECTED_PLUGS=""; main ) 2>&1 )"; st=$?
 assert_status "$st" "1" "main: journald stream w/o plug -> exit 1"
 assert_contains "$out" "snap connect zwave-js-ui:log-observe" "main: death message has the fix"
-[ ! -e "$SNAP_DATA/tail.ran" ]; assert_status "$?" "0" "main: no follower launched before death"
+_rc=0; [ ! -e "$SNAP_DATA/tail.ran" ] || _rc=1; assert_status "$_rc" "0" "main: no follower launched before death"
 
 # main: all streams journald-backed w/o plug -> same death
 printf '%s' '{"gateway":{"logToFile":false},"zwave":{"logToFile":false}}' > "$SNAP_DATA/settings.json"

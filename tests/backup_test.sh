@@ -186,4 +186,92 @@ spp="$(SNAPCTL_backup_target="sftp://nas/zui" GNUPGHOME="$SNAP_COMMON/.gnupg" \
 assert_contains "$spp" "sftp://nas/zui" "main status: plain ctx keeps content"
 assert_eq "$(cat "$LESS_LOG")" "" "main status: plain ctx -> less NOT invoked"
 
+# --- create-key: confirmed passphrase, delivered on fd 0 (C8, D11) ------------------
+# cmd_* expect main's `export GNUPGHOME` (snap keyring). Set it here: under bash <=5.2 the
+# GNUPGHOME=… prefix on `main status` above leaked out of main and hid this; bash 5.3 does not.
+export GNUPGHOME="$SNAP_COMMON/.gnupg"
+GPG_LOG="$SNAP_COMMON/gpg.log"; GPG_IN="$SNAP_COMMON/gpg.stdin"
+gpg() { printf '%s\n' "$*" >> "$GPG_LOG"; case "$*" in *--passphrase-fd*) cat > "$GPG_IN" ;; esac
+        case "$*" in *--list-keys*) printf 'fpr:::::::::ABCDEF0123456789ABCDEF0123456789ABCDEF01:\n' ;; esac; }
+: > "$GPG_LOG"; : > "$GPG_IN"
+ck="$( (ensure_agent() { :; }; printf 'correct-horse-7\ncorrect-horse-7\n' | cmd_create_key Name mail@example.com) 2>&1 )"; rc=$?
+assert_status "$rc" 0 "K1: confirmed passphrase -> created"; assert_contains "$ck" "needed to restore" "K1: explains irrecoverability"
+assert_contains "$(cat "$GPG_LOG")" "--passphrase-fd 0" "K1: passphrase on fd 0"; assert_not_contains "$(cat "$GPG_LOG")" "correct-horse-7" "K1: passphrase never on argv (D11)"
+assert_eq "$(cat "$GPG_IN")" "correct-horse-7" "K1: passphrase delivered on stdin"
+: > "$GPG_LOG"; ck="$( (ensure_agent() { :; }; printf 'correct-horse-7\nwrong-horse-8\n' | cmd_create_key Name mail@example.com) 2>&1 )"; rc=$?
+assert_status "$rc" 1 "K2: mismatch -> rc 1"; assert_contains "$ck" "Passphrases do not match — nothing created." "K2: message"; assert_eq "$(cat "$GPG_LOG")" "" "K2: gpg never called"
+
+# --- export-key: pipe-only, terminal passphrase prompt, loopback export (A4, C6) ---
+# X1: terminal on stdout is refused before anything else (pty via script, as logs_test does)
+if command -v script >/dev/null 2>&1; then
+  cat > "$SNAP_COMMON/export_tty.sh" <<EOF
+export SNAP="$SNAP" SNAP_COMMON="$SNAP_COMMON"
+snapctl() { case "\$1" in get) printf 'F0F0' ;; *) : ;; esac; }
+source "$ROOT/src/bin/backup"; require_root() { :; }; ensure_agent() { echo AGENT_CALLED; }
+( cmd_export_key ); echo "rc=\$?"
+EOF
+  pty="$(timeout 10 script -qec "bash $SNAP_COMMON/export_tty.sh" /dev/null 2>&1 </dev/null)"
+  assert_contains "$pty" "redirect it" "X1: TTY stdout refused with the redirect hint"; assert_contains "$pty" "rc=1" "X1: rc 1"; assert_not_contains "$pty" "AGENT_CALLED" "X1: refused before the agent is touched"
+fi
+gpg() { printf '%s\n' "$*" >> "$GPG_LOG"; case "$*" in
+    *--list-secret-keys*) return "${GPG_NO_SECRET:-0}" ;;
+    *--export-secret-keys*) cat > "$GPG_IN"; printf -- '-----BEGIN PGP PRIVATE KEY BLOCK-----\nabc\n-----END PGP PRIVATE KEY BLOCK-----\n' ;;
+    esac; }
+: > "$GPG_LOG"; : > "$GPG_IN"
+xo="$( (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\nn\n')) 2>"$SNAP_COMMON/xerr" )"; rc=$?
+assert_status "$rc" 0 "X2: export ok"; assert_contains "$xo" "BEGIN PGP PRIVATE KEY BLOCK" "X2: key on stdout only"
+assert_contains "$(cat "$GPG_LOG")" "--pinentry-mode loopback" "X2: loopback (no pinentry in the snap, A4)"; assert_contains "$(cat "$GPG_LOG")" "--passphrase-fd 0" "X2: passphrase on fd 0"
+assert_not_contains "$(cat "$GPG_LOG")" "hunter2-xyz" "X2: passphrase not on argv"; assert_eq "$(cat "$GPG_IN")" "hunter2-xyz" "X2: passphrase delivered"
+assert_contains "$(cat "$SNAP_COMMON/xerr")" "Passphrase of the backup private key" "X2: prompt on stderr"; assert_not_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X2: 'n' keeps the key"
+# X3: 'y' typed on a terminal deletes (spec D6: deletion only when stdin is a terminal).
+# script(1) forwards the piped lines into the pty, so stdin is a terminal and stdout the key file.
+if command -v script >/dev/null 2>&1; then
+  cat > "$SNAP_COMMON/export_pty.sh" <<EOF
+export SNAP="$SNAP" SNAP_COMMON="$SNAP_COMMON"
+snapctl() { case "\$1" in get) printf 'F0F0' ;; *) : ;; esac; }
+source "$ROOT/src/bin/backup"; require_root() { :; }; ensure_agent() { :; }
+gpg() { printf '%s\n' "\$*" >> "$GPG_LOG"; case "\$*" in
+    *--export-secret-keys*) cat >/dev/null; printf -- '-----BEGIN PGP PRIVATE KEY BLOCK-----\nabc\n-----END PGP PRIVATE KEY BLOCK-----\n' ;;
+    esac; }
+( cmd_export_key ); echo "rc=\$?" >&2
+EOF
+  : > "$GPG_LOG"; printf 'hunter2-xyz\ny\n' | timeout 10 script -qec "bash $SNAP_COMMON/export_pty.sh > $SNAP_COMMON/xpty.out" /dev/null >/dev/null 2>&1
+  assert_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X3: 'y' on a terminal deletes after a verified export"
+  assert_contains "$(cat "$SNAP_COMMON/xpty.out")" "BEGIN PGP PRIVATE KEY BLOCK" "X3: key written to the redirected stdout"
+fi
+# X3b: a piped 'y' (no terminal on stdin) never deletes
+: > "$GPG_LOG"; (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\ny\n')) >/dev/null 2>"$SNAP_COMMON/xerr"; assert_status "$?" 0 "X3b: piped y -> rc 0"
+assert_not_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X3b: piped y -> no delete call"
+assert_contains "$(cat "$SNAP_COMMON/xerr")" "Kept the private key in the snap keyring." "X3b: says the key was kept"
+# X6: a failed write of the exported key (disk full) must stop before the delete prompt
+if [ -w /dev/full ]; then
+  : > "$GPG_LOG"; (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\ny\n')) >/dev/full 2>"$SNAP_COMMON/xerr"; assert_status "$?" 1 "X6: failed key write -> rc 1"
+  assert_contains "$(cat "$SNAP_COMMON/xerr")" "Writing the key failed — the private key has NOT been deleted." "X6: says the key was kept"
+  assert_not_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X6: no delete after a failed write"
+fi
+(ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key </dev/null) >/dev/null 2>"$SNAP_COMMON/xerr"; assert_status "$?" 1 "X4: no passphrase -> rc 1"
+assert_contains "$(cat "$SNAP_COMMON/xerr")" "passphrase" "X4: says what is missing"
+: > "$GPG_LOG"; (ensure_agent() { :; }; GPG_NO_SECRET=1 SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\n')) >/dev/null 2>"$SNAP_COMMON/xerr"; assert_status "$?" 0 "X5: public-only key -> rc 0"
+assert_contains "$(cat "$SNAP_COMMON/xerr")" "nothing to export" "X5: explains"; assert_not_contains "$(cat "$SNAP_COMMON/xerr")" "Passphrase of" "X5: no passphrase prompt"
+
+# --- status reads the keyring on disk; import-key says what it waits for (A5, C7) ---
+export GNUPGHOME="$SNAP_COMMON/.gnupg"; mkdir -p "$GNUPGHOME/private-keys-v1.d"
+gpg() { case "$*" in *--with-keygrip*) printf 'grp:::::::::1234GRIP:\n' ;; esac; }
+: > "$GNUPGHOME/private-keys-v1.d/1234GRIP.key"; secret_key_on_disk F0F0; assert_status "$?" 0 "S1: keygrip file present -> secret key on disk"
+printf '%s\n' "$(SNAPCTL_backup_encrypt_key=F0F0 cmd_status)" | grep -Eq 'private key on this device[[:space:]]+yes'; assert_status "$?" 0 "S1: status says yes without an agent (A5)"
+rm "$GNUPGHOME/private-keys-v1.d/1234GRIP.key"; secret_key_on_disk F0F0; assert_status "$?" 1 "S2: no keygrip file -> no"
+printf '%s\n' "$(SNAPCTL_backup_encrypt_key=F0F0 cmd_status)" | grep -Eq 'private key on this device[[:space:]]+no'; assert_status "$?" 0 "S2: status says no"
+gpg() { :; }; secret_key_on_disk F0F0; assert_status "$?" 1 "S3: key not in the keyring -> no"
+ih="$( (gpg() { return 1; }; printf 'junk' | cmd_import_key) 2>&1 )"; assert_not_contains "$ih" "Paste the ARMORED" "I1: piped stdin -> no paste hint"
+if command -v script >/dev/null 2>&1; then
+  cat > "$SNAP_COMMON/import_tty.sh" <<EOT
+export SNAP="$SNAP" SNAP_COMMON="$SNAP_COMMON" GNUPGHOME="$GNUPGHOME"
+snapctl() { :; }; source "$ROOT/src/bin/backup"; require_root() { :; }; gpg() { return 1; }
+cmd_import_key
+EOT
+  ip="$(timeout 10 script -qec "bash $SNAP_COMMON/import_tty.sh" /dev/null 2>&1 </dev/null)"
+  assert_contains "$ip" "Paste the ARMORED PUBLIC key" "I2: terminal stdin -> paste hint before reading (C7)"
+fi
+unset GNUPGHOME
+
 finish

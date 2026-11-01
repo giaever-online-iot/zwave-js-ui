@@ -69,33 +69,63 @@ assert_eq "$(catalog_row server.ssl | cut -f3)" "false" "catalog_row server.ssl 
 assert_eq "$(catalog_row nope)" "" "catalog_row unknown -> empty"
 
 # --- Settings: edit a bool, apply via snapctl set ---
+# The fixture helper shim has no seeding functions; load the real ones (no drift) so Reset re-seeds.
+# shellcheck disable=SC1090
+source <(sed -n '/^function testnset_config {/,/^}/p;/^function test_default_config {/,/^}/p' "$ROOT/src/helper/functions")
 SET_LOG="$SNAP_DATA/set.log"; : > "$SET_LOG"
 snapctl() {
     case "$1" in
-        services) printf 'Service  Startup  Current  Notes\nzwave-js-ui.zwave-js-ui  enabled  active  -\n' ;;
+        services) printf 'Service  Startup  Current  Notes\nzwave-js-ui.zwave-js-ui  enabled  %s  -\n' "${SNAPCTL_MAIN_STATE:-active}" ;;
         get) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;;
-        set)   printf 'set %s\n' "$2" >> "$SET_LOG"; [ -n "${SNAPCTL_SET_FAIL:-}" ] && { echo "configure: bad value" >&2; return 1; }; return 0 ;;
+        set)   printf 'set %s\n' "$2" >> "$SET_LOG"; return 0 ;;
         unset) printf 'unset %s\n' "$2" >> "$SET_LOG"; return 0 ;;
         *) : ;;
     esac
 }
 # browse server.ssl -> Edit -> choose "true" -> Back; then Back out of settings
 CQ="$SNAP_DATA/setc.q"; printf '%s\n' "server.ssl" "Edit" "true" "← Back" > "$CQ"
-out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings 2>&1)"
+out="$(UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings 2>&1)"
 assert_contains "$(cat "$SET_LOG")" "set server.ssl=true" "Edit bool -> snapctl set key=value"
 assert_contains "$out" "set" "success surfaced"
 
-# rejection: configure hook says no -> ui_err, message shown, value not claimed applied
-# server.port is int -> the value comes from ui_input (GUM_INPUT_QUEUE), NOT the choose queue.
-: > "$SET_LOG"; printf '%s\n' "server.port" "Edit" "← Back" > "$CQ"
-INQ="$SNAP_DATA/in.q"; printf '99999\n' > "$INQ"
-out="$(UI_ASSUME_TTY=1 SNAPCTL_SET_FAIL=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings 2>&1)"
-assert_contains "$out" "configure: bad value" "rejection surfaces the hook message"
-
-# reset to default -> snapctl unset
-: > "$SET_LOG"; printf '%s\n' "mqtt.name" "Reset to default" "← Back" > "$CQ"
-UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings >/dev/null 2>&1
-assert_contains "$(cat "$SET_LOG")" "unset mqtt.name" "Reset -> snapctl unset"
+INQ="$SNAP_DATA/in.q"
+: > "$SET_LOG"; printf '%s\n' "server.port" "Edit" "← Back" > "$CQ"; printf '99999\n' > "$INQ"
+out="$(UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings 2>&1)"
+assert_contains "$out" "a port number 1-65535" "N1: client-side validation message"; assert_contains "$out" "Rejected" "N1: rejected banner"
+assert_not_contains "$(cat "$SET_LOG")" "set server.port" "N1: nothing written on rejection"
+: > "$SET_LOG"; printf '%s\n' "server.port" "Edit" "← Back" > "$CQ"; printf '8092\n' > "$INQ"
+UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings >/dev/null 2>&1
+assert_contains "$(cat "$SET_LOG")" "set server.port=8092" "N2: valid int written"
+: > "$SET_LOG"; printf '%s\n' "server.port" "Reset to default" "← Back" > "$CQ"
+UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings >/dev/null 2>&1
+assert_contains "$(cat "$SET_LOG")" "unset server.port" "N3: reset unsets"; assert_contains "$(cat "$SET_LOG")" "set server.port=8091" "N3: reset re-seeds the default"
+: > "$GUM_LOG"; printf '%s\n' "server.port" "Edit" "← Back" > "$CQ"; printf '8092\n' > "$INQ"
+out="$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CONFIRM=0 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings 2>&1)"
+assert_contains "$out" "RAN_restart" "N4: restart accepted -> restart bin runs"
+: > "$GUM_LOG"; printf '%s\n' "server.port" "Edit" "← Back" > "$CQ"; printf '8092\n' > "$INQ"
+out="$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings 2>&1)"
+assert_not_contains "$out" "RAN_restart" "N4: restart declined -> no restart"; assert_contains "$(cat "$GUM_LOG")" "confirm" "N4: restart was offered"
+: > "$GUM_LOG"; printf '%s\n' "server.port" "Edit" "← Back" > "$CQ"; printf '8092\n' > "$INQ"
+out="$(UI_ASSUME_TTY=1 SNAPCTL_MAIN_STATE=inactive GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings 2>&1)"
+assert_contains "$out" "Takes effect when the service starts." "N5: inactive -> no offer, hint"; assert_not_contains "$(cat "$GUM_LOG")" "confirm" "N5: no confirm when inactive"
+: > "$GUM_LOG"; printf '%s\n' "backup.target" "Edit" "← Back" > "$CQ"; printf 'file:///x\n' > "$INQ"
+out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings 2>&1)"
+assert_contains "$out" "Used by the next backup run." "N6: backup key -> no restart talk"; assert_not_contains "$(cat "$GUM_LOG")" "confirm" "N6: no confirm for backup keys"
+: > "$SET_LOG"; printf '%s\n' "session.cookie-secure" "Reset to default" "← Back" > "$CQ"
+SNAPCTL_server_ssl=true UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings >/dev/null 2>&1
+assert_contains "$(cat "$SET_LOG")" "set session.cookie-secure=true" "N7: dependent default follows server.ssl"
+: > "$SET_LOG"; printf '%s\n' "mqtt.name" "Edit" "← Back" > "$CQ"; printf '\n' > "$INQ"
+UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings >/dev/null 2>&1
+assert_contains "$(cat "$SET_LOG")" "unset mqtt.name" "N8: empty edit = reset"
+printf '%s\n' "backup.retention" "Reset to default" "← Back" > "$CQ"
+out="$(UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings 2>&1)"
+assert_contains "$out" "backup.retention reset to default: 3" "N9: run-time default shown from the catalog"
+printf '%s\n' "mqtt.name" "Reset to default" "← Back" > "$CQ"
+out="$(UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings 2>&1)"
+assert_contains "$out" "mqtt.name reset to default: (unset)" "N9: a key without a default still says (unset)"
+printf '%s\n' "zwave.serial-port" "← Back" > "$CQ"
+out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings 2>&1)"
+assert_contains "$out" "Serial device of the Z-Wave controller" "A6: real description shown"; assert_not_contains "$out" "advanced" "A6: scope no longer leaks into the description"
 
 # session.secret value is masked in the success banner (not leaked)
 # Re-source src/bin/ui to clear any spy overrides left by prior tests
@@ -103,7 +133,7 @@ assert_contains "$(cat "$SET_LOG")" "unset mqtt.name" "Reset -> snapctl unset"
 source "$ROOT/src/bin/ui"
 SQ="$SNAP_DATA/sec.q"; printf '%s\n' "session.secret" "Edit" "← Back" > "$SQ"
 SIQ="$SNAP_DATA/sec.in"; printf 'supersecretvalue\n' > "$SIQ"
-out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$SQ" GUM_INPUT_QUEUE="$SIQ" nav_settings 2>&1)"
+out="$(UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$SQ" GUM_INPUT_QUEUE="$SIQ" nav_settings 2>&1)"
 case "$out" in *supersecretvalue*) FAIL=$((FAIL+1)); echo "FAIL: session.secret leaked in banner" >&2 ;; *) PASS=$((PASS+1)) ;; esac
 assert_contains "$out" "(hidden)" "session.secret edit shows (hidden) in banner"
 

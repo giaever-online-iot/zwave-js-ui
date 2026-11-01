@@ -87,7 +87,7 @@ cmd_status() {                 # render current backup config as a table
     local target key onbox="no" retention timer
     target="$(cfg target)"
     key="$(cfg encrypt-key)"
-    if [ -n "$key" ] && gpg_snap --list-secret-keys "$key" >/dev/null 2>&1; then
+    if [ -n "$key" ] && secret_key_on_disk "$key"; then
         onbox="yes"
     fi
     retention="$(cfg retention)"
@@ -127,6 +127,17 @@ nth_fpr() {
 # via ensure_agent and connect over its socket). Centralise them here. NB: pick-key targets
 # the USER's host keyring, not $GNUPGHOME, so it does NOT use this wrapper.
 gpg_snap() { gpg --no-autostart --homedir "$GNUPGHOME" "$@"; }
+
+# Is the private half of <fpr> in the snap keyring? Looks at the key file on disk
+# (private-keys-v1.d/<keygrip>.key) rather than asking gpg-agent: the agent is down after
+# every reboot, so --list-secret-keys fails then, and `status` must stay read-only (it
+# must not start a daemon). --list-keys with a keygrip needs no agent.
+secret_key_on_disk() {
+    local grip
+    grip="$(gpg_snap --with-colons --with-keygrip --list-keys "$1" 2>/dev/null \
+        | awk -F: '$1=="grp" { print $10; exit }')"
+    [ -n "$grip" ] && [ -e "$GNUPGHOME/private-keys-v1.d/${grip}.key" ]
+}
 
 # USER-context: list the invoking user's host public keys, or export one (armored) to
 # stdout. Refuses root (root can't read the user's keyring — owner-match fails). Pipe the
@@ -216,6 +227,9 @@ cmd_import_key() {
     mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
     local tmp; tmp="$(mktemp "${SNAP_COMMON:-/tmp}/.import-key.XXXXXX")"
     trap 'rm -f "$tmp"' RETURN
+    if [ -t 0 ]; then
+        ui_print "Paste the ARMORED PUBLIC key, then press Ctrl-D — or pipe it: ${SNAP_NAME}.backup pick-key | sudo ${SNAP_NAME}.backup import-key" >&2
+    fi
     cat > "$tmp"
     # gpg_snap carries --no-autostart: importing a PUBLIC key needs no gpg-agent; without
     # it gpg tries to autostart the (base-path, absent-in-snap) agent and exits non-zero
@@ -276,10 +290,10 @@ cmd_create_key() {
         ui_print "  ${SNAP_NAME}.backup pick-key | sudo ${SNAP_NAME}.backup import-key" >&2
         return 1
     fi
-    local name email comment pass uid
+    local name email comment pass pass2 uid
     # UID fields may be supplied as args ($1 name, $2 email, $3 comment) or prompted
     # interactively. Arg mode requires at least name + email; the passphrase is ALWAYS
-    # prompted (never an argument, to keep it out of the process list).
+    # prompted twice and travels to gpg on fd 0 (never an argument, to keep it out of the process list).
     if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
         name="$1"; email="$2"; comment="${3:-}"
     else
@@ -287,16 +301,19 @@ cmd_create_key() {
         email="$(ui_input 'Email')" || { ui_err "Cannot prompt without a terminal — pass name/email as arguments."; return 1; }
         comment="$(ui_input 'Comment (optional)')" || comment=""
     fi
+    ui_print "This passphrase is needed to restore — there is no recovery if it is lost." >&2
     pass="$(ui_input --password 'Passphrase for the new private key')" || { ui_err "Cannot prompt for a passphrase without a terminal."; return 1; }
+    pass2="$(ui_input --password 'Repeat passphrase')" || { ui_err "Cannot prompt for a passphrase without a terminal."; return 1; }
     [ -n "$name" ]  || { ui_err "Real name must not be empty."; return 1; }
     [ -n "$email" ] || { ui_err "Email must not be empty."; return 1; }
     [ -n "$pass" ]  || { ui_err "Passphrase must not be empty — the backup private key must be protected."; return 1; }
+    [ "$pass" = "$pass2" ] || { ui_err "Passphrases do not match — nothing created."; return 1; }
     uid="$name"
     [ -n "$comment" ] && uid="$uid ($comment)"
     uid="$uid <$email>"
     # gpg chatter (trustdb, revocation-cert notes) only on failure, where it explains.
     local gpgout
-    if ! gpgout="$(gpg_snap --batch --pinentry-mode loopback --passphrase "$pass" \
+    if ! gpgout="$(printf '%s\n' "$pass" | gpg_snap --batch --pinentry-mode loopback --passphrase-fd 0 \
         --quick-generate-key "$uid" ed25519 cert,sign never 2>&1)"; then
         ui_err "Key generation failed — check the name/email are valid. gpg said:"
         printf '%s\n' "$gpgout" >&2
@@ -307,7 +324,7 @@ cmd_create_key() {
         ui_err "Key was generated but its fingerprint could not be read for '${email}'."
         return 1
     fi
-    if ! gpgout="$(gpg_snap --batch --pinentry-mode loopback --passphrase "$pass" \
+    if ! gpgout="$(printf '%s\n' "$pass" | gpg_snap --batch --pinentry-mode loopback --passphrase-fd 0 \
         --quick-add-key "$fpr" cv25519 encr never 2>&1)"; then
         ui_err "Adding the encryption subkey failed; '${fpr}' is not usable for backups yet. gpg said:"
         printf '%s\n' "$gpgout" >&2
@@ -324,8 +341,15 @@ cmd_create_key() {
 # snap (leaving the public key for backups). Delete prompt defaults to "no", and is only
 # offered after a verified, non-empty export so the only copy can't be lost on a failure.
 cmd_export_key() {
-    # The agent is required both to export secret-key material and to reliably tell
-    # whether a secret key exists at all — so fail loud here rather than guess.
+    # Pipe-only: the armored PRIVATE key must never land on a terminal (scrollback, shoulder).
+    if [ -t 1 ]; then
+        ui_err "export-key writes the PRIVATE key to stdout — redirect it:"
+        ui_print "  sudo ${SNAP_NAME}.backup export-key > zui-backup-key.asc" >&2
+        ui_print "  then on your workstation: gpg --import zui-backup-key.asc   (keep a copy offline)" >&2
+        exit 1
+    fi
+    # The agent is required both to export secret-key material (even in loopback mode) and
+    # to reliably tell whether a secret key exists at all — so fail loud here rather than guess.
     if ! ensure_agent; then
         ui_err "Cannot export a private key on this device (gpg needs its agent for secret keys)."
         exit 1
@@ -336,22 +360,42 @@ cmd_export_key() {
         ui_print "No private key on this device for ${fpr} (public-only or card key); nothing to export." >&2
         exit 0
     fi
+    # Prompts here use printf >&2 + read, not ui_input/ui_confirm: the UI library only runs
+    # widgets when stdout is a terminal, which this command forbids (stdout is the key file).
+    # An explicit printf, not `read -p`: bash shows -p only when stdin is a terminal.
+    local pass answer
+    printf '%s' "Passphrase of the backup private key: " >&2
+    IFS= read -rs pass || pass=""
+    printf '\n' >&2
+    if [ -z "$pass" ]; then
+        ui_err "Cannot read the passphrase — run from a terminal with stdout redirected to a file."
+        exit 1
+    fi
     ui_print "# To add this key to your workstation keyring, run on the HOST (not in the snap):" >&2
-    ui_print "#     gpg --import   # paste/redirect the block below" >&2
+    ui_print "#     gpg --import zui-backup-key.asc" >&2
     ui_print "# Also store it OFFLINE — it is the ONLY way to decrypt your backups." >&2
     # stderr to a scratch file: it must not pollute the armored stdout, and gpg's
-    # notes only help when the export FAILS (pinentry itself draws on the tty).
+    # notes only help when the export FAILS.
     local exported gpgerr; gpgerr="$(mktemp "${SNAP_COMMON:-/tmp}/.export-key-err.XXXXXX")"
-    if ! exported="$(gpg_snap --export-secret-keys --armor "$fpr" 2>"$gpgerr")" || [ -z "$exported" ]; then
+    if ! exported="$(printf '%s\n' "$pass" | gpg_snap --batch --pinentry-mode loopback --passphrase-fd 0 --export-secret-keys --armor "$fpr" 2>"$gpgerr")" || [ -z "$exported" ]; then
         ui_err "Export failed or produced no output — aborting. The private key has NOT been deleted. gpg said:"
         cat "$gpgerr" >&2; rm -f "$gpgerr"
         exit 1
     fi
     rm -f "$gpgerr"
-    printf '%s\n' "$exported"
-    ui_confirm "Delete the private key from THIS device now?"
-    case "$?" in
-        0)
+    # A failed write (disk full, closed pipe) must stop here: never offer deletion of the
+    # only copy when the exported one did not land.
+    printf '%s\n' "$exported" || { ui_err "Writing the key failed — the private key has NOT been deleted."; exit 1; }
+    # Deleting the only copy needs a person at a terminal (spec D6): a piped answer keeps it.
+    if [ ! -t 0 ]; then
+        ui_print "Kept the private key in the snap keyring." >&2
+        return 0
+    fi
+    printf '%s' "Delete the private key from THIS device now? [y/N] " >&2
+    IFS= read -r answer || answer=""
+    printf '\n' >&2
+    case "$answer" in
+        y|Y|yes|YES)
             local delout
             if ! delout="$(gpg_snap --batch --yes --delete-secret-keys "$fpr" 2>&1)"; then
                 ui_err "Failed to delete the private key — it may still be present in the snap keyring. gpg said:"

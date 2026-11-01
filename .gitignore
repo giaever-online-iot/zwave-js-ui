@@ -21,3 +21,4 @@ __pycache__/
 
 # Local on-device test scripts (one per PR, not part of the build)
 .test/
+tests/.tmp.*
