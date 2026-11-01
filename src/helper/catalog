@@ -55,7 +55,8 @@ validate_config() {   # <key> <value> -> rc 0 valid; rc 1 + "!! key must be <rul
 	esac
 	case "$key" in
 		server.port)
-			{ [ "$val" -ge 1 ] && [ "$val" -le 65535 ]; } || { echo "!! $key must be a port number 1-65535, got $val" >&2; return 1; }
+			# length first: an all-digit value too long for [ -ge ] would print a bash error
+			{ [ "${#val}" -le 5 ] && [ "$val" -ge 1 ] && [ "$val" -le 65535 ]; } || { echo "!! $key must be a port number 1-65535, got $val" >&2; return 1; }
 			;;
 		backup.dir)
 			case "$val" in /*) ;; *) echo "!! $key must be an absolute path, got $val" >&2; return 1 ;; esac

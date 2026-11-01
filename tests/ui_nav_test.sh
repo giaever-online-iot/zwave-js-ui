@@ -102,7 +102,7 @@ assert_contains "$(cat "$SET_LOG")" "unset server.port" "N3: reset unsets"; asse
 : > "$GUM_LOG"; printf '%s\n' "server.port" "Edit" "← Back" > "$CQ"; printf '8092\n' > "$INQ"
 out="$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CONFIRM=0 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings 2>&1)"
 assert_contains "$out" "RAN_restart" "N4: restart accepted -> restart bin runs"
-printf '%s\n' "server.port" "Edit" "← Back" > "$CQ"; printf '8092\n' > "$INQ"
+: > "$GUM_LOG"; printf '%s\n' "server.port" "Edit" "← Back" > "$CQ"; printf '8092\n' > "$INQ"
 out="$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings 2>&1)"
 assert_not_contains "$out" "RAN_restart" "N4: restart declined -> no restart"; assert_contains "$(cat "$GUM_LOG")" "confirm" "N4: restart was offered"
 : > "$GUM_LOG"; printf '%s\n' "server.port" "Edit" "← Back" > "$CQ"; printf '8092\n' > "$INQ"

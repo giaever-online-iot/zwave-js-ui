@@ -4,7 +4,8 @@ set -e
 source $SNAP/helper/functions
 source $SNAP/helper/catalog
 
-# Seed first: an unset key means "use the default" (snap unset, navigator reset).
+# Seed before validating: seeding makes an unset key (snap unset, navigator reset) fall
+# back to its default instead of staying empty.
 test_default_config
 
 for key in $(catalog_keys); do
