@@ -1,39 +1,21 @@
 #!/usr/bin/env bash
-
 set -e
 source $SNAP/helper/functions
+source $SNAP/helper/catalog
 
-SERVER_SSL=$(snapctl get server.ssl)
-SERVER_PORT=$(snapctl get server.port)
-COOKIE_SECURE=$(snapctl get session.cookie-secure)
-
-if ! [[ "${SERVER_PORT}" =~ ^-?[0-9]+$ ]]; then
-    echo "!! server.port must be numeric, got ${SERVER_PORT}" >&2
-    exit 1
-fi
-
-if [ "${SERVER_SSL}" != true ] && [ "${SERVER_SSL}" != false ]; then
-    echo "!! server.ssl must be boolean value" >&2
-    exit 1
-fi
-
-if [ "${COOKIE_SECURE}" != true ] && [ "${COOKIE_SECURE}" != false ]; then
-    echo "!! session.cookie-secure must be boolean value" >&2
-    exit 1
-fi
-
-BACKUP_DIR_CFG=$(snapctl get backup.dir)
-if [ -n "${BACKUP_DIR_CFG}" ] && [[ "${BACKUP_DIR_CFG}" != /* ]]; then
-    echo "!! backup.dir must be an absolute path, got ${BACKUP_DIR_CFG}" >&2
-    exit 1
-fi
-
+# Seed first: an unset key means "use the default" (snap unset, navigator reset).
 test_default_config
 
-# NB: keep `grep … | wc -l`, not `grep -c` — under `set -e`, grep -c exits 1 when the
-# count is 0 (service active, no inactive lines) and would abort the hook.
-RUNNING=$(snapctl services | grep "${SNAP_NAME}" | grep inactive | wc -l)
-if [ "${RUNNING}" -eq 0 ]; then
-    echo "Restarting ${SNAP_NAME}"
-    snapctl restart "${SNAP_NAME}"
+for key in $(catalog_keys); do
+    validate_config "${key}" "$(snapctl get "${key}")" || exit 1
+done
+
+# Restart only when the running daemon's inputs changed. env-wrapper writes the digest
+# of what the daemon started with; snapd runs this hook after start-snap-services on
+# every refresh, so an equal digest (or a backup-only change) must not bounce the driver.
+DIGEST_FILE="$(daemon_digest_file)"
+if [ "$(daemon_config_digest)" != "$(cat "${DIGEST_FILE}" 2>/dev/null || true)" ]; then
+    case "$(service_state)" in
+        *" active") echo "Restarting ${SNAP_NAME}.${SNAP_NAME}"; snapctl restart "${SNAP_NAME}.${SNAP_NAME}" ;;
+    esac
 fi
