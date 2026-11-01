@@ -64,6 +64,17 @@ validate_config() {   # <key> <value> -> rc 0 valid; rc 1 + "!! key must be <rul
 	return 0
 }
 
+sanitize_config() {   # unset every stored value validate_config rejects (needs lprint from helper/functions)
+	# post-refresh: values an older hook accepted must not fail configure inside the refresh
+	# change (snapd would undo the refresh). Never prints the value: secret keys included.
+	local key
+	for key in $(catalog_keys); do
+		validate_config "$key" "$(snapctl get "$key" 2>/dev/null)" 2>/dev/null && continue
+		snapctl unset "$key" && lprint "$key: removed invalid value; the default applies"
+	done
+	return 0
+}
+
 daemon_config_digest() {   # sha256 of every daemon-applied key=value, in catalog order
 	local k
 	while IFS= read -r k; do

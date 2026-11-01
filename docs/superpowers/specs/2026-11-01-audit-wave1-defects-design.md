@@ -154,7 +154,10 @@ hook already checked (`server.port`, `server.ssl`, `session.cookie-secure`, `bac
 are covered without a per-key table, and the navigator can call the same function.
 Consequence to document: `server.force-disable-ssl`, `backup.encrypt` (bool) and
 `backup.retention` (int) are now checked too; an existing bad value makes the next
-`snap set` fail with the key named, and `snap unset <key>` is always the recovery.
+`snap set` fail with the key named, and `snap unset <key>` is always the recovery. A refresh
+must not fail on such a value (snapd would undo the refresh), so `post-refresh` runs
+`sanitize_config`, which unsets every stored value `validate_config` rejects and logs
+`<key>: removed invalid value; the default applies` without the value, then seeds again.
 
 ### D3. The navigator does what the hook would have done: validate, write, re-seed on reset, offer a restart
 `nav_set_apply` calls `validate_config` before `snapctl set`; on failure it shows the

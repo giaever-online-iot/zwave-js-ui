@@ -2,7 +2,12 @@
 
 export DAEMONIZED=1
 source $SNAP/helper/functions
+source $SNAP/helper/catalog
 
+test_default_config
+# Drop stored values this revision rejects (configure would fail and snapd would undo
+# the refresh), then seed again so a dropped key with a default gets it back.
+sanitize_config
 test_default_config
 migrate_session_secret
 test_device_priority_dir

@@ -79,7 +79,7 @@ Snap users set config with `snap set zwave-js-ui server.host=0.0.0.0` (namespace
 - `configure` — seeds defaults first (so `snap unset` means "back to the default"), then validates every catalog key with `validate_config`, then restarts the daemon **only if it is active and `daemon_config_digest` differs from the digest `env-wrapper` recorded at its last start**. Runs on every `snap set` and, courtesy of snapd, after the services start on install/refresh — the digest keeps that from being a second restart.
 - `install` — seeds defaults, then disables the daemon (the user enables it explicitly with `zwave-js-ui.enable`).
 - `pre-refresh` — seeds defaults.
-- `post-refresh` — seeds defaults, runs `migrate_session_secret`, runs `test_device_priority_dir` (rewrites a stale `deviceConfigPriorityDir` that embedded the old revision number; a missing key is left alone) and removes the external-config `devices/index.json` so it rebuilds.
+- `post-refresh` — seeds defaults, runs `sanitize_config` (catalog: unsets any stored value `validate_config` now rejects, logging the key but never the value, so the refresh's `configure` cannot fail and undo it) and seeds again, runs `migrate_session_secret`, runs `test_device_priority_dir` (rewrites a stale `deviceConfigPriorityDir` that embedded the old revision number; a missing key is left alone) and removes the external-config `devices/index.json` so it rebuilds.
 
 ### User commands (`src/bin/`)
 
