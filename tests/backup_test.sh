@@ -187,6 +187,9 @@ assert_contains "$spp" "sftp://nas/zui" "main status: plain ctx keeps content"
 assert_eq "$(cat "$LESS_LOG")" "" "main status: plain ctx -> less NOT invoked"
 
 # --- create-key: confirmed passphrase, delivered on fd 0 (C8, D11) ------------------
+# cmd_* expect main's `export GNUPGHOME` (snap keyring). Set it here: under bash <=5.2 the
+# GNUPGHOME=… prefix on `main status` above leaked out of main and hid this; bash 5.3 does not.
+export GNUPGHOME="$SNAP_COMMON/.gnupg"
 GPG_LOG="$SNAP_COMMON/gpg.log"; GPG_IN="$SNAP_COMMON/gpg.stdin"
 gpg() { printf '%s\n' "$*" >> "$GPG_LOG"; case "$*" in *--passphrase-fd*) cat > "$GPG_IN" ;; esac
         case "$*" in *--list-keys*) printf 'fpr:::::::::ABCDEF0123456789ABCDEF0123456789ABCDEF01:\n' ;; esac; }
