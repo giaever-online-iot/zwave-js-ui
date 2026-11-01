@@ -48,7 +48,7 @@ description: | # markdown
   # Getting started
       sudo snap install zwave-js-ui
       sudo zwave-js-ui.enable        # the service is disabled until you enable it
-  Then open http://<host>:8091 — `zwave-js-ui.help` lists the settings, `sudo zwave-js-ui.ui` edits them.
+  Then open `http://<host>:8091` — `zwave-js-ui.help` lists the settings, `sudo zwave-js-ui.ui` edits them.
 
 grade: stable
 confinement: strict

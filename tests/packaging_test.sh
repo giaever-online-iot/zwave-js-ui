@@ -10,6 +10,7 @@ assert_eq "$(grep -rl '\buuid\b' "$ROOT/src" | wc -l)" "0" "nothing in src/ call
 assert_contains "$(yq '.description' "$Y")" "sudo zwave-js-ui.enable" "C1: store text has getting started"
 assert_contains "$(yq '.description' "$Y")" "required" "C3: store text says plugs are required"
 assert_not_contains "$(yq '.description' "$Y")" "None of these connections are necessary" "C3: contradiction gone"
+assert_contains "$(yq '.description' "$Y")" '`http://<host>:8091`' "store text: URL in a code span so markdown keeps <host>"
 assert_eq "$(yq '.permissions.contents' "$ROOT/.github/workflows/lint-test.yml")" "read" "D7: lint-test token is read-only"
 R="$ROOT/README.md"; C="$ROOT/CLAUDE.md"
 assert_not_contains "$(cat "$R")" "edge/dev" "B2: no latest/edge/dev"
