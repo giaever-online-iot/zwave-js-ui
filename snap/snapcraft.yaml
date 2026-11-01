@@ -39,12 +39,16 @@ description: | # markdown
   - Command to read the log from the terminal independent of if you're logging to file or not
   - Plugs for the `code-server` snap, if you want a full-fledge editor experience for the «store-folder»
 
-  # Auto-connections
-  - `raw-usb`: To access USB devices, such as Z-wave controller dongles
-  - `hardware-observe`: To observe your system for devices, to easily find them in the UI
+  # Interfaces
+  - `hardware-observe` (auto-connected) plus one of `raw-usb` (auto-connected) or `serial-port`
+    are **required**: the service refuses to start without them, and `zwave-js-ui.enable`
+    names the missing one.
+  - `log-observe` (connect manually) lets `zwave-js-ui.logs` read journald when the app does not log to file.
 
-  **Note:** None of these connections are necessary to run the app, so you can disconnect them as you like, but please note that it might
-    change the experience within the software.
+  # Getting started
+      sudo snap install zwave-js-ui
+      sudo zwave-js-ui.enable        # the service is disabled until you enable it
+  Then open http://<host>:8091 — `zwave-js-ui.help` lists the settings, `sudo zwave-js-ui.ui` edits them.
 
 grade: stable
 confinement: strict
@@ -89,7 +93,6 @@ apps:
       - raw-usb
       - serial-port
       - hardware-observe
-      - log-observe
   exec:
     environment:
       STORE_DIR: $SNAP_DATA
@@ -207,7 +210,6 @@ parts:
     plugin: dump
     source: src/
     stage-packages:
-      - uuid
       - less
     organize:
       hooks: snap/hooks
