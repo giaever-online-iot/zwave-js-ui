@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 source "$SNAP/helper/functions"
+source "$SNAP/helper/catalog"
 
 require_root
 
@@ -57,6 +58,13 @@ fi
 
 export ZWAVEJS_LOGS_DIR="${STORE_DIR}/logs/zwavejs"
 BACKUPS_DIR="$(backup_dir)"; export BACKUPS_DIR
+
+# Record the config this daemon starts with; the configure hook restarts the
+# service only when the digest changes (not on refresh, not for backup-only keys).
+DIGEST_FILE="$(daemon_digest_file)"
+if ! ( umask 077; daemon_config_digest > "$DIGEST_FILE" ) 2>/dev/null || ! chmod 600 "$DIGEST_FILE" 2>/dev/null; then
+    lprint "Could not record the config digest in ${DIGEST_FILE}"
+fi
 
 # When chained ahead of `npm`, run it from the app's module dir so its subcommands
 # resolve; otherwise exec the target as-is. Explicit if/then avoids the `A && B || C`
