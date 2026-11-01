@@ -6,8 +6,9 @@ source "$SNAP/helper/ui"
 source "$SNAP/helper/catalog"
 
 settings_rows() {              # catalog (common only) + live values -> TSV: key, value, default, description
-    local key type def desc scope cur
-    while IFS=$'\t' read -r key type def desc scope; do
+    local key type def desc scope applies cur
+    # shellcheck disable=SC2034  # applies is unused here
+    while IFS=$'\t' read -r key type def desc scope applies; do
         [ "$scope" = common ] || continue           # advanced keys stay out of the help table
         cur="$(snapctl get "$key" 2>/dev/null)"
         [ "$type" = secret ] && [ -n "$cur" ] && cur="(hidden)"
