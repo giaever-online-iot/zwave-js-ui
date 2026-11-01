@@ -222,6 +222,12 @@ assert_not_contains "$(cat "$GPG_LOG")" "hunter2-xyz" "X2: passphrase not on arg
 assert_contains "$(cat "$SNAP_COMMON/xerr")" "Passphrase of the backup private key" "X2: prompt on stderr"; assert_not_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X2: 'n' keeps the key"
 : > "$GPG_LOG"; (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\ny\n')) >/dev/null 2>&1
 assert_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X3: 'y' deletes after a verified export"
+# X6: a failed write of the exported key (disk full) must stop before the delete prompt
+if [ -w /dev/full ]; then
+  : > "$GPG_LOG"; (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\ny\n')) >/dev/full 2>"$SNAP_COMMON/xerr"; assert_status "$?" 1 "X6: failed key write -> rc 1"
+  assert_contains "$(cat "$SNAP_COMMON/xerr")" "Writing the key failed — the private key has NOT been deleted." "X6: says the key was kept"
+  assert_not_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X6: no delete after a failed write"
+fi
 (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key </dev/null) >/dev/null 2>"$SNAP_COMMON/xerr"; assert_status "$?" 1 "X4: no passphrase -> rc 1"
 assert_contains "$(cat "$SNAP_COMMON/xerr")" "passphrase" "X4: says what is missing"
 : > "$GPG_LOG"; (ensure_agent() { :; }; GPG_NO_SECRET=1 SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\n')) >/dev/null 2>"$SNAP_COMMON/xerr"; assert_status "$?" 0 "X5: public-only key -> rc 0"

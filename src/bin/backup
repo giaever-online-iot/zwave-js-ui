@@ -383,7 +383,9 @@ cmd_export_key() {
         exit 1
     fi
     rm -f "$gpgerr"
-    printf '%s\n' "$exported"
+    # A failed write (disk full, closed pipe) must stop here: never offer deletion of the
+    # only copy when the exported one did not land.
+    printf '%s\n' "$exported" || { ui_err "Writing the key failed — the private key has NOT been deleted."; exit 1; }
     printf '%s' "Delete the private key from THIS device now? [y/N] " >&2
     IFS= read -r answer || answer=""
     printf '\n' >&2
