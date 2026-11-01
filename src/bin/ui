@@ -6,7 +6,8 @@ source "$SNAP/helper/ui"
 source "$SNAP/helper/catalog"
 
 # --- section stubs (replaced in Tasks 2-5) ---
-nav_settings() {               # browse the catalog; edit via snapctl (configure hook validates)
+nav_settings() {               # browse the catalog; edit via snapctl (nav_set_apply validates + re-seeds + offers restart,
+                               # because snapd skips the configure hook for in-app snapctl writes)
     local choice key type def desc cur act new
     while true; do
         ui_clear
@@ -19,7 +20,7 @@ nav_settings() {               # browse the catalog; edit via snapctl (configure
         choice="$(ui_choose "Setting (type to filter)" "" "${items[@]}" "← Back")" || return
         [ "$choice" = "← Back" ] && return
         key="${choice%% = *}"
-        IFS=$'\t' read -r _ type def desc _ < <(catalog_row "$key")
+        type="$(catalog_field "$key" 2)"; def="$(catalog_field "$key" 3)"; desc="$(catalog_field "$key" 4)"
         cur="$(snapctl get "$key" 2>/dev/null)"; catalog_is_secret "$key" && [ -n "$cur" ] && cur="(hidden)"
         ui_kv "key" "$key" "current" "${cur:-(unset)}" "default" "$def" "type" "$type" "description" "$desc"
         act="$(ui_choose "Action for $key" "" "Edit" "Reset to default" "← Back")" || continue
@@ -41,21 +42,36 @@ nav_settings() {               # browse the catalog; edit via snapctl (configure
     done
 }
 
-nav_set_apply() {              # $1 key, $2 value, $3 set|unset — run snapctl, surface configure's verdict
-    local key="$1" val="$2" mode="$3" out rc
-    if [ "$mode" = unset ]; then out="$(snapctl unset "$key" 2>&1)"; rc=$?
-    else out="$(snapctl set "$key=$val" 2>&1)"; rc=$?; fi
-    if [ "$rc" -eq 0 ]; then
-        if [ "$mode" = unset ]; then
-            ui_ok "$key reset to default"
-        else
-            local shown="$val"; catalog_is_secret "$key" && [ -n "$val" ] && shown="(hidden)"
-            ui_ok "$key set to $shown"
+nav_set_apply() {              # $1 key, $2 value, $3 set|unset. snapd commits in-app snapctl writes WITHOUT running
+                               # the configure hook, so do its job here: validate, re-seed a reset, offer a restart.
+    local key="$1" val="$2" mode="$3" msg shown applies
+    [ "$mode" = set ] && [ -z "$val" ] && mode="unset"
+    if [ "$mode" = set ]; then
+        if ! msg="$(validate_config "$key" "$val" 2>&1)"; then
+            ui_err "Rejected — $key unchanged"
+            [ -n "$msg" ] && ui_print "$msg"
+            ui_pause
+            return
         fi
+        snapctl set "$key=$val" || { ui_err "snapctl could not set $key"; ui_pause; return; }
+        shown="$val"; catalog_is_secret "$key" && shown="(hidden)"
+        ui_ok "$key set to $shown"
     else
-        ui_err "Rejected — $key unchanged"
-        [ -n "$out" ] && ui_print "$out"
+        snapctl unset "$key" || { ui_err "snapctl could not unset $key"; ui_pause; return; }
+        ( test_default_config ) >/dev/null 2>&1     # subshell: its testnset_config exits on a failed set
+        shown="$(snapctl get "$key" 2>/dev/null)"
+        catalog_is_secret "$key" && [ -n "$shown" ] && shown="(hidden)"
+        ui_ok "$key reset to default: ${shown:-(unset)}"
     fi
+    applies="$(catalog_field "$key" 6)"
+    case "$applies" in
+        daemon)
+            case "$(service_state)" in
+                *" active") if ui_confirm "Restart $SNAP_NAME to apply?"; then "${NAV_BIN:-$SNAP/bin}/restart"; fi ;;
+                *) ui_print "Takes effect when the service starts." ;;
+            esac ;;
+        backup) ui_print "Used by the next backup run." ;;
+    esac
     ui_pause
 }
 

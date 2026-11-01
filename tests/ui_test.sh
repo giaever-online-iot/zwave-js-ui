@@ -206,6 +206,8 @@ kvn="$(printf 'encrypt-key\t0E32DAF912C2645073A3DFFA8956E92F1A70C779\n' | UI_ASS
 assert_contains "$kvn" "encrypt-key"                                  "kv stack: label title"
 assert_contains "$kvn" "    0E32DAF912C2645073A3DFFA8956E92F1A70C779" "kv stack: indented bare value"
 
+es="$(printf 'a\t\tc\n' | ui_stack h1 h2 h3)"; assert_contains "$es" "    h3: c" "stack: empty middle field keeps later columns aligned"; assert_eq "$(printf '%s\n' "$es" | wc -l)" "3" "stack: three lines for three fields"
+
 # plain ctx unchanged (aligned columns, zero ANSI)
 plain="$(printf 'k\tv\n' | ui_table key value)"
 assert_contains "$plain" "k" "plain: aligned still works"
