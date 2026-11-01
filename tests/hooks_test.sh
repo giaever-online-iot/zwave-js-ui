@@ -37,4 +37,8 @@ reset_state "${VALID[@]}"; SNAPCTL_SERVICES_FAIL=1 run_hook configure; assert_st
 assert_not_contains "$(cat "$SNAPCTL_LOG")" "restart" "C8: services unknown -> no restart"
 reset_state "${VALID[@]}"; printf 'garbage\n' > "$SNAP_COMMON/.daemon-config.sha256"; run_hook configure
 assert_contains "$(cat "$SNAPCTL_LOG")" "restart zwave-js-ui.zwave-js-ui" "C9: corrupt digest file reads as changed -> restart"
+reset_state "${VALID[@]}" session.secret=6ba7b810-9dad-11d1-80b4-00c04fd430c8; run_hook post-refresh
+assert_contains "$(cat "$SNAPCTL_LOG")" "unset session.secret" "P1: post-refresh removes the seeded v1 UUID"
+assert_eq "$(grep -c "^set session.secret" "$SNAPCTL_LOG")" "0" "P1: nothing re-seeds it"
+assert_not_contains "$(cat "$LOGGER_LOG")" "6ba7b810" "P1: value not in syslog"
 finish

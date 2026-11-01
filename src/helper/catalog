@@ -12,7 +12,7 @@ server.host	string	0.0.0.0	IP address the web UI binds to	common	daemon
 server.port	int	8091	Port for the web UI	common	daemon
 server.ssl	bool	false	Serve the web UI over HTTPS	common	daemon
 server.force-disable-ssl	bool	false	Force-disable SSL even when enabled	common	daemon
-session.secret	secret	(generated)	Session secret (a UUID is generated on install)	common	daemon
+session.secret	secret	(unset)	Session secret; leave unset and the app keeps its own 256-bit secret in the store (recommended)	common	daemon
 session.cookie-secure	bool	(= server.ssl)	Secure session cookie (see expressjs/session#cookiesecure)	common	daemon
 mqtt.name	string	(unset)	Client name when connecting to the MQTT broker	common	daemon
 timezone	string	Europe/Oslo	Timezone exported to the app as TZ	common	daemon

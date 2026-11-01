@@ -43,4 +43,5 @@ assert_eq "$(SNAPCTL_server_host=10.0.0.7 daemon_config_digest)" "$d1" "digest d
 [ "$(SNAPCTL_server_host=10.0.0.8 daemon_config_digest)" != "$d1" ]; assert_status "$?" 0 "digest changes with a daemon key"
 assert_eq "$(SNAPCTL_server_host=10.0.0.7 SNAPCTL_backup_target=file:///x daemon_config_digest)" "$d1" "digest ignores backup-only keys"
 assert_eq "$(daemon_digest_file)" "$SNAP_COMMON/.daemon-config.sha256" "digest file path"
+assert_eq "$(catalog_field session.secret 3)" "(unset)" "session.secret default is unset (D4)"
 finish

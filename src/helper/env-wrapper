@@ -30,7 +30,12 @@ elif [ "${USE_SECURE_COOKIE}" != true ]; then
     unset USE_SECURE_COOKIE
 fi
 
-SESSION_SECRET=$(snapctl get session.secret); export SESSION_SECRET
+SESSION_SECRET=$(snapctl get session.secret)
+if [ -n "${SESSION_SECRET}" ]; then
+    export SESSION_SECRET
+else
+    unset SESSION_SECRET
+fi
 
 MQTT_NAME=$(snapctl get mqtt.name); export MQTT_NAME
 

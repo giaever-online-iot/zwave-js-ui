@@ -137,11 +137,22 @@ function test_default_config {
     testnset_config "server.force-disable-ssl" false
 
     testnset_config "session.cookie-secure" "$(snapctl get server.ssl)"
-    testnset_config "session.secret" "$(uuid)"
 
     testnset_config "mqtt.name" ""
 
     testnset_config "timezone" "Europe/Oslo"
+}
+
+# Older revisions seeded session.secret with a v1 UUID, which overrode the
+# app's own 256-bit secret. Drop that value (and only that shape) so the app
+# keeps its own. Never prints the value.
+function migrate_session_secret {
+    local v; v="$(snapctl get session.secret 2>/dev/null)"
+    if [ "${#v}" -eq 36 ] && [[ "$v" =~ ^[0-9a-fA-F-]+$ ]] && [ "${v:14:1}" = "1" ]; then
+        snapctl unset session.secret
+        lprint "session.secret: removed the generated v1 UUID; the app now keeps its own secret in ${SNAP_DATA}/.session-secret (one re-login)"
+    fi
+    return 0
 }
 
 function backup_dir {

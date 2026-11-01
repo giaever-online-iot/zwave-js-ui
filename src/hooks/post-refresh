@@ -4,6 +4,7 @@ export DAEMONIZED=1
 source $SNAP/helper/functions
 
 test_default_config
+migrate_session_secret
 test_device_priority_dir
 
 # Update references to the external config directory

@@ -37,4 +37,6 @@ SNAPCTL_server_host=10.0.0.7 SNAPCTL_backup_target=file:///x run_wrapper >/dev/n
 assert_eq "$(cat "$DF")" "$d7" "E3: backup-only key does not change the digest"
 out="$(SNAP_COMMON=/nonexistent/no-such-dir run_wrapper)"
 assert_contains "$out" "HOST=" "E4: unwritable SNAP_COMMON still execs the app"
+assert_not_contains "$(run_wrapper)" "SESSION_SECRET=" "unset secret -> not exported"
+assert_contains "$(SNAPCTL_session_secret=abc run_wrapper)" "SESSION_SECRET=abc" "set secret -> exported"
 finish
