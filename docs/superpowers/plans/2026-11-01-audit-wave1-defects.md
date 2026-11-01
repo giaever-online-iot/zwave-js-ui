@@ -198,8 +198,7 @@ git commit -m "feat(env-wrapper): record the daemon's config digest at start (A1
   - `set <k>=<v>` / `unset <k>`: when `SNAPCTL_STATE` is set, write/remove `$SNAPCTL_STATE/<k>`; when `SNAPCTL_LOG` is set, append `set <k>=<v>` / `unset <k>`.
   - `restart|start|stop <args>`: append `<verb> <args>` to `SNAPCTL_LOG` when set.
   - `services [name]`: with `SNAPCTL_SERVICES_FAIL=1` print nothing and exit 1; else the header line, then `zwave-js-ui.zwave-js-ui  enabled  ${SNAPCTL_MAIN_STATE:-active}  -` and `zwave-js-ui.backup-timer  enabled  inactive  timer-activated` (only the matching row when `name` is given; `SNAP_NAME` defaults to `zwave-js-ui`).
-  - `is-connected <plug>`: when `SNAPCTL_CONNECTED` is set, exit 0 iff the plug is listed in it (space-separated); else exit 0.
-  - Everything else: quiet no-op (today's behaviour).
+  - Everything else (including `is-connected`): quiet no-op, exit 0 (today's behaviour).
 - Produces: `tests/hooks_test.sh` harness helpers `reset_state k=v…`, `run_hook <name>` (runs `bash "$ROOT/src/hooks/<name>"`, stderr to `$T/stderr`, returns its rc), `digest_now` (prints the digest for the current state), reused by Tasks 4 and 5.
 
 - [ ] **Step 1: Extend the fixture `snapctl`** per the contract above (keep the file a plain `case`, ~30 lines).
@@ -489,11 +488,11 @@ GPG_LOG="$SNAP_COMMON/gpg.log"; GPG_IN="$SNAP_COMMON/gpg.stdin"
 gpg() { printf '%s\n' "$*" >> "$GPG_LOG"; case "$*" in *--passphrase-fd*) cat > "$GPG_IN" ;; esac
         case "$*" in *--list-keys*) printf 'fpr:::::::::ABCDEF0123456789ABCDEF0123456789ABCDEF01:\n' ;; esac; }
 : > "$GPG_LOG"; : > "$GPG_IN"
-ck="$( (ensure_agent() { :; }; printf 'pw1\npw1\n' | cmd_create_key Name mail@example.com) 2>&1 )"; rc=$?
+ck="$( (ensure_agent() { :; }; printf 'correct-horse-7\ncorrect-horse-7\n' | cmd_create_key Name mail@example.com) 2>&1 )"; rc=$?
 assert_status "$rc" 0 "K1: confirmed passphrase -> created"; assert_contains "$ck" "needed to restore" "K1: explains irrecoverability"
-assert_contains "$(cat "$GPG_LOG")" "--passphrase-fd 0" "K1: passphrase on fd 0"; assert_not_contains "$(cat "$GPG_LOG")" "pw1" "K1: passphrase never on argv (D11)"
-assert_eq "$(cat "$GPG_IN")" "pw1" "K1: passphrase delivered on stdin"
-: > "$GPG_LOG"; ck="$( (ensure_agent() { :; }; printf 'pw1\npw2\n' | cmd_create_key Name mail@example.com) 2>&1 )"; rc=$?
+assert_contains "$(cat "$GPG_LOG")" "--passphrase-fd 0" "K1: passphrase on fd 0"; assert_not_contains "$(cat "$GPG_LOG")" "correct-horse-7" "K1: passphrase never on argv (D11)"
+assert_eq "$(cat "$GPG_IN")" "correct-horse-7" "K1: passphrase delivered on stdin"
+: > "$GPG_LOG"; ck="$( (ensure_agent() { :; }; printf 'correct-horse-7\nwrong-horse-8\n' | cmd_create_key Name mail@example.com) 2>&1 )"; rc=$?
 assert_status "$rc" 1 "K2: mismatch -> rc 1"; assert_contains "$ck" "Passphrases do not match — nothing created." "K2: message"; assert_eq "$(cat "$GPG_LOG")" "" "K2: gpg never called"
 ```
 
@@ -540,16 +539,16 @@ gpg() { printf '%s\n' "$*" >> "$GPG_LOG"; case "$*" in
     *--export-secret-keys*) cat > "$GPG_IN"; printf -- '-----BEGIN PGP PRIVATE KEY BLOCK-----\nabc\n-----END PGP PRIVATE KEY BLOCK-----\n' ;;
     esac; }
 : > "$GPG_LOG"; : > "$GPG_IN"
-xo="$( (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'pw\nn\n')) 2>"$SNAP_COMMON/xerr" )"; rc=$?
+xo="$( (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\nn\n')) 2>"$SNAP_COMMON/xerr" )"; rc=$?
 assert_status "$rc" 0 "X2: export ok"; assert_contains "$xo" "BEGIN PGP PRIVATE KEY BLOCK" "X2: key on stdout only"
 assert_contains "$(cat "$GPG_LOG")" "--pinentry-mode loopback" "X2: loopback (no pinentry in the snap, A4)"; assert_contains "$(cat "$GPG_LOG")" "--passphrase-fd 0" "X2: passphrase on fd 0"
-assert_not_contains "$(cat "$GPG_LOG")" "pw" "X2: passphrase not on argv"; assert_eq "$(cat "$GPG_IN")" "pw" "X2: passphrase delivered"
+assert_not_contains "$(cat "$GPG_LOG")" "hunter2-xyz" "X2: passphrase not on argv"; assert_eq "$(cat "$GPG_IN")" "hunter2-xyz" "X2: passphrase delivered"
 assert_contains "$(cat "$SNAP_COMMON/xerr")" "Passphrase of the backup private key" "X2: prompt on stderr"; assert_not_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X2: 'n' keeps the key"
-: > "$GPG_LOG"; (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'pw\ny\n')) >/dev/null 2>&1
+: > "$GPG_LOG"; (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\ny\n')) >/dev/null 2>&1
 assert_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X3: 'y' deletes after a verified export"
 (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key </dev/null) >/dev/null 2>"$SNAP_COMMON/xerr"; assert_status "$?" 1 "X4: no passphrase -> rc 1"
 assert_contains "$(cat "$SNAP_COMMON/xerr")" "passphrase" "X4: says what is missing"
-: > "$GPG_LOG"; (ensure_agent() { :; }; GPG_NO_SECRET=1 SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'pw\n')) >/dev/null 2>"$SNAP_COMMON/xerr"; assert_status "$?" 0 "X5: public-only key -> rc 0"
+: > "$GPG_LOG"; (ensure_agent() { :; }; GPG_NO_SECRET=1 SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\n')) >/dev/null 2>"$SNAP_COMMON/xerr"; assert_status "$?" 0 "X5: public-only key -> rc 0"
 assert_contains "$(cat "$SNAP_COMMON/xerr")" "nothing to export" "X5: explains"; assert_not_contains "$(cat "$SNAP_COMMON/xerr")" "Passphrase of" "X5: no passphrase prompt"
 ```
 
