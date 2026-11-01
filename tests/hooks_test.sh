@@ -16,6 +16,7 @@ VALID=(server.port=8091 server.ssl=false session.cookie-secure=false)
 
 reset_state "${VALID[@]}"; run_hook configure; assert_status "$?" 0 "C1: valid config -> rc 0"
 assert_contains "$(cat "$SNAPCTL_LOG")" "restart zwave-js-ui.zwave-js-ui" "C1: active + no digest file -> restart (timer line is inactive)"
+assert_contains "$(cat "$LOGGER_LOG")" "Restarting zwave-js-ui.zwave-js-ui" "C1: restart notice goes to syslog"; assert_eq "$(cat "$T/stdout")" "" "C1: configure prints nothing on stdout (DAEMONIZED)"
 reset_state "${VALID[@]}"; SNAPCTL_MAIN_STATE=inactive run_hook configure
 assert_not_contains "$(cat "$SNAPCTL_LOG")" "restart" "C2: inactive daemon -> no restart"
 reset_state "${VALID[@]}"; run_hook configure; digest_now > "$SNAP_COMMON/.daemon-config.sha256"; : > "$SNAPCTL_LOG"
@@ -28,6 +29,7 @@ for bad in "server.port=abc|!! server.port must be a whole number, got abc" "ser
     kv="${bad%%|*}"; msg="${bad#*|}"; reset_state "${VALID[@]}" "$kv"; run_hook configure; rc=$?
     assert_status "$rc" 1 "C5: $kv rejected"; assert_contains "$(cat "$T/stderr")" "$msg" "C5: $kv message"
     assert_not_contains "$(cat "$SNAPCTL_LOG")" "restart" "C5: $kv -> no restart"
+    assert_eq "$(cat "$T/stdout")" "" "C5: $kv -> nothing on stdout"; assert_eq "$(grep -vc '^!! ' "$T/stderr")" "0" "C5: $kv -> stderr holds only the !! line"
 done
 reset_state "${VALID[@]}" session.secret=SUPERSECRETVALUE; run_hook configure
 assert_not_contains "$(cat "$LOGGER_LOG")$(cat "$T/stdout")$(cat "$T/stderr")" "SUPERSECRETVALUE" "C6: secret never logged"

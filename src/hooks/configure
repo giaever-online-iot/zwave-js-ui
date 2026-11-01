@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+export DAEMONIZED=1
 set -e
 source $SNAP/helper/functions
 source $SNAP/helper/catalog
@@ -16,6 +17,6 @@ done
 DIGEST_FILE="$(daemon_digest_file)"
 if [ "$(daemon_config_digest)" != "$(cat "${DIGEST_FILE}" 2>/dev/null || true)" ]; then
     case "$(service_state)" in
-        *" active") echo "Restarting ${SNAP_NAME}.${SNAP_NAME}"; snapctl restart "${SNAP_NAME}.${SNAP_NAME}" ;;
+        *" active") lprint "Restarting ${SNAP_NAME}.${SNAP_NAME}"; snapctl restart "${SNAP_NAME}.${SNAP_NAME}" ;;
     esac
 fi
