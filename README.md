@@ -17,6 +17,18 @@ If you find this snap package useful, please consider:
   - [@AlCalzone](https://github.com/sponsors/AlCalzone) (Z-Wave JS driver dev)
 - Starring this repository
 
+## Getting started
+
+```bash
+sudo snap install zwave-js-ui
+sudo zwave-js-ui.enable          # the service is disabled until you enable it
+```
+
+Then open `http://<host>:8091`. `zwave-js-ui.help` shows the settings and commands;
+`sudo zwave-js-ui.ui` is an interactive navigator for settings, service, interfaces and logs.
+Settings are snap config: `sudo snap set zwave-js-ui server.port=8092` (the service restarts
+itself when a setting it uses changes; `sudo snap unset zwave-js-ui <key>` restores the default).
+
 ## Release Channels
 
 The snap uses different channels in the `latest` track to give you control over update frequency:
@@ -25,7 +37,7 @@ The snap uses different channels in the `latest` track to give you control over 
 
 - **`latest/candidate`** — Latest minor or patch release of the current major version. Updates when version `a.b.c` changes to `a.b.d` (patch) or `a.c.0` (minor). This is a rolling release channel for users who want regular updates without major version changes.
 
-- **`latest/edge`** and **`latest/edge/dev`** — Development builds. Every build, including experimental and test versions, may be pushed to these channels. These channels are intended for maintainers and testers only.
+- **`latest/edge`** — Development builds. Every build, including experimental and test versions, may be pushed to this channel. It is intended for maintainers and testers only.
 
 For users who want full control and prefer not to receive automatic updates between major and minor releases, use a specific version track (for example, `v9.11`). This allows you to stay on a particular major.minor version and only receive patch updates.
 
@@ -85,32 +97,27 @@ This snap includes features that simplify running and managing Z-Wave JS UI on s
 - Read logs from the terminal regardless of whether the application logs to file (`zwave-js-ui.logs`)
 - Optional integration with the `code-server` snap to edit files in the persistent store
 
-## Auto-Connections
+## Interfaces
 
-When installed from the Snap Store, the snap automatically connects two interfaces to provide a convenient out-of-the-box experience:
+The service needs `hardware-observe` **and one of** `raw-usb` or `serial-port`.
+It refuses to start without them: `sudo zwave-js-ui.enable` and `zwave-js-ui.restart` print
+which interface is missing and the command that connects it.
 
-- `raw-usb` — Grants access to USB devices (for example, Z-Wave controller dongles).
-- `hardware-observe` — Allows the snap to observe hardware events so the UI can discover devices on the host.
+- `raw-usb` (auto-connected from the Snap Store) — USB Z-Wave controller sticks.
+- `hardware-observe` (auto-connected) — lets the UI discover devices on the host.
+- `serial-port` (manual; needs snapd's experimental hotplug) — a serial controller instead of `raw-usb`.
+- `log-observe` (manual) — `zwave-js-ui.logs` reads journald for any log not written to file;
+  without it the command exits with the fix: `sudo snap connect zwave-js-ui:log-observe`.
 
-These connections are automatically set for convenience and to provide a good initial experience, but they are not strictly required. If you prefer tighter isolation you can disconnect them; note that doing so may restrict functionality (for example, the UI may not detect USB dongles and the snap won't be able to access a controller via USB).
+Manual connections (needed after `snap install --dangerous` of a local build):
+```bash
+sudo snap connect zwave-js-ui:raw-usb
+sudo snap connect zwave-js-ui:hardware-observe
+```
 
-Manual connect/disconnect examples:
-- To manually connect (useful if you installed the snap locally or built it yourself):
-  ```bash
-  sudo snap connect zwave-js-ui:raw-usb
-  sudo snap connect zwave-js-ui:hardware-observe
-  ```
-- To disconnect:
-  ```bash
-  sudo snap disconnect zwave-js-ui:raw-usb
-  sudo snap disconnect zwave-js-ui:hardware-observe
-  ```
-
-Additional notes:
-- If you install the snap outside the Snap Store (for example with `snap install --dangerous`), the interfaces might not be auto-connected and you may need to run the connect commands above.
-- `zwave-js-ui.logs` reads journald for any log not written to file ("log to file" off, the upstream default). That requires the `log-observe` interface, which is **not** auto-connected — without it the command exits with an error that includes the fix: `sudo snap connect zwave-js-ui:log-observe`.
-- Depending on your distribution, you may also need to adjust USB device permissions or add your user to a serial/dialout group for direct access to the controller device node.
-- Granting the `raw-usb` interface gives the snap broad access to USB devices. Only enable it if you trust the snap source and understand the implications.
+Notes:
+- Depending on your distribution you may need to adjust USB device permissions for the controller.
+- `raw-usb` grants broad USB access; connect it only if you trust the snap source.
 
 ## Reporting Issues
 

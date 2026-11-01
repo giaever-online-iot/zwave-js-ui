@@ -11,4 +11,11 @@ assert_contains "$(yq '.description' "$Y")" "sudo zwave-js-ui.enable" "C1: store
 assert_contains "$(yq '.description' "$Y")" "required" "C3: store text says plugs are required"
 assert_not_contains "$(yq '.description' "$Y")" "None of these connections are necessary" "C3: contradiction gone"
 assert_eq "$(yq '.permissions.contents' "$ROOT/.github/workflows/lint-test.yml")" "read" "D7: lint-test token is read-only"
+R="$ROOT/README.md"; C="$ROOT/CLAUDE.md"
+assert_not_contains "$(cat "$R")" "edge/dev" "B2: no latest/edge/dev"
+assert_contains "$(cat "$R")" "sudo zwave-js-ui.enable" "C1: README getting started"; assert_contains "$(cat "$R")" "http://<host>:8091" "C1: README URL"
+assert_not_contains "$(cat "$R")" "not strictly required" "C3: README no longer calls plugs optional"; assert_contains "$(cat "$R")" "refuses to start" "C3: README says required"
+assert_not_contains "$(cat "$C")" "22.20.0" "B2: no stale Node literal"
+assert_not_contains "$(cat "$C")" '`pre-refresh` — runs `test_device_priority_dir`' "B2: hooks attributed correctly"
+assert_contains "$(cat "$C")" "daemon_config_digest" "CLAUDE.md documents the digest gate"
 finish
