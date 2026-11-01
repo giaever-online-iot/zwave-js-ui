@@ -276,10 +276,10 @@ cmd_create_key() {
         ui_print "  ${SNAP_NAME}.backup pick-key | sudo ${SNAP_NAME}.backup import-key" >&2
         return 1
     fi
-    local name email comment pass uid
+    local name email comment pass pass2 uid
     # UID fields may be supplied as args ($1 name, $2 email, $3 comment) or prompted
     # interactively. Arg mode requires at least name + email; the passphrase is ALWAYS
-    # prompted (never an argument, to keep it out of the process list).
+    # prompted twice and travels to gpg on fd 0 (never an argument, to keep it out of the process list).
     if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
         name="$1"; email="$2"; comment="${3:-}"
     else
@@ -287,16 +287,19 @@ cmd_create_key() {
         email="$(ui_input 'Email')" || { ui_err "Cannot prompt without a terminal — pass name/email as arguments."; return 1; }
         comment="$(ui_input 'Comment (optional)')" || comment=""
     fi
+    ui_print "This passphrase is needed to restore — there is no recovery if it is lost." >&2
     pass="$(ui_input --password 'Passphrase for the new private key')" || { ui_err "Cannot prompt for a passphrase without a terminal."; return 1; }
+    pass2="$(ui_input --password 'Repeat passphrase')" || { ui_err "Cannot prompt for a passphrase without a terminal."; return 1; }
     [ -n "$name" ]  || { ui_err "Real name must not be empty."; return 1; }
     [ -n "$email" ] || { ui_err "Email must not be empty."; return 1; }
     [ -n "$pass" ]  || { ui_err "Passphrase must not be empty — the backup private key must be protected."; return 1; }
+    [ "$pass" = "$pass2" ] || { ui_err "Passphrases do not match — nothing created."; return 1; }
     uid="$name"
     [ -n "$comment" ] && uid="$uid ($comment)"
     uid="$uid <$email>"
     # gpg chatter (trustdb, revocation-cert notes) only on failure, where it explains.
     local gpgout
-    if ! gpgout="$(gpg_snap --batch --pinentry-mode loopback --passphrase "$pass" \
+    if ! gpgout="$(printf '%s\n' "$pass" | gpg_snap --batch --pinentry-mode loopback --passphrase-fd 0 \
         --quick-generate-key "$uid" ed25519 cert,sign never 2>&1)"; then
         ui_err "Key generation failed — check the name/email are valid. gpg said:"
         printf '%s\n' "$gpgout" >&2
@@ -307,7 +310,7 @@ cmd_create_key() {
         ui_err "Key was generated but its fingerprint could not be read for '${email}'."
         return 1
     fi
-    if ! gpgout="$(gpg_snap --batch --pinentry-mode loopback --passphrase "$pass" \
+    if ! gpgout="$(printf '%s\n' "$pass" | gpg_snap --batch --pinentry-mode loopback --passphrase-fd 0 \
         --quick-add-key "$fpr" cv25519 encr never 2>&1)"; then
         ui_err "Adding the encryption subkey failed; '${fpr}' is not usable for backups yet. gpg said:"
         printf '%s\n' "$gpgout" >&2

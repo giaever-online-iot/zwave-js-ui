@@ -186,4 +186,16 @@ spp="$(SNAPCTL_backup_target="sftp://nas/zui" GNUPGHOME="$SNAP_COMMON/.gnupg" \
 assert_contains "$spp" "sftp://nas/zui" "main status: plain ctx keeps content"
 assert_eq "$(cat "$LESS_LOG")" "" "main status: plain ctx -> less NOT invoked"
 
+# --- create-key: confirmed passphrase, delivered on fd 0 (C8, D11) ------------------
+GPG_LOG="$SNAP_COMMON/gpg.log"; GPG_IN="$SNAP_COMMON/gpg.stdin"
+gpg() { printf '%s\n' "$*" >> "$GPG_LOG"; case "$*" in *--passphrase-fd*) cat > "$GPG_IN" ;; esac
+        case "$*" in *--list-keys*) printf 'fpr:::::::::ABCDEF0123456789ABCDEF0123456789ABCDEF01:\n' ;; esac; }
+: > "$GPG_LOG"; : > "$GPG_IN"
+ck="$( (ensure_agent() { :; }; printf 'correct-horse-7\ncorrect-horse-7\n' | cmd_create_key Name mail@example.com) 2>&1 )"; rc=$?
+assert_status "$rc" 0 "K1: confirmed passphrase -> created"; assert_contains "$ck" "needed to restore" "K1: explains irrecoverability"
+assert_contains "$(cat "$GPG_LOG")" "--passphrase-fd 0" "K1: passphrase on fd 0"; assert_not_contains "$(cat "$GPG_LOG")" "correct-horse-7" "K1: passphrase never on argv (D11)"
+assert_eq "$(cat "$GPG_IN")" "correct-horse-7" "K1: passphrase delivered on stdin"
+: > "$GPG_LOG"; ck="$( (ensure_agent() { :; }; printf 'correct-horse-7\nwrong-horse-8\n' | cmd_create_key Name mail@example.com) 2>&1 )"; rc=$?
+assert_status "$rc" 1 "K2: mismatch -> rc 1"; assert_contains "$ck" "Passphrases do not match — nothing created." "K2: message"; assert_eq "$(cat "$GPG_LOG")" "" "K2: gpg never called"
+
 finish
