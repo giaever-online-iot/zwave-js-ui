@@ -87,7 +87,7 @@ cmd_status() {                 # render current backup config as a table
     local target key onbox="no" retention timer
     target="$(cfg target)"
     key="$(cfg encrypt-key)"
-    if [ -n "$key" ] && gpg_snap --list-secret-keys "$key" >/dev/null 2>&1; then
+    if [ -n "$key" ] && secret_key_on_disk "$key"; then
         onbox="yes"
     fi
     retention="$(cfg retention)"
@@ -127,6 +127,17 @@ nth_fpr() {
 # via ensure_agent and connect over its socket). Centralise them here. NB: pick-key targets
 # the USER's host keyring, not $GNUPGHOME, so it does NOT use this wrapper.
 gpg_snap() { gpg --no-autostart --homedir "$GNUPGHOME" "$@"; }
+
+# Is the private half of <fpr> in the snap keyring? Looks at the key file on disk
+# (private-keys-v1.d/<keygrip>.key) rather than asking gpg-agent: the agent is down after
+# every reboot, so --list-secret-keys fails then, and `status` must stay read-only (it
+# must not start a daemon). --list-keys with a keygrip needs no agent.
+secret_key_on_disk() {
+    local grip
+    grip="$(gpg_snap --with-colons --with-keygrip --list-keys "$1" 2>/dev/null \
+        | awk -F: '$1=="grp" { print $10; exit }')"
+    [ -n "$grip" ] && [ -e "$GNUPGHOME/private-keys-v1.d/${grip}.key" ]
+}
 
 # USER-context: list the invoking user's host public keys, or export one (armored) to
 # stdout. Refuses root (root can't read the user's keyring — owner-match fails). Pipe the
@@ -216,6 +227,9 @@ cmd_import_key() {
     mkdir -p "$GNUPGHOME"; chmod 700 "$GNUPGHOME"
     local tmp; tmp="$(mktemp "${SNAP_COMMON:-/tmp}/.import-key.XXXXXX")"
     trap 'rm -f "$tmp"' RETURN
+    if [ -t 0 ]; then
+        ui_print "Paste the ARMORED PUBLIC key, then press Ctrl-D — or pipe it: ${SNAP_NAME}.backup pick-key | sudo ${SNAP_NAME}.backup import-key" >&2
+    fi
     cat > "$tmp"
     # gpg_snap carries --no-autostart: importing a PUBLIC key needs no gpg-agent; without
     # it gpg tries to autostart the (base-path, absent-in-snap) agent and exits non-zero

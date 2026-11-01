@@ -227,4 +227,24 @@ assert_contains "$(cat "$SNAP_COMMON/xerr")" "passphrase" "X4: says what is miss
 : > "$GPG_LOG"; (ensure_agent() { :; }; GPG_NO_SECRET=1 SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\n')) >/dev/null 2>"$SNAP_COMMON/xerr"; assert_status "$?" 0 "X5: public-only key -> rc 0"
 assert_contains "$(cat "$SNAP_COMMON/xerr")" "nothing to export" "X5: explains"; assert_not_contains "$(cat "$SNAP_COMMON/xerr")" "Passphrase of" "X5: no passphrase prompt"
 
+# --- status reads the keyring on disk; import-key says what it waits for (A5, C7) ---
+export GNUPGHOME="$SNAP_COMMON/.gnupg"; mkdir -p "$GNUPGHOME/private-keys-v1.d"
+gpg() { case "$*" in *--with-keygrip*) printf 'grp:::::::::1234GRIP:\n' ;; esac; }
+: > "$GNUPGHOME/private-keys-v1.d/1234GRIP.key"; secret_key_on_disk F0F0; assert_status "$?" 0 "S1: keygrip file present -> secret key on disk"
+printf '%s\n' "$(SNAPCTL_backup_encrypt_key=F0F0 cmd_status)" | grep -Eq 'private key on this device[[:space:]]+yes'; assert_status "$?" 0 "S1: status says yes without an agent (A5)"
+rm "$GNUPGHOME/private-keys-v1.d/1234GRIP.key"; secret_key_on_disk F0F0; assert_status "$?" 1 "S2: no keygrip file -> no"
+printf '%s\n' "$(SNAPCTL_backup_encrypt_key=F0F0 cmd_status)" | grep -Eq 'private key on this device[[:space:]]+no'; assert_status "$?" 0 "S2: status says no"
+gpg() { :; }; secret_key_on_disk F0F0; assert_status "$?" 1 "S3: key not in the keyring -> no"
+ih="$( (gpg() { return 1; }; printf 'junk' | cmd_import_key) 2>&1 )"; assert_not_contains "$ih" "Paste the ARMORED" "I1: piped stdin -> no paste hint"
+if command -v script >/dev/null 2>&1; then
+  cat > "$SNAP_COMMON/import_tty.sh" <<EOT
+export SNAP="$SNAP" SNAP_COMMON="$SNAP_COMMON" GNUPGHOME="$GNUPGHOME"
+snapctl() { :; }; source "$ROOT/src/bin/backup"; require_root() { :; }; gpg() { return 1; }
+cmd_import_key
+EOT
+  ip="$(timeout 10 script -qec "bash $SNAP_COMMON/import_tty.sh" /dev/null 2>&1 </dev/null)"
+  assert_contains "$ip" "Paste the ARMORED PUBLIC key" "I2: terminal stdin -> paste hint before reading (C7)"
+fi
+unset GNUPGHOME
+
 finish
