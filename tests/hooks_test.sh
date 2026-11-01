@@ -43,7 +43,7 @@ reset_state "${VALID[@]}" session.secret=6ba7b810-9dad-11d1-80b4-00c04fd430c8; r
 assert_contains "$(cat "$SNAPCTL_LOG")" "unset session.secret" "P1: post-refresh removes the seeded v1 UUID"
 assert_eq "$(grep -c "^set session.secret" "$SNAPCTL_LOG")" "0" "P1: nothing re-seeds it"
 assert_not_contains "$(cat "$LOGGER_LOG")" "6ba7b810" "P1: value not in syslog"
-[ -e "$SNAP_COMMON/.session-secret-migrated" ]; assert_status "$?" 0 "P1: migration marker written"
+_rc=0; [ -e "$SNAP_COMMON/.session-secret-migrated" ] || _rc=1; assert_status "$_rc" 0 "P1: migration marker written"
 V1=6ba7b810-9dad-11d1-80b4-00c04fd430c8
 reset_state "${VALID[@]}" session.secret=$V1; run_hook post-refresh   # marker from P1 present
 assert_not_contains "$(cat "$SNAPCTL_LOG")" "unset session.secret" "P3: marker present -> a deliberately set v1 UUID is kept"
@@ -53,13 +53,13 @@ assert_not_contains "$(cat "$LOGGER_LOG")" "removed the generated" "P4: failed u
 # P2: values the old hook accepted but validate_config now rejects must not fail the refresh
 reset_state "${VALID[@]}" server.force-disable-ssl=YESPLEASE backup.retention=-5; run_hook post-refresh; assert_status "$?" 0 "P2: post-refresh with invalid stored values -> rc 0"
 assert_eq "$(cat "$SNAPCTL_STATE/server.force-disable-ssl" 2>/dev/null)" "false" "P2: invalid server.force-disable-ssl unset, then re-seeded to its default"
-[ ! -e "$SNAPCTL_STATE/backup.retention" ]; assert_status "$?" 0 "P2: invalid backup.retention unset (run-time default applies)"
+_rc=0; [ ! -e "$SNAPCTL_STATE/backup.retention" ] || _rc=1; assert_status "$_rc" 0 "P2: invalid backup.retention unset (run-time default applies)"
 assert_contains "$(cat "$LOGGER_LOG")" "server.force-disable-ssl: removed invalid value; the default applies" "P2: notice for server.force-disable-ssl"
 assert_contains "$(cat "$LOGGER_LOG")" "backup.retention: removed invalid value; the default applies" "P2: notice for backup.retention"
 p2all="$(cat "$LOGGER_LOG" "$T/stdout" "$T/stderr")"; assert_not_contains "$p2all" "YESPLEASE" "P2: bool value never printed"; assert_not_contains "$p2all" "-5" "P2: int value never printed"
 run_hook configure; assert_status "$?" 0 "P2: the configure run that follows passes"
 reset_state "${VALID[@]}"; mkdir -p "$SNAP_DATA/.ext-config/devices"; : > "$SNAP_DATA/.ext-config/devices/index.json"
-run_hook post-refresh; [ ! -e "$SNAP_DATA/.ext-config/devices/index.json" ]; assert_status "$?" 0 "A9: index.json removed"
+_rc=0; run_hook post-refresh; [ ! -e "$SNAP_DATA/.ext-config/devices/index.json" ] || _rc=1; assert_status "$_rc" 0 "A9: index.json removed"
 assert_not_contains "$(cat "$T/stderr")" "null byte" "A9: no bash warning"
 printf '{"mqtt":{"host":"x"}}' > "$SNAP_DATA/settings.json"; cp "$SNAP_DATA/settings.json" "$T/ref.json"; : > "$LOGGER_LOG"
 run_hook post-refresh; cmp -s "$SNAP_DATA/settings.json" "$T/ref.json"; assert_status "$?" 0 "A8: settings.json without the key is untouched"
