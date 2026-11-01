@@ -61,6 +61,8 @@ nav_set_apply() {              # $1 key, $2 value, $3 set|unset. snapd commits i
         ( test_default_config ) >/dev/null 2>&1     # subshell: its testnset_config exits on a failed set
         shown="$(snapctl get "$key" 2>/dev/null)"
         catalog_is_secret "$key" && [ -n "$shown" ] && shown="(hidden)"
+        # Nothing stored: the default applies at run time (backup.retention, …) — show it.
+        [ -n "$shown" ] || shown="$(catalog_field "$key" 3)"
         ui_ok "$key reset to default: ${shown:-(unset)}"
     fi
     applies="$(catalog_field "$key" 6)"

@@ -117,6 +117,12 @@ assert_contains "$(cat "$SET_LOG")" "set session.cookie-secure=true" "N7: depend
 : > "$SET_LOG"; printf '%s\n' "mqtt.name" "Edit" "← Back" > "$CQ"; printf '\n' > "$INQ"
 UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings >/dev/null 2>&1
 assert_contains "$(cat "$SET_LOG")" "unset mqtt.name" "N8: empty edit = reset"
+printf '%s\n' "backup.retention" "Reset to default" "← Back" > "$CQ"
+out="$(UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings 2>&1)"
+assert_contains "$out" "backup.retention reset to default: 3" "N9: run-time default shown from the catalog"
+printf '%s\n' "mqtt.name" "Reset to default" "← Back" > "$CQ"
+out="$(UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings 2>&1)"
+assert_contains "$out" "mqtt.name reset to default: (unset)" "N9: a key without a default still says (unset)"
 printf '%s\n' "zwave.serial-port" "← Back" > "$CQ"
 out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings 2>&1)"
 assert_contains "$out" "Serial device of the Z-Wave controller" "A6: real description shown"; assert_not_contains "$out" "advanced" "A6: scope no longer leaks into the description"
