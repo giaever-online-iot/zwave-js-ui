@@ -198,4 +198,33 @@ assert_eq "$(cat "$GPG_IN")" "correct-horse-7" "K1: passphrase delivered on stdi
 : > "$GPG_LOG"; ck="$( (ensure_agent() { :; }; printf 'correct-horse-7\nwrong-horse-8\n' | cmd_create_key Name mail@example.com) 2>&1 )"; rc=$?
 assert_status "$rc" 1 "K2: mismatch -> rc 1"; assert_contains "$ck" "Passphrases do not match — nothing created." "K2: message"; assert_eq "$(cat "$GPG_LOG")" "" "K2: gpg never called"
 
+# --- export-key: pipe-only, terminal passphrase prompt, loopback export (A4, C6) ---
+# X1: terminal on stdout is refused before anything else (pty via script, as logs_test does)
+if command -v script >/dev/null 2>&1; then
+  cat > "$SNAP_COMMON/export_tty.sh" <<EOF
+export SNAP="$SNAP" SNAP_COMMON="$SNAP_COMMON"
+snapctl() { case "\$1" in get) printf 'F0F0' ;; *) : ;; esac; }
+source "$ROOT/src/bin/backup"; require_root() { :; }; ensure_agent() { echo AGENT_CALLED; }
+( cmd_export_key ); echo "rc=\$?"
+EOF
+  pty="$(timeout 10 script -qec "bash $SNAP_COMMON/export_tty.sh" /dev/null 2>&1 </dev/null)"
+  assert_contains "$pty" "redirect it" "X1: TTY stdout refused with the redirect hint"; assert_contains "$pty" "rc=1" "X1: rc 1"; assert_not_contains "$pty" "AGENT_CALLED" "X1: refused before the agent is touched"
+fi
+gpg() { printf '%s\n' "$*" >> "$GPG_LOG"; case "$*" in
+    *--list-secret-keys*) return "${GPG_NO_SECRET:-0}" ;;
+    *--export-secret-keys*) cat > "$GPG_IN"; printf -- '-----BEGIN PGP PRIVATE KEY BLOCK-----\nabc\n-----END PGP PRIVATE KEY BLOCK-----\n' ;;
+    esac; }
+: > "$GPG_LOG"; : > "$GPG_IN"
+xo="$( (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\nn\n')) 2>"$SNAP_COMMON/xerr" )"; rc=$?
+assert_status "$rc" 0 "X2: export ok"; assert_contains "$xo" "BEGIN PGP PRIVATE KEY BLOCK" "X2: key on stdout only"
+assert_contains "$(cat "$GPG_LOG")" "--pinentry-mode loopback" "X2: loopback (no pinentry in the snap, A4)"; assert_contains "$(cat "$GPG_LOG")" "--passphrase-fd 0" "X2: passphrase on fd 0"
+assert_not_contains "$(cat "$GPG_LOG")" "hunter2-xyz" "X2: passphrase not on argv"; assert_eq "$(cat "$GPG_IN")" "hunter2-xyz" "X2: passphrase delivered"
+assert_contains "$(cat "$SNAP_COMMON/xerr")" "Passphrase of the backup private key" "X2: prompt on stderr"; assert_not_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X2: 'n' keeps the key"
+: > "$GPG_LOG"; (ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\ny\n')) >/dev/null 2>&1
+assert_contains "$(cat "$GPG_LOG")" "--delete-secret-keys" "X3: 'y' deletes after a verified export"
+(ensure_agent() { :; }; SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key </dev/null) >/dev/null 2>"$SNAP_COMMON/xerr"; assert_status "$?" 1 "X4: no passphrase -> rc 1"
+assert_contains "$(cat "$SNAP_COMMON/xerr")" "passphrase" "X4: says what is missing"
+: > "$GPG_LOG"; (ensure_agent() { :; }; GPG_NO_SECRET=1 SNAPCTL_backup_encrypt_key=F0F0 cmd_export_key < <(printf 'hunter2-xyz\n')) >/dev/null 2>"$SNAP_COMMON/xerr"; assert_status "$?" 0 "X5: public-only key -> rc 0"
+assert_contains "$(cat "$SNAP_COMMON/xerr")" "nothing to export" "X5: explains"; assert_not_contains "$(cat "$SNAP_COMMON/xerr")" "Passphrase of" "X5: no passphrase prompt"
+
 finish
