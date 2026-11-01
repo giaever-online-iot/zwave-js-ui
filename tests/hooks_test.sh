@@ -43,6 +43,13 @@ reset_state "${VALID[@]}" session.secret=6ba7b810-9dad-11d1-80b4-00c04fd430c8; r
 assert_contains "$(cat "$SNAPCTL_LOG")" "unset session.secret" "P1: post-refresh removes the seeded v1 UUID"
 assert_eq "$(grep -c "^set session.secret" "$SNAPCTL_LOG")" "0" "P1: nothing re-seeds it"
 assert_not_contains "$(cat "$LOGGER_LOG")" "6ba7b810" "P1: value not in syslog"
+[ -e "$SNAP_COMMON/.session-secret-migrated" ]; assert_status "$?" 0 "P1: migration marker written"
+V1=6ba7b810-9dad-11d1-80b4-00c04fd430c8
+reset_state "${VALID[@]}" session.secret=$V1; run_hook post-refresh   # marker from P1 present
+assert_not_contains "$(cat "$SNAPCTL_LOG")" "unset session.secret" "P3: marker present -> a deliberately set v1 UUID is kept"
+assert_eq "$(cat "$SNAPCTL_STATE/session.secret")" "$V1" "P3: value untouched"
+rm -f "$SNAP_COMMON/.session-secret-migrated"; reset_state "${VALID[@]}" session.secret=$V1; SNAPCTL_UNSET_FAIL=1 run_hook post-refresh
+assert_not_contains "$(cat "$LOGGER_LOG")" "removed the generated" "P4: failed unset -> no 'removed' line"
 # P2: values the old hook accepted but validate_config now rejects must not fail the refresh
 reset_state "${VALID[@]}" server.force-disable-ssl=YESPLEASE backup.retention=-5; run_hook post-refresh; assert_status "$?" 0 "P2: post-refresh with invalid stored values -> rc 0"
 assert_eq "$(cat "$SNAPCTL_STATE/server.force-disable-ssl" 2>/dev/null)" "false" "P2: invalid server.force-disable-ssl unset, then re-seeded to its default"

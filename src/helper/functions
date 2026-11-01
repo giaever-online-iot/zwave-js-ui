@@ -148,13 +148,18 @@ function test_default_config {
 
 # Older revisions seeded session.secret with a v1 UUID, which overrode the
 # app's own 256-bit secret. Drop that value (and only that shape) so the app
-# keeps its own. Never prints the value.
+# keeps its own — once: the marker file stops later refreshes from removing a
+# v1 UUID the user sets on purpose. Never prints the value.
 function migrate_session_secret {
-    local v; v="$(snapctl get session.secret 2>/dev/null)"
+    local marker="${SNAP_COMMON}/.session-secret-migrated" v
+    [ -e "$marker" ] && return 0
+    v="$(snapctl get session.secret 2>/dev/null)"
     if [ "${#v}" -eq 36 ] && [[ "$v" =~ ^[0-9a-fA-F-]+$ ]] && [ "${v:14:1}" = "1" ]; then
-        snapctl unset session.secret
-        lprint "session.secret: removed the generated v1 UUID; the app now keeps its own secret in ${SNAP_DATA}/.session-secret (one re-login)"
+        if snapctl unset session.secret; then
+            lprint "session.secret: removed the generated v1 UUID; the app now keeps its own secret in ${SNAP_DATA}/.session-secret (one re-login)"
+        fi
     fi
+    : > "$marker" 2>/dev/null || true
     return 0
 }
 

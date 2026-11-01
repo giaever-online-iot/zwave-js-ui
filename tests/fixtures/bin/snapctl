@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fake snapctl for process-level tests. `get <key>` reads $SNAPCTL_STATE/<key> when that
 # dir is set and has the key, else $SNAPCTL_<key with . and - as _>. set/unset persist to
-# SNAPCTL_STATE and log to SNAPCTL_LOG; restart/start/stop log; services prints a table
+# SNAPCTL_STATE and log to SNAPCTL_LOG (SNAPCTL_UNSET_FAIL=1 -> unset exits 1, changes nothing); restart/start/stop log; services prints a table
 # (SNAPCTL_SERVICES_FAIL=1 -> exit 1, SNAPCTL_MAIN_STATE sets the main row's Current).
 # Everything else (is-connected, ...) is a quiet no-op.
 log() { [ -z "${SNAPCTL_LOG:-}" ] || printf '%s\n' "$*" >> "$SNAPCTL_LOG"; }
@@ -10,7 +10,8 @@ case "$verb" in
     get) if [ -n "${SNAPCTL_STATE:-}" ] && [ -e "$SNAPCTL_STATE/$1" ]; then cat "$SNAPCTL_STATE/$1"
          else k="${1//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\""; fi ;;
     set) for kv in "$@"; do [ -z "${SNAPCTL_STATE:-}" ] || printf '%s' "${kv#*=}" > "$SNAPCTL_STATE/${kv%%=*}"; log "set $kv"; done ;;
-    unset) for k in "$@"; do [ -z "${SNAPCTL_STATE:-}" ] || rm -f "$SNAPCTL_STATE/$k"; log "unset $k"; done ;;
+    unset) [ "${SNAPCTL_UNSET_FAIL:-}" != 1 ] || exit 1
+           for k in "$@"; do [ -z "${SNAPCTL_STATE:-}" ] || rm -f "$SNAPCTL_STATE/$k"; log "unset $k"; done ;;
     restart|start|stop) log "$verb $*" ;;
     services) [ "${SNAPCTL_SERVICES_FAIL:-}" != 1 ] || exit 1
         n="${1:-}"; echo "Service  Startup  Current  Notes"
