@@ -91,6 +91,9 @@ assert_contains "$(cat "$LOGGER_LOG")" "session.cookie-secure: removed (needs se
 run_hook configure; assert_status "$?" 0 "P6b: the configure run that follows passes"
 reset_state server.port=8091 server.ssl=false session.cookie-secure=false; run_hook post-refresh   # marker from P6b present
 assert_not_contains "$(cat "$SNAPCTL_LOG")" "unset session.cookie-secure" "P6c: marker present -> a deliberate false is kept"
+reset_state "${VALID[@]}" backup.gdrive-credentials=/x.json; run_hook configure; assert_status "$?" 0 "G1: backup.gdrive-credentials is a known key (configure rc 0)"
+run_hook post-refresh; assert_not_contains "$(cat "$SNAPCTL_LOG")" "unset backup.gdrive-credentials" "G1: post-refresh leaves it alone"
+assert_eq "$(cat "$SNAPCTL_STATE/backup.gdrive-credentials" 2>/dev/null)" "/x.json" "G1: value kept"
 reset_state server.port=8091; run_hook configure; run_hook post-refresh
 assert_not_contains "$(cat "$SNAPCTL_LOG")" "set timezone" "P7: timezone never seeded"
 assert_not_contains "$(cat "$SNAPCTL_LOG")" "set session.cookie-secure" "P7: cookie-secure never seeded"

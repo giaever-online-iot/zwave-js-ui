@@ -22,6 +22,7 @@ backup.encrypt	bool	(unset)	Set false to opt out of backup encryption	common	bac
 backup.encrypt-key	string	(unset)	GPG fingerprint backups are encrypted to	common	backup
 backup.full-if-older-than	string	7D	Force a full backup after this age	common	backup
 backup.retention	int	3	Full backup chains kept on the target	common	backup
+backup.gdrive-credentials	string	(unset)	Google service-account JSON for gdrive:// (put it under $SNAP_COMMON)	advanced	backup
 zwave.serial-port	string	(unset)	Serial device of the Z-Wave controller (ZWAVE_PORT)	advanced	daemon
 zwave.s2-unauthenticated	secret	(unset)	S2 Unauthenticated network key (KEY_S2_Unauthenticated)	advanced	daemon
 zwave.s2-authenticated	secret	(unset)	S2 Authenticated network key (KEY_S2_Authenticated)	advanced	daemon

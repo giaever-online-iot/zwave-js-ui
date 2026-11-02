@@ -23,7 +23,15 @@ assert_eq "$(catalog_field backup.dir 6)" "daemon"    "catalog_field: backup.dir
 assert_eq "$(catalog_field zwave.serial-port 5)" "advanced" "catalog_field: scope survives (A6)"
 _rc=0; [ -n "$(catalog_field zwave.serial-port 4)" ] || _rc=1; assert_status "$_rc" 0 "zwave.serial-port has a description (A6)"
 assert_eq "$(catalog_field nope 2)" "" "catalog_field: unknown key -> empty"
-assert_eq "$(catalog_keys_for backup)" "$(printf 'backup.target\nbackup.encrypt\nbackup.encrypt-key\nbackup.full-if-older-than\nbackup.retention')" "keys_for backup"
+assert_eq "$(catalog_keys_for backup)" "$(printf 'backup.target\nbackup.encrypt\nbackup.encrypt-key\nbackup.full-if-older-than\nbackup.retention\nbackup.gdrive-credentials')" "keys_for backup"
+assert_eq "$(catalog_keys_for backup | grep -c .)" "6" "keys_for backup: 6 keys"
+# K1: every key the code reads names a catalog row (D1 rejects/sanitizes anything else)
+_used="$( { grep -oE 'cfg [a-z][a-z-]*' "$ROOT/src/bin/backup" | awk '{print "backup."$2}'
+            grep -ohE 'snapctl get [a-z][a-z.-]*' "$ROOT/src/helper/env-wrapper" "$ROOT/src/helper/functions" "$ROOT/src/bin/help" "$ROOT/src/bin/ui" | awk '{print $3}'; } | sort -u)"
+_rc=0; [ "$(grep -c . <<<"$_used")" -ge 10 ] || _rc=1; assert_status "$_rc" 0 "K1: grep found the code's keys"
+for _k in $_used; do
+	_rc=0; catalog_keys | grep -qxF -- "$_k" || _rc=1; assert_status "$_rc" 0 "K1: $_k (read by the code) is in the catalog"
+done
 assert_eq "$(catalog_keys_for daemon | grep -c .)" "16" "keys_for daemon: 8 common + backup.dir + 7 zwave"
 v() { validate_config "$1" "$2" 2>"$SNAP_COMMON/err"; echo "$?"; }   # prints rc; message in err
 assert_eq "$(v server.port 8091)" 0 "port ok";   assert_eq "$(v server.port 65535)" 0 "port max ok"
