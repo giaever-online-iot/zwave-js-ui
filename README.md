@@ -111,14 +111,14 @@ The snap also integrates with the `code-server` snap to edit files in the persis
 Settings are snap config, set with `sudo snap set zwave-js-ui <key>=<value>`:
 
 - `server.*` — listen address, port and SSL: `sudo snap set zwave-js-ui server.host=0.0.0.0`
-- `session.*` — session secret and cookie behaviour: `sudo snap set zwave-js-ui session.cookie-secure=true`
+- `session.*` — session secret and cookie behaviour: `sudo snap set zwave-js-ui server.ssl=true session.cookie-secure=true` (secure cookies need HTTPS)
 - `mqtt.name` — MQTT client name: `sudo snap set zwave-js-ui mqtt.name=zwave`
 - `timezone` — time zone for the app: `sudo snap set zwave-js-ui timezone=Europe/Oslo`
 - `backup.*` — off-box backups: `sudo snap set zwave-js-ui backup.target=file:///mnt/backup`
 - `zwave.*` — controller serial port and security keys: `sudo snap set zwave-js-ui zwave.serial-port=/dev/ttyUSB0`
 
-Only mqtt.name is snap config; the broker (host, port, user, password) lives in settings.json — edit it with sudo zwave-js-ui.ui → MQTT broker.
-Unknown keys are rejected; sudo snap unset zwave-js-ui <key> restores a default.
+Only `mqtt.name` is snap config; the broker (host, port, user, password) lives in settings.json — edit it with `sudo zwave-js-ui.ui → MQTT broker`.
+Unknown keys are rejected; `sudo snap unset zwave-js-ui <key>` restores a default.
 
 ## Interfaces
 
@@ -131,7 +131,7 @@ which interface is missing and the command that connects it.
 - `serial-port` (manual; needs snapd's experimental hotplug) — a serial controller instead of `raw-usb`.
 - `log-observe` (manual) — `zwave-js-ui.logs` reads journald for any log not written to file;
   without it the command exits with the fix: `sudo snap connect zwave-js-ui:log-observe`.
-- `gpg-public-keys` (manual) — lets zwave-js-ui.backup list-keys/pick-key read your ~/.gnupg; without it they say so and print the connect command.
+- `gpg-public-keys` (manual) — lets `zwave-js-ui.backup list-keys`/`pick-key` read your `~/.gnupg`; without it they say so and print the connect command.
 
 Manual connections (needed after `snap install --dangerous` of a local build):
 ```bash
