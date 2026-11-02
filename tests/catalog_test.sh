@@ -8,7 +8,7 @@ source "$HERE/lib/assert.sh"
 
 export SNAP="$HERE/fixtures"
 SNAP_COMMON="$(mktemp -d)"; export SNAP_COMMON
-snapctl() { case "$1 ${2:-}" in "get -d") printf '%s' "${SNAPCTL_D:-{}}" ;; get*) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;; *) : ;; esac; }
+snapctl() { case "$1 ${2:-}" in "get -d") [ $# -gt 2 ] || return 1; printf '%s' "${SNAPCTL_D:-{}}" ;; get*) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;; *) : ;; esac; }
 
 # shellcheck source=/dev/null
 source "$ROOT/src/helper/catalog"
@@ -54,6 +54,7 @@ assert_eq "$(v backup.target /mnt/usb/zui)" 1 "D7: bare path rejected"; assert_e
 _rc=0; [ "$(catalog_field session.secret 4 | wc -c)" -le 64 ] || _rc=1; assert_status "$_rc" 0 "polish: session.secret description ≤ 63 chars"
 SNAPCTL_D='{"server":{"host":"x","prot":"1"},"mqtt":{"host":"y","name":"a.b=c d"},"timezone":"Europe/Oslo"}'
 assert_eq "$(unknown_config_keys | sort | tr '\n' ' ')" "mqtt.host server.prot " "U1: unknown leaf paths only"
+_rc=0; snapctl get -d >/dev/null 2>&1 || _rc=1; assert_status "$_rc" 1 "U8: stub refuses get -d without keys, like snapd"
 assert_eq "$(SNAPCTL_D='{}' unknown_config_keys)" "" "U4: empty config -> nothing"; assert_eq "$(SNAPCTL_D='not json' unknown_config_keys 2>/dev/null; echo "rc=$?")" "rc=0" "U4: garbage -> nothing, rc 0"
 assert_eq "$(SNAPCTL_D='{"mqtt":{"name":"a.b=c d"}}' unknown_config_keys)" "" "U5: dotted VALUE is not a key"
 finish

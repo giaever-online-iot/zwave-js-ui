@@ -74,4 +74,6 @@ reset_state "${VALID[@]}" server.prot=SEKRIT; run_hook post-refresh; assert_stat
 assert_contains "$(cat "$SNAPCTL_LOG")" "unset server.prot" "U6: stray key unset at refresh"; assert_contains "$(cat "$LOGGER_LOG")" "server.prot: removed unknown setting" "U6: notice"; assert_not_contains "$(cat "$LOGGER_LOG")" "SEKRIT" "U6: value not logged"
 : > "$SNAPCTL_LOG"; run_hook configure; assert_status "$?" 0 "U6: configure passes after the refresh cleaned up"
 reset_state "${VALID[@]}"; SNAPCTL_GET_D_RAW='garbage' run_hook configure; assert_status "$?" 0 "U4: unreadable get -d does not fail the hook"
+reset_state "${VALID[@]}" foo.bar=1; run_hook configure; assert_status "$?" 0 "U7: key under an unknown namespace is undetectable by design"
+run_hook post-refresh; assert_not_contains "$(cat "$SNAPCTL_LOG")" "unset foo.bar" "U7: sanitizer leaves it alone"
 finish

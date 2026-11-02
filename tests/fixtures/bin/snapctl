@@ -3,16 +3,19 @@
 # dir is set and has the key, else $SNAPCTL_<key with . and - as _>. set/unset persist to
 # SNAPCTL_STATE and log to SNAPCTL_LOG (SNAPCTL_UNSET_FAIL=1 -> unset exits 1, changes nothing); restart/start/stop log; services prints a table
 # (SNAPCTL_SERVICES_FAIL=1 -> exit 1, SNAPCTL_MAIN_STATE sets the main row's Current).
-# `get -d` prints the nested JSON of every state file (SNAPCTL_GET_D_RAW overrides, verbatim).
+# `get -d <ns>...` prints the nested JSON of the state files under those namespaces (no keys -> error rc 1, like snapd) (SNAPCTL_GET_D_RAW overrides, verbatim).
 # Everything else (is-connected, ...) is a quiet no-op.
 log() { [ -z "${SNAPCTL_LOG:-}" ] || printf '%s\n' "$*" >> "$SNAPCTL_LOG"; }
 verb="${1:-}"; [ $# -eq 0 ] || shift
 case "$verb" in
     get) if [ "${1:-}" = "-d" ]; then
              if [ -n "${SNAPCTL_GET_D_RAW+x}" ]; then printf '%s' "$SNAPCTL_GET_D_RAW"; exit 0; fi
+             shift   # snapd refuses `get -d` without keys; the requested keys are top-level namespaces
+             if [ $# -eq 0 ]; then echo "error: snapctl: get which option?" >&2; exit 1; fi
              j='{}'
              for f in "${SNAPCTL_STATE:-/nonexistent}"/*; do
                  [ -f "$f" ] || continue
+                 case " $* " in *" $(basename "$f" | cut -d. -f1) "*) ;; *) continue ;; esac
                  j="$(P="$(basename "$f")" V="$(cat "$f")" yq -p=json -o=json -I0 'setpath(strenv(P) | split("."); strenv(V))' <<<"$j")"
              done
              printf '%s' "$j"
