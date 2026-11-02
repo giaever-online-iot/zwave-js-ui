@@ -133,7 +133,7 @@ apps:
   backup-timer:
     command: bin/backup
     daemon: oneshot
-    timer: "00:00"
+    timer: "03:00"
     environment:
       DAEMONIZED: 1
     plugs:

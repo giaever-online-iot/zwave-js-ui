@@ -83,25 +83,66 @@ parse_collection_status() {
         }'
 }
 
+last_run_file() { printf '%s' "${SNAP_COMMON:-/tmp}/backup.last"; }
+
+# Hide user[:pass]@ in a URL before it reaches a terminal or log.
+redact_url() { printf '%s' "$1" | sed -E 's#(//)[^/@]+@#\1<redacted>@#'; }
+
+# record_last_run <ok|failed|skipped> <detail> -> $SNAP_COMMON/backup.last, 0600.
+# Never fails the backup: a write problem only prints a notice.
+record_last_run() {
+    local f; f="$(last_run_file)"; local tmp
+    tmp="$f.tmp.$$"
+    if ! { ( umask 077; printf '%s %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" > "$tmp" ) 2>/dev/null \
+            && chmod 600 "$tmp" 2>/dev/null && mv -f "$tmp" "$f" 2>/dev/null; }; then
+        rm -f "$tmp" 2>/dev/null
+        ui_print "Could not record the last run in $f." >&2
+    fi
+    return 0
+}
+
+# The "last run" status value for the current config.
+last_run_row() {
+    local ts state detail
+    [ -n "$(cfg target)" ] || { printf 'not configured'; return 0; }
+    [ -r "$(last_run_file)" ] || { printf 'never'; return 0; }
+    read -r ts state detail < "$(last_run_file)" || true
+    ts="${ts%Z}"; ts="${ts/T/ }"; ts="${ts%:*} UTC"
+    case "$state" in
+        ok)      printf '%s  OK' "$ts" ;;
+        failed)  printf '%s  FAILED (rc %s) — see: sudo snap logs %s.backup-timer' "$ts" "$detail" "$SNAP_NAME" ;;
+        skipped) printf "%s  skipped (nothing in %s — enable ZUI's scheduled backups)" "$ts" "$(backup_dir)" ;;
+        *)       printf 'unknown' ;;
+    esac
+}
+
 cmd_status() {                 # render current backup config as a table
-    local target key onbox="no" retention timer
+    local target key onbox="-" retention timer startup
     target="$(cfg target)"
     key="$(cfg encrypt-key)"
-    if [ -n "$key" ] && secret_key_on_disk "$key"; then
-        onbox="yes"
+    if [ -n "$key" ]; then
+        if secret_key_on_disk "$key"; then
+            onbox="yes"
+        else
+            onbox="no (public key only — restore needs the private key)"
+        fi
     fi
     retention="$(cfg retention)"
-    # Startup ("enabled") matters more than Current for a timer that is normally
-    # inactive between firings — show both so "inactive" doesn't read as broken.
-    timer="$(snapctl services "$SNAP_NAME.backup-timer" 2>/dev/null | awk 'NR==2 { print $2 "/" $3 }')"
+    startup="$(snapctl services "$SNAP_NAME.backup-timer" 2>/dev/null | awk 'NR==2 { print $2 }')"
+    case "$startup" in
+        enabled) timer="enabled — runs daily at 03:00 (idle between runs)" ;;
+        '')      timer="unknown" ;;
+        *)       timer="disabled" ;;
+    esac
     ui_kv \
         "target"                     "${target:-(unset)}" \
         "dir"                        "$(backup_dir)" \
+        "last run"                   "$(last_run_row)" \
         "encrypt-key"                "${key:-(unset)}" \
-        "private key on this device" "$onbox" \
+        "private key in snap keyring" "$onbox" \
         "retention (full chains)"    "${retention:-3}" \
         "full backup if older than"  "$(full_if_older)" \
-        "timer"                      "${timer:-unknown} (daily @ 00:00)"
+        "timer"                      "$timer"
 }
 
 # Renders a parse_pubkey_list stream (FPR<tab>uid[<tab>extra]) as a numbered human
@@ -520,15 +561,21 @@ main() {
                 if [ "${DAEMONIZED:-0}" -eq 1 ]; then exit 0; else exit 1; fi
             fi
             if ! has_backups; then
+                record_last_run skipped nothing-to-back-up
                 ui_print "Nothing to back up in $(backup_dir) — enable ZUI's scheduled backups in its settings." >&2
                 exit 0
             fi
             require_encryption_config
             # shellcheck disable=SC2294
-            if ! eval "$(build_backup_cmd "$(backup_dir)")"; then
+            local dup_rc=0
+            eval "$(build_backup_cmd "$(backup_dir)")" || dup_rc=$?
+            if [ "$dup_rc" -ne 0 ]; then
+                record_last_run failed "$dup_rc"
                 ui_err "Backup failed (duplicity exited non-zero)."
                 exit 1
             fi
+            record_last_run ok 0
+            ui_ok "Shipped $(backup_dir) to $(redact_url "$target")"
             "$DUP_PY" -m duplicity remove-all-but-n-full "$(retention)" --force --archive-dir "$ARCHIVE_DIR" "$target" || true
             ;;
         restore)

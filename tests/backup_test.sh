@@ -258,9 +258,9 @@ assert_contains "$(cat "$SNAP_COMMON/xerr")" "nothing to export" "X5: explains";
 export GNUPGHOME="$SNAP_COMMON/.gnupg"; mkdir -p "$GNUPGHOME/private-keys-v1.d"
 gpg() { case "$*" in *--with-keygrip*) printf 'grp:::::::::1234GRIP:\n' ;; esac; }
 : > "$GNUPGHOME/private-keys-v1.d/1234GRIP.key"; secret_key_on_disk F0F0; assert_status "$?" 0 "S1: keygrip file present -> secret key on disk"
-printf '%s\n' "$(SNAPCTL_backup_encrypt_key=F0F0 cmd_status)" | grep -Eq 'private key on this device[[:space:]]+yes'; assert_status "$?" 0 "S1: status says yes without an agent (A5)"
+printf '%s\n' "$(SNAPCTL_backup_encrypt_key=F0F0 cmd_status)" | grep -Eq 'private key in snap keyring[[:space:]]+yes'; assert_status "$?" 0 "S1: status says yes without an agent (A5)"
 rm "$GNUPGHOME/private-keys-v1.d/1234GRIP.key"; secret_key_on_disk F0F0; assert_status "$?" 1 "S2: no keygrip file -> no"
-printf '%s\n' "$(SNAPCTL_backup_encrypt_key=F0F0 cmd_status)" | grep -Eq 'private key on this device[[:space:]]+no'; assert_status "$?" 0 "S2: status says no"
+printf '%s\n' "$(SNAPCTL_backup_encrypt_key=F0F0 cmd_status)" | grep -Eq 'private key in snap keyring[[:space:]]+no'; assert_status "$?" 0 "S2: status says no"
 gpg() { :; }; secret_key_on_disk F0F0; assert_status "$?" 1 "S3: key not in the keyring -> no"
 ih="$( (gpg() { return 1; }; printf 'junk' | cmd_import_key) 2>&1 )"; assert_not_contains "$ih" "Paste the ARMORED" "I1: piped stdin -> no paste hint"
 if command -v script >/dev/null 2>&1; then
@@ -273,5 +273,40 @@ EOT
   assert_contains "$ip" "Paste the ARMORED PUBLIC key" "I2: terminal stdin -> paste hint before reading (C7)"
 fi
 unset GNUPGHOME
+
+# --- Task 8: last-run record, status rows, Shipped line (D8, C22) ---
+t8c="$SNAP_COMMON"; t8b="$(mktemp -d)"; echo x > "$t8b/f"
+printf '#!/bin/sh\necho "Errors 0"\nexit "${DUP_RC:-0}"\n' > "$t8c/dup.sh"; chmod +x "$t8c/dup.sh"
+t8run() { ( DUP_PY="$t8c/dup.sh" SNAPCTL_backup_target='sftp://u:p@nas/zui' SNAPCTL_backup_encrypt=false SNAPCTL_backup_dir="$1" main backup ) 2>&1; }
+rm -f "$t8c/backup.last"
+o="$(DUP_RC=0 t8run "$t8b")"; rc=$?
+_rc=0; grep -Eq '^[0-9T:-]+Z ok 0$' "$t8c/backup.last" || _rc=1; assert_status "$_rc" 0 "B1: ok recorded"
+assert_eq "$(stat -c %a "$t8c/backup.last")" "600" "B1: mode 600"
+assert_contains "$o" "Shipped $t8b to sftp://<redacted>@nas/zui" "B1: Shipped line"
+assert_not_contains "$o" "u:p@" "B1: credentials redacted"
+DUP_RC=23 t8run "$t8b" >/dev/null; assert_status "$?" 1 "B2: failed run rc 1"
+_rc=0; grep -Eq '^[0-9T:-]+Z failed 23$' "$t8c/backup.last" || _rc=1; assert_status "$_rc" 0 "B2: failed recorded"
+t8e="$(mktemp -d)"; t8run "$t8e" >/dev/null; assert_status "$?" 0 "B3: nothing to back up rc 0"
+_rc=0; grep -Eq '^[0-9T:-]+Z skipped nothing-to-back-up$' "$t8c/backup.last" || _rc=1; assert_status "$_rc" 0 "B3: skipped recorded"
+t8st() { SNAPCTL_backup_dir="$t8b" SNAPCTL_backup_target="${T8T-sftp://x/y}" cmd_status; }
+printf '2026-11-02T03:00:04Z ok 0\n' > "$t8c/backup.last"
+assert_contains "$(t8st)" "2026-11-02 03:00 UTC  OK" "B4: ok row"
+printf '2026-11-02T03:00:04Z failed 23\n' > "$t8c/backup.last"
+assert_contains "$(t8st)" "FAILED (rc 23) — see: sudo snap logs" "B4: failed row"
+printf '2026-11-02T03:00:04Z skipped nothing-to-back-up\n' > "$t8c/backup.last"
+assert_contains "$(t8st)" "skipped (nothing in $t8b — enable ZUI's scheduled backups)" "B4: skipped row"
+rm -f "$t8c/backup.last"
+_rc=0; t8st | grep -Eq 'last run[[:space:]]+never' || _rc=1; assert_status "$_rc" 0 "B4: never"
+_rc=0; T8T='' t8st | grep -Eq 'last run[[:space:]]+not configured' || _rc=1; assert_status "$_rc" 0 "B4: not configured"
+snapctl() { case "$1" in get) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;; services) printf 'Service Startup Current Notes\nzwave-js-ui.backup-timer enabled inactive -\n' ;; *) : ;; esac; }
+assert_contains "$(t8st)" "enabled — runs daily at 03:00 (idle between runs)" "B5: timer row"
+snapctl() { case "$1" in get) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;; services) printf 'Service Startup Current Notes\nzwave-js-ui.backup-timer disabled inactive -\n' ;; *) : ;; esac; }
+_rc=0; t8st | grep -Eq 'timer[[:space:]]+disabled' || _rc=1; assert_status "$_rc" 0 "B5: timer disabled"
+snapctl() { case "$1" in get) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;; *) : ;; esac; }
+_rc=0; ( export GNUPGHOME="$t8c/.gnupg"; gpg() { :; }; SNAPCTL_backup_encrypt_key=F0F0 t8st ) | grep -Fq 'no (public key only — restore needs the private key)' || _rc=1; assert_status "$_rc" 0 "B5: key row public only"
+_rc=0; t8st | grep -Eq 'private key in snap keyring[[:space:]]+-' || _rc=1; assert_status "$_rc" 0 "B5: key row none"
+( SNAP_COMMON=/nonexistent DUP_PY="$t8c/dup.sh" SNAPCTL_backup_target='sftp://u:p@nas/zui' SNAPCTL_backup_encrypt=false SNAPCTL_backup_dir="$t8b" main backup ) >/dev/null 2>&1
+assert_status "$?" 0 "B6: unwritable SNAP_COMMON never fails the backup"
+rm -rf "$t8b" "$t8e"
 
 finish

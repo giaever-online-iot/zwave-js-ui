@@ -19,4 +19,5 @@ assert_not_contains "$(cat "$R")" "not strictly required" "C3: README no longer 
 assert_not_contains "$(cat "$C")" "22.20.0" "B2: no stale Node literal"
 assert_not_contains "$(cat "$C")" '`pre-refresh` — runs `test_device_priority_dir`' "B2: hooks attributed correctly"
 assert_contains "$(cat "$C")" "daemon_config_digest" "CLAUDE.md documents the digest gate"
+assert_eq "$(yq '.apps.backup-timer.timer' "$Y")" "03:00" "D8: backup timer at 03:00"
 finish
