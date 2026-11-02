@@ -345,4 +345,28 @@ _rc=0; [[ "$o" != *"store browser"* ]] || _rc=1; assert_status "$_rc" 0 "R6: no 
 assert_contains "$(usage)" "3D (three days ago)" "R7: usage documents <time>"
 rm -rf "$t9c" "$t9d"
 
+# ---- Task 10: name the missing gpg-public-keys interface; honest agent error (D10, D15) ----
+t10c="$(mktemp -d)"
+# Opt-in stub variant (local to each subshell): is-connected follows SNAPCTL_CONNECTED
+# (space-separated plug names) when that variable is set, else succeeds.
+t10_stub='snapctl() { case "$1" in is-connected) [ -z "${SNAPCTL_CONNECTED+x}" ] || case " $SNAPCTL_CONNECTED " in *" $2 "*) return 0;; *) return 1;; esac ;; *) : ;; esac; }'
+# G1: interface not connected -> named error, rc 1, no "No host GPG keyring" claim
+( eval "$t10_stub"; export SNAPCTL_CONNECTED='' SNAP_REAL_HOME="$t10c/nohome"; require_host_keyring list-keys ) >"$t10c/g1.out" 2>&1
+_rc=$?; assert_status "$_rc" 1 "G1: not connected -> rc 1"
+assert_contains "$(cat "$t10c/g1.out")" "The gpg-public-keys interface is not connected, so your ~/.gnupg is not visible to the snap. Run: sudo snap connect zwave-js-ui:gpg-public-keys" "G1: names the interface and the connect command"
+assert_not_contains "$(cat "$t10c/g1.out")" "No host GPG keyring" "G1: no misleading keyring message"
+# G2: interface connected but no ~/.gnupg -> the existing keyring message
+mkdir -p "$t10c/home"
+( eval "$t10_stub"; export SNAPCTL_CONNECTED='gpg-public-keys' SNAP_REAL_HOME="$t10c/home"; require_host_keyring list-keys ) >"$t10c/g2.out" 2>&1
+_rc=$?; assert_status "$_rc" 1 "G2: connected, no keyring -> rc 1"
+assert_contains "$(cat "$t10c/g2.out")" "No host GPG keyring at $t10c/home/.gnupg." "G2: existing keyring message"
+# G3: gpg-agent cannot start -> honest message naming the likely causes
+( GNUPGHOME="$t10c/gnupg"; export GNUPGHOME SNAP_COMMON="$t10c"
+  gpg-agent() { return 1; }; gpg-connect-agent() { :; }; ensure_agent ) >"$t10c/g3.out" 2>&1
+_rc=$?; assert_status "$_rc" 1 "G3: agent failure -> rc 1"
+assert_contains "$(cat "$t10c/g3.out")" "could not start gpg-agent — on kernel 6.17+ this is snap confinement's AF_UNIX mediation; otherwise see: sudo snap logs zwave-js-ui" "G3: honest agent error"
+# G4: usage names the interface needed by list-keys/pick-key
+assert_contains "$(usage)" "(needs: sudo snap connect zwave-js-ui:gpg-public-keys)" "G4: usage names gpg-public-keys"
+rm -rf "$t10c"
+
 finish

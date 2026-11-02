@@ -23,6 +23,7 @@ Usage: ${SNAP_NAME}.backup [restore [<time>] [--into <dir>] | list | status | li
   list-keys   list YOUR host GPG public keys (no sudo)
   pick-key    export one of YOUR host keys, armored, for the pipe below (no sudo);
               without <fpr> it asks you to pick — bare/unpiped runs are refused
+              (needs: sudo snap connect ${SNAP_NAME}:gpg-public-keys)
   import-key  import a GPG public key (armored, on stdin) into the snap keyring + set encrypt-key (sudo)
   create-key  generate a backup keypair in the snap keyring + set encrypt-key (sudo)
   export-key  export the snap keyring's private key to move it to your host/offline (sudo)
@@ -191,6 +192,10 @@ require_host_keyring() {  # $1 = subcommand name for the message
         ui_err "Run '${1}' WITHOUT sudo — it reads YOUR personal GPG keyring."
         exit 1
     fi
+    if ! snapctl is-connected gpg-public-keys 2>/dev/null; then
+        ui_err "The gpg-public-keys interface is not connected, so your ~/.gnupg is not visible to the snap. Run: sudo snap connect ${SNAP_NAME}:gpg-public-keys"
+        exit 1
+    fi
     local home; home="$(gpg_host_homedir)"
     if [ ! -d "$home" ]; then
         ui_err "No host GPG keyring at ${home}."
@@ -320,7 +325,7 @@ ensure_agent() {
     # listen() everywhere in the snap (verified: $SNAP_COMMON, /tmp, XDG_RUNTIME_DIR),
     # so the agent can never come up. Callers must fail with actionable guidance.
     if ! gpg-connect-agent --homedir "$GNUPGHOME" --no-autostart 'GETINFO pid' /bye 2>/dev/null | grep -q '^D '; then
-        ui_err "gpg-agent cannot run here: this kernel's snap confinement blocks its socket (AF_UNIX listen mediation, e.g. kernel 6.17 / Ubuntu 25.10)."
+        ui_err "could not start gpg-agent — on kernel 6.17+ this is snap confinement's AF_UNIX mediation; otherwise see: sudo snap logs ${SNAP_NAME}"
         return 1
     fi
 }
