@@ -87,7 +87,7 @@ dependencies.
 ### D1. Unknown keys are rejected; refresh removes them (C4)
 `validate_config` gains a companion `unknown_config_keys`: it flattens `snapctl get -d` to
 dotted leaf paths (yq) and prints every path that is not a catalog key. `configure` fails on
-the first one: `!! unknown setting "<key>" — remove it with: sudo snap unset zwave-js-ui <key>. Known settings: zwave-js-ui.help`, with one extra
+the first one: `!! unknown setting "<key>" — remove it with: sudo snap unset zwave-js-ui <key>. Known settings: zwave-js-ui.help (common) or sudo zwave-js-ui.ui → Settings (all)`, with one extra
 line for `mqtt.*` keys: `MQTT broker settings live in settings.json — sudo zwave-js-ui.ui →
 MQTT broker` (only `mqtt.name` is snap config). `sanitize_config` (post-refresh) also unsets
 unknown keys, logging the key, never the value.
@@ -95,6 +95,9 @@ Scope: `unknown_config_keys` queries the catalog's namespaces (`server session m
 backup zwave`), so it catches typos and foreign keys inside them (`server.prot`, `mqtt.host`);
 a key under an unknown top-level namespace (`foo.bar`) cannot be enumerated from a hook and
 stays accepted — snapd offers no "get everything" call.
+Every key the code reads must be a catalog row (the final review found `backup.gdrive-credentials`
+missing; a catalog test now greps the sources), otherwise this rule would delete a live setting at refresh.
+The navigator's "Reset to default" also applies the cross-key rule (D6) and restores the old value on rejection.
 **Why:** the user is watching at `snap set`; a typo that "works" is the worst outcome.
 Unsetting on refresh is the only way a stray key from the past cannot fail every future
 refresh; such keys never had any effect, so nothing that worked stops working.
@@ -147,7 +150,7 @@ now means host time.
 Stop seeding `session.cookie-secure`. `env-wrapper`: when the key is empty,
 `USE_SECURE_COOKIE` follows effective HTTPS (ssl on and not force-disabled); when set, as
 today. `configure` rejects `session.cookie-secure=true` while `server.ssl=false`:
-`!! session.cookie-secure=true needs server.ssl=true (secure cookies only work over HTTPS)`;
+`!! session.cookie-secure=true needs server.ssl=true (secure cookies only work over HTTPS) — or unset it: sudo snap unset zwave-js-ui session.cookie-secure`;
 `sanitize_config` unsets it in that combination on refresh. An explicit `false` with HTTPS on is a deliberate opt-out and is honoured. Catalog default
 becomes `(follows server.ssl)` (a placeholder like `(host time)`; the drift guard only checks
 keys with literal defaults); `help` shows the effective value for an unset key as
@@ -239,7 +242,8 @@ Rows become `sudo zwave-js-ui.enable  start the service now and at every boot`,
   confinement's AF_UNIX mediation; otherwise see: sudo snap logs zwave-js-ui`.
 - `ui_pause` says `press Enter to continue` and accepts Enter.
 - `logs` usage: `(no arg)  follow both streams (on a terminal: asks which)`.
-- Catalog: shorten the two longest descriptions so the `help` table fits 100 columns.
+- Catalog: shorten the two longest descriptions (the `help` table still exceeds 100 columns with
+  the new `timezone` text and auto-stacks there; the width goal is relaxed to "shorter").
 - `snapcraft.yaml`: title `Z-Wave JS UI`; typos `MQTT apis`, `integation`, `full-fledge`,
   `«store-folder»`, `Z-wave`.
 
