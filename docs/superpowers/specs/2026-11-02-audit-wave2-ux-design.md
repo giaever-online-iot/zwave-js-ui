@@ -29,7 +29,7 @@ dependencies.
 | C10 | Navigator edits: no prefill (retype a whole URL to fix one character), bool edit does not mark the current value, header promises "type to filter" that `gum choose` cannot do, `← Back` sits below the 10-row fold. |
 | C12 | `timezone=Europe/Oslo` is seeded on every install and re-seeded after `snap unset`; the maintainer's zone is not a sensible Store default and "empty" cannot mean "host time". |
 | C13 | `session.cookie-secure` is seeded once from `server.ssl` at install; enabling HTTPS later leaves cookies insecure while `help` shows `(= server.ssl)`; `cookie-secure=true` with `ssl=false` is silently dropped. |
-| C14 | Still unchecked after wave 1: `backup.target` (a typo fails only at 00:00 in the journal) and `backup.full-if-older-than`. |
+| C14 | Still unchecked after wave 1: `backup.target` (a typo fails only at 00:00 in the journal). |
 | C15 | `backup status` shows no last run or outcome, renders the timer as "enabled/inactive", and says "private key on this device: no" to users who deliberately imported only a public key. |
 | C16 | `help`, `backup status`, `backup list` vanish when the pager closes (less without `-X`). |
 | C17 | Without the `gpg-public-keys` plug, `list-keys`/`pick-key` say "No host GPG keyring" and tell the user to generate a new key. |
@@ -86,25 +86,28 @@ dependencies.
 ### D1. Unknown keys are rejected; refresh removes them (C4)
 `validate_config` gains a companion `unknown_config_keys`: it flattens `snapctl get -d` to
 dotted leaf paths (yq) and prints every path that is not a catalog key. `configure` fails on
-the first one: `!! unknown setting "<key>". Known settings: zwave-js-ui.help`, with one extra
+the first one: `!! unknown setting "<key>" — remove it with: sudo snap unset zwave-js-ui <key>. Known settings: zwave-js-ui.help`, with one extra
 line for `mqtt.*` keys: `MQTT broker settings live in settings.json — sudo zwave-js-ui.ui →
 MQTT broker` (only `mqtt.name` is snap config). `sanitize_config` (post-refresh) also unsets
 unknown keys, logging the key, never the value.
 **Why:** the user is watching at `snap set`; a typo that "works" is the worst outcome.
 Unsetting on refresh is the only way a stray key from the past cannot fail every future
 refresh; such keys never had any effect, so nothing that worked stops working.
+Consequence, accepted: on an install that already holds a stray key, any `snap set` fails
+naming that key until it is unset or the next refresh removes it; the message says how.
 *Flagged for Joachim:* this removes stray keys from existing installs.
 
 ### D2. `restore` writes into a fresh directory (C5)
-`restore [<time>]` restores into `$(backup_dir)/restored-<UTC YYYYMMDD-HHMMSS>` (created
-empty) and ends with `✓ Restored into <dir> — pick the files in ZUI → Settings → Backup →
-Restore (or the store browser).` A new `--into <empty dir>` option overrides the target and
+`restore [<time>]` restores into `$SNAP_DATA/restored/<UTC YYYYMMDD-HHMMSS>` (created
+empty; outside `backup.dir` so the next `backup` never ships it back) and ends with
+`✓ Restored into <dir> — the files are in ZUI's store browser under restored/; download the
+one you need and use ZUI's restore (NVM or store).` A new `--into <empty dir>` option overrides the target and
 refuses a non-empty dir with `<dir> is not empty — choose an empty directory`. Usage
 documents `<time>` as `e.g. 2026-10-30, 2026-10-30T02:00, 3D (three days ago)`.
 **Why:** restoring an older backup while current ones exist is the normal recovery case;
 never overwriting the live dir needs no `--force` and cannot destroy anything.
-*To verify on device:* that ZUI's restore UI can reach files in the sub-directory (if not,
-the message points to the store browser, which can).
+If `backup.dir` is `$SNAP_DATA` itself, `restore` uses `$SNAP_COMMON/restored/<stamp>` instead
+and says so. *To verify on device:* the store browser shows `restored/`.
 
 ### D3. `NO_COLOR` means no colour, not no widgets (C9)
 `ui_ctx` stops treating `NO_COLOR` as "plain": with a TTY and gum the context stays
@@ -113,6 +116,8 @@ the message points to the store browser, which can).
 stays plain, and `ui` then says `zwave-js-ui.ui needs a terminal that can draw menus
 (TERM=dumb) — use the zwave-js-ui.* commands, or run with a different TERM`.
 **Why:** NO_COLOR (no-color.org) is a colour preference; `TERM=dumb` genuinely cannot draw.
+Tests asserting "zero ANSI bytes under NO_COLOR" become "no colour SGR codes under NO_COLOR";
+"zero ANSI bytes" stays the rule for no-TTY and `TERM=dumb`.
 
 ### D4. Navigator edits in place (C10)
 `ui_input` gains `--value <initial>`; Settings edits pass the current value for non-secret
@@ -138,24 +143,35 @@ Stop seeding `session.cookie-secure`. `env-wrapper`: when the key is empty,
 `USE_SECURE_COOKIE` follows effective HTTPS (ssl on and not force-disabled); when set, as
 today. `configure` rejects `session.cookie-secure=true` while `server.ssl=false`:
 `!! session.cookie-secure=true needs server.ssl=true (secure cookies only work over HTTPS)`;
-`sanitize_config` unsets it in that combination on refresh. Catalog default becomes
-`(follows server.ssl)`; `help` shows the effective value for an unset key as
-`(follows server.ssl: true)`.
-**Why:** the one-time copy at install is what makes enabling HTTPS later insecure; existing
-installs keep their stored value, which equals what they had.
+`sanitize_config` unsets it in that combination on refresh. An explicit `false` with HTTPS on is a deliberate opt-out and is honoured. Catalog default
+becomes `(follows server.ssl)` (a placeholder like `(host time)`; the drift guard only checks
+keys with literal defaults); `help` shows the effective value for an unset key as
+`(follows server.ssl: true)`. Existing installs: `post-refresh` runs once (marker
+`$SNAP_COMMON/.cookie-secure-migrated`) and unsets `session.cookie-secure` when it equals
+`server.ssl` (the value the old install hook copied), so today's behaviour is unchanged and it
+follows HTTPS from then on; a value that differs from `server.ssl` was set on purpose and stays.
+**Why:** the one-time copy at install is what makes enabling HTTPS later insecure.
 
 ### D7. Backup keys are validated (C14)
-`backup.target` must match `^[a-z][a-z0-9+.-]*://.+` (rule: `a duplicity URL like
-sftp://user@nas/zui, s3://bucket/path or file:///mnt/usb/zui`); `backup.full-if-older-than`
-must match `^[0-9]+[smhDWMY]$` (rule: `a duplicity interval like 7D or 2W`). Both go through
-`validate_config`, so `snap set`, the navigator and `sanitize_config` apply them.
+`backup.target` must match `^[A-Za-z][A-Za-z0-9+.-]*://.+` (rule: `a duplicity URL like
+sftp://user@nas/zui, s3://bucket/path or file:///mnt/usb/zui`). It goes through
+`validate_config`, so `snap set`, the navigator and `sanitize_config` apply it.
+`backup.full-if-older-than` stays unchecked: duplicity accepts intervals, compound intervals
+(`1D12h`) and dates there, and a rule narrower than duplicity's would let the refresh
+sanitizer delete a working value.
 **Why:** the failure otherwise surfaces at 00:00 in a journal the user was never pointed at.
+duplicity itself refuses any target that is not a URL ("Target should be url"), so no working
+value can fail this rule and `sanitize_config` can never stop someone's backups.
 
 ### D8. `backup status` answers "did it run" (C15)
-Every backup run (manual and timer) writes `$SNAP_COMMON/backup.last` (0600, one line:
-`<ISO-8601 UTC> ok|failed <rc> full|incremental|-`). `status` shows
-`last run   2026-11-02 03:00 UTC  OK (incremental)` or
-`last run   … FAILED (rc 23) — see: sudo snap logs zwave-js-ui.backup-timer`, or `never`.
+Every backup run (manual and timer) that reaches duplicity writes `$SNAP_COMMON/backup.last`
+(0600, one line: `<ISO-8601 UTC> ok|failed <rc>`), from duplicity's exit status alone (the
+retention clean-up after it stays best-effort and does not change the outcome). A run that
+finds nothing to back up writes `<time> skipped nothing-to-back-up`; a run without a target
+writes nothing (status then says `not configured`). `status` shows
+`last run   2026-11-02 03:00 UTC  OK`, `… FAILED (rc 23) — see: sudo snap logs
+zwave-js-ui.backup-timer`, `… skipped (nothing in <dir> — enable ZUI's scheduled backups)`,
+or `never`.
 The timer row reads `enabled — runs daily at 03:00 (idle between runs)` /
 `disabled`; the key row reads `private key in snap keyring  yes` or
 `no (public key only — restore needs the private key)`. The timer moves from `00:00` to
@@ -203,7 +219,8 @@ Rows become `sudo zwave-js-ui.enable  start the service now and at every boot`,
 ### D15. Small fixes (C22, C23, polish)
 - C22: after a successful run `backup` prints `✓ Shipped <dir> to <target, credentials
   redacted> (<full|incremental>)` and logs the same line for the timer.
-- C23: README "Snap-Specific Features" becomes a command table (same rows as `help`) plus a
+- C23: README "Snap-Specific Features" becomes a command table (same rows as `help`; a
+  packaging test checks every `help` command name appears in README) plus a
   "Configuration" subsection (namespaces, one `snap set` example each, the `mqtt.*` split);
   connect examples gain `gpg-public-keys` and `log-observe`.
 - Plug messages: `Missing interface: raw-usb` (no guillemets), connect commands without a
