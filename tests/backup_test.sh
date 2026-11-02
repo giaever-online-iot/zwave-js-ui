@@ -313,4 +313,36 @@ _rc=0; t8st | grep -Eq 'private key in snap keyring[[:space:]]+-' || _rc=1; asse
 assert_status "$?" 0 "B6: unwritable SNAP_COMMON never fails the backup"
 rm -rf "$t8b" "$t8e"
 
+# ---- Task 9: restore into a fresh folder ----
+t9c="$(mktemp -d)"; t9d="$(mktemp -d)"
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" > "$SNAP_COMMON/dup.argv"\nexit "${DUP_RC:-0}"\n' > "$t9c/dup.sh"; chmod +x "$t9c/dup.sh"
+t9run() { ( SNAP_COMMON="$t9c" SNAP_DATA="${T9D:-$t9d}" DUP_PY="$t9c/dup.sh" SNAPCTL_backup_target='sftp://nas/zui' SNAPCTL_backup_encrypt=false SNAPCTL_backup_dir="${T9BD-}" main restore "$@" ) 2>&1; }
+rm -f "$t9c/dup.argv"; o="$(t9run)"; rc=$?
+assert_status "$rc" 0 "R1: restore rc 0"
+last="$(awk '{print $NF}' "$t9c/dup.argv")"
+_rc=0; [[ "$last" =~ ^$t9d/restored/[0-9]{8}-[0-9]{6}$ ]] || _rc=1; assert_status "$_rc" 0 "R1: dest under SNAP_DATA/restored/<stamp>"
+_rc=0; [ -d "$last" ] || _rc=1; assert_status "$_rc" 0 "R1: dest exists"
+assert_contains "$o" "Restored into $last — the files are in ZUI's store browser under restored/" "R1: success text"
+t9run 3D >/dev/null; assert_contains "$(cat "$t9c/dup.argv")" "--time 3D" "R2: time passed"
+mkdir "$t9c/empty"; o="$(t9run --into "$t9c/empty")"
+assert_eq "$(awk '{print $NF}' "$t9c/dup.argv")" "$t9c/empty" "R3: --into dest"
+assert_contains "$o" "Restored into $t9c/empty." "R3: into message"
+t9run 2026-10-30 --into "$t9c/empty" >/dev/null; assert_contains "$(cat "$t9c/dup.argv")" "--time 2026-10-30" "R3: time with --into after"
+mkdir "$t9c/full"; : > "$t9c/full/x"; rm -f "$t9c/dup.argv"
+o="$(t9run --into "$t9c/full")"; rc=$?
+assert_status "$rc" 1 "R4: non-empty rc 1"
+assert_contains "$o" "$t9c/full is not empty — choose an empty directory" "R4: message"
+_rc=0; [ ! -e "$t9c/dup.argv" ] || _rc=1; assert_status "$_rc" 0 "R4: duplicity not invoked"
+o="$(T9D=/proc/none t9run)"; rc=$?
+assert_status "$rc" 1 "R5: cannot create rc 1"
+assert_contains "$o" "Cannot create /proc/none/restored/" "R5: message"
+_rc=0; [ ! -e "$t9c/dup.argv" ] || _rc=1; assert_status "$_rc" 0 "R5: duplicity not invoked"
+o="$(T9BD="$t9d" t9run)"; rc=$?
+assert_status "$rc" 0 "R6: fallback rc 0"
+_rc=0; [[ "$(awk '{print $NF}' "$t9c/dup.argv")" == "$t9c/restored/"* ]] || _rc=1; assert_status "$_rc" 0 "R6: under SNAP_COMMON/restored"
+assert_contains "$o" "Restored into $t9c/restored/" "R6: message"
+_rc=0; [[ "$o" != *"store browser"* ]] || _rc=1; assert_status "$_rc" 0 "R6: no store-browser claim"
+assert_contains "$(usage)" "3D (three days ago)" "R7: usage documents <time>"
+rm -rf "$t9c" "$t9d"
+
 finish
