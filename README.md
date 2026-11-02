@@ -91,11 +91,34 @@ Manage your Z-Wave network from the web interface:
 - Access files in the persistent store from the UI
 - Network graph that visualizes node communication paths
 
-## Snap-Specific Features
+## Commands
 
-This snap includes features that simplify running and managing Z-Wave JS UI on systems that use snaps:
-- Read logs from the terminal regardless of whether the application logs to file (`zwave-js-ui.logs`)
-- Optional integration with the `code-server` snap to edit files in the persistent store
+| Command | What it does |
+| --- | --- |
+| `sudo zwave-js-ui.enable` | start the service now and at every boot |
+| `sudo zwave-js-ui.disable` | stop it and do not start at boot |
+| `sudo zwave-js-ui.restart` | restart the service |
+| `sudo zwave-js-ui.exec` | run in the foreground (debug start-up) |
+| `sudo zwave-js-ui.ui` | interactive navigator — settings, service, interfaces, logs |
+| `sudo zwave-js-ui.logs [zui\|zwjs]` | follow live logs (merged by default) |
+| `zwave-js-ui.backup ...` | ship backups off-box (see --help; most need sudo) |
+| `zwave-js-ui.help` | this overview (no sudo) |
+
+The snap also integrates with the `code-server` snap to edit files in the persistent store.
+
+## Configuration
+
+Settings are snap config, set with `sudo snap set zwave-js-ui <key>=<value>`:
+
+- `server.*` — listen address, port and SSL: `sudo snap set zwave-js-ui server.host=0.0.0.0`
+- `session.*` — session secret and cookie behaviour: `sudo snap set zwave-js-ui session.cookie-secure=true`
+- `mqtt.name` — MQTT client name: `sudo snap set zwave-js-ui mqtt.name=zwave`
+- `timezone` — time zone for the app: `sudo snap set zwave-js-ui timezone=Europe/Oslo`
+- `backup.*` — off-box backups: `sudo snap set zwave-js-ui backup.target=file:///mnt/backup`
+- `zwave.*` — controller serial port and security keys: `sudo snap set zwave-js-ui zwave.serial-port=/dev/ttyUSB0`
+
+Only mqtt.name is snap config; the broker (host, port, user, password) lives in settings.json — edit it with sudo zwave-js-ui.ui → MQTT broker.
+Unknown keys are rejected; sudo snap unset zwave-js-ui <key> restores a default.
 
 ## Interfaces
 
@@ -108,11 +131,14 @@ which interface is missing and the command that connects it.
 - `serial-port` (manual; needs snapd's experimental hotplug) — a serial controller instead of `raw-usb`.
 - `log-observe` (manual) — `zwave-js-ui.logs` reads journald for any log not written to file;
   without it the command exits with the fix: `sudo snap connect zwave-js-ui:log-observe`.
+- `gpg-public-keys` (manual) — lets zwave-js-ui.backup list-keys/pick-key read your ~/.gnupg; without it they say so and print the connect command.
 
 Manual connections (needed after `snap install --dangerous` of a local build):
 ```bash
 sudo snap connect zwave-js-ui:raw-usb
 sudo snap connect zwave-js-ui:hardware-observe
+sudo snap connect zwave-js-ui:log-observe
+sudo snap connect zwave-js-ui:gpg-public-keys
 ```
 
 Notes:
