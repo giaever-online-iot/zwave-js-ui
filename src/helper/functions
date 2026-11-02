@@ -16,12 +16,12 @@ function lprint {
 
 function plug_connected {
     if ! snapctl is-connected "${1}"; then
-        lprint "Missing plug: «${1}»"
-	    lprint "Connect with:"
+        lprint "Missing interface: ${1}"
+        lprint "Connect with:"
         if [ "${1}" == "serial-port" ]; then
-            lprint "$ sudo snap connect ${SNAP_NAME}:${1} <slot name>"
+            lprint "sudo snap connect ${SNAP_NAME}:${1} <slot name>"
         else
-            lprint "$ sudo snap connect ${SNAP_NAME}:${1}"
+            lprint "sudo snap connect ${SNAP_NAME}:${1}"
         fi
         return 1
     fi
@@ -38,10 +38,9 @@ function plugs_connected {
     SERIAL_RES=$?
 
     if [ "$RAW_RES" -ne 0 ] && [ "$SERIAL_RES" -ne 0 ]; then
+        lprint "Connect raw-usb (USB stick) OR serial-port (see ${SNAP_NAME}.help):"
         lprint "$RAW_OUT"
-        lprint "----- OR -----"
         lprint "$SERIAL_OUT"
-        lprint "See ${SNAP_NAME}.help for more info on the serial-port plug"
         MISSING=1
     fi
 
@@ -56,8 +55,7 @@ function plugs_connected {
 
 function require_root {
     if [ "${EUID:-$(id -u)}" -ne 0 ]; then
-        lprint "Running as root is required." >&2
-        lprint "Re-run with sudo."
+        lprint "${SNAP_NAME}: this command must run as root — re-run with sudo." >&2
         exit 1
     fi
 }

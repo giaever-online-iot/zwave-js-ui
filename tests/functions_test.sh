@@ -62,6 +62,13 @@ snapctl() { case "$1" in is-connected) [ "$2" != raw-usb ] ;; *) : ;; esac; }   
 assert_eq "$(cat "$PLOG")" "" "A7: nothing logged when the alternative plug is present"
 snapctl() { case "$1" in is-connected) [ "$2" = hardware-observe ] ;; *) : ;; esac; } # both alternatives missing
 ( DAEMONIZED=1 plugs_connected ); assert_status "$?" 1 "A7: both missing -> fail"
-assert_contains "$(cat "$PLOG")" "Missing plug: «raw-usb»" "A7: raw-usb message logged"; assert_contains "$(cat "$PLOG")" "----- OR -----" "A7: OR line"; assert_contains "$(cat "$PLOG")" "serial-port" "A7: serial-port alternative logged"
+assert_contains "$(cat "$PLOG")" "Missing interface: raw-usb" "A7: raw-usb message logged"
+assert_contains "$(cat "$PLOG")" "Connect raw-usb (USB stick) OR serial-port (see zwave-js-ui.help):" "A7: single header"
+assert_contains "$(cat "$PLOG")" "serial-port" "A7: serial-port alternative logged"
+assert_not_contains "$(cat "$PLOG")" "----- OR" "A7: no OR separator"; assert_not_contains "$(cat "$PLOG")" "\$ sudo" "A7: no prompt prefix"; assert_not_contains "$(cat "$PLOG")" "«" "A7: no guillemets"
+# D12: require_root is one stderr line, nothing on stdout
+out="$( (require_root) 2>&1 >/dev/null )"; assert_eq "$out" "zwave-js-ui: this command must run as root — re-run with sudo." "D12: require_root stderr line"
+out="$( (require_root) 2>/dev/null )"; assert_eq "$out" "" "D12: require_root stdout empty"
+(require_root) >/dev/null 2>&1; assert_status "$?" 1 "D12: require_root exits 1"
 rm -f "$PLOG"
 finish

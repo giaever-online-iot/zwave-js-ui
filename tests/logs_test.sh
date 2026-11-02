@@ -168,7 +168,16 @@ assert_eq "$(cat "$LESS_LOG2" 2>/dev/null)" "" "viewer: piped run does NOT invok
 h="$(use_color=1 log_viewer_hint)"
 assert_contains "$h" "Ctrl-C" "hint: documents Ctrl-C (scroll back)"
 assert_contains "$h" "F"      "hint: documents F (resume follow)"
-assert_contains "$h" "q"      "hint: documents q (quit)"
+assert_contains "$h" "q: quit (after Ctrl-C)" "hint: documents q (quit, after Ctrl-C)"
+u="$(usage 2>&1)"
+assert_contains "$u" "q       quit (after Ctrl-C)" "usage: legend truthful about q"
+assert_contains "$u" "(on a terminal: asks which)" "usage: no-arg line"
+# picker: Back exits 0 without following
+FOLLOW_SENTINEL="$SNAP_DATA/follow.ran"; rm -f "$FOLLOW_SENTINEL"
+( ui_interactive() { return 0; }; ui_choose() { printf '%s' '← Back'; }; require_root() { :; }
+  run_followers() { : > "$FOLLOW_SENTINEL"; }; main ) >/dev/null 2>&1; _rc=$?
+assert_status "$_rc" 0 "picker: Back -> rc 0"
+_rc=0; [ ! -e "$FOLLOW_SENTINEL" ] || _rc=1; assert_status "$_rc" 0 "picker: Back follows nothing"
 # coloured on a TTY, plain otherwise
 case "$h" in *$'\033'*) PASS=$((PASS+1)) ;; *) FAIL=$((FAIL+1)); echo "FAIL: TTY hint not coloured" >&2 ;; esac
 hp="$(use_color=0 log_viewer_hint)"
