@@ -147,6 +147,27 @@ out="$(SNAPCTL_server_ssl=false UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="
 assert_contains "$out" "session.cookie-secure=true needs server.ssl=true" "N14: cross-key rejection message"
 assert_contains "$out" "Rejected" "N14: rejected banner"
 assert_not_contains "$(cat "$SET_LOG")" "set session.cookie-secure" "N14: nothing written on cross-key rejection"
+# N18: Reset to default also runs the cross-key rule. A stateful stub (the reset re-seeds via a
+# subshell, so state lives in files): server.ssl=true + cookie-secure=true, reset server.ssl.
+_prev_snapctl="$(declare -f snapctl)"
+ST="$SNAP_DATA/n18"; rm -rf "$ST"; mkdir -p "$ST"; printf true > "$ST/server.ssl"; printf true > "$ST/session.cookie-secure"
+snapctl() {
+    case "$1" in
+        services) printf 'Service  Startup  Current  Notes\nzwave-js-ui.zwave-js-ui  enabled  active  -\n' ;;
+        get) [ -e "$ST/$2" ] && cat "$ST/$2"; return 0 ;;
+        set)   printf 'set %s\n' "$2" >> "$SET_LOG"; printf '%s' "${2#*=}" > "$ST/${2%%=*}" ;;
+        unset) printf 'unset %s\n' "$2" >> "$SET_LOG"; rm -f "$ST/$2" ;;
+        *) : ;;
+    esac
+}
+: > "$SET_LOG"; : > "$GUM_LOG"; printf '%s\n' "server.ssl" "Reset to default" "← Back" > "$CQ"
+out="$(UI_ASSUME_TTY=1 GUM_CONFIRM=0 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$CQ" nav_settings 2>&1)"
+assert_contains "$out" "session.cookie-secure=true needs server.ssl=true" "N18: reset hits the cross-key message"
+assert_contains "$out" "Rejected" "N18: rejected banner"
+assert_eq "$(sed -n '$p' "$SET_LOG")" "set server.ssl=true" "N18: previous value restored"
+assert_eq "$(cat "$ST/server.ssl")" "true" "N18: stored server.ssl is true again"
+assert_not_contains "$(cat "$GUM_LOG")" "confirm" "N18: no restart offer"; assert_not_contains "$out" "RAN_restart" "N18: no restart"
+eval "$_prev_snapctl"
 
 # session.secret value is masked in the success banner (not leaked)
 # Re-source src/bin/ui to clear any spy overrides left by prior tests

@@ -63,8 +63,16 @@ nav_set_apply() {              # $1 key, $2 value, $3 set|unset. snapd commits i
         shown="$val"; catalog_is_secret "$key" && shown="(hidden)"
         ui_ok "$key set to $shown"
     else
+        local raw; raw="$(snapctl get "$key" 2>/dev/null)"   # restored if the reset breaks a cross-key rule
         snapctl unset "$key" || { ui_err "snapctl could not unset $key"; ui_pause; return; }
         ( test_default_config ) >/dev/null 2>&1     # subshell: its testnset_config exits on a failed set
+        if ! msg="$(validate_cross_config 2>&1)"; then
+            if [ -n "$raw" ]; then snapctl set "$key=$raw"; else snapctl unset "$key"; fi
+            ui_err "Rejected — $key unchanged"
+            [ -n "$msg" ] && ui_print "$msg"
+            ui_pause
+            return
+        fi
         shown="$(snapctl get "$key" 2>/dev/null)"
         catalog_is_secret "$key" && [ -n "$shown" ] && shown="(hidden)"
         # Nothing stored: the default applies at run time (backup.retention, …) — show it.
