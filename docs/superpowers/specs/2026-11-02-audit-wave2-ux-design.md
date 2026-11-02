@@ -72,8 +72,9 @@ dependencies.
   `configure` must never be possible from stored values (post-refresh `sanitize_config`
   runs first and unsets anything `validate_config` rejects).
 - The hook's stderr reaches the user only when it fails; there is no way to warn on success.
-- `snapctl get -d` prints the whole snap config as nested JSON; snapd stores `server.host` as
-  `{"server":{"host":…}}`.
+- `snapctl get -d <key…>` prints the named keys as nested JSON (`server` → `{"server":{"host":…}}`);
+  snapd refuses `get` without a key (`get which option?`), so a hook can only enumerate the
+  namespaces it knows. Verified inside a strict snap on 2026-11-02.
 - Strict snaps see the host's `/etc` (so `/etc/localtime` and `/etc/timezone` are readable);
   the `help` app has no plugs.
 - gum v0.17.0: `input --value`, `choose --selected`, `choose --height` exist; `choose` has no
@@ -90,6 +91,10 @@ the first one: `!! unknown setting "<key>" — remove it with: sudo snap unset z
 line for `mqtt.*` keys: `MQTT broker settings live in settings.json — sudo zwave-js-ui.ui →
 MQTT broker` (only `mqtt.name` is snap config). `sanitize_config` (post-refresh) also unsets
 unknown keys, logging the key, never the value.
+Scope: `unknown_config_keys` queries the catalog's namespaces (`server session mqtt timezone
+backup zwave`), so it catches typos and foreign keys inside them (`server.prot`, `mqtt.host`);
+a key under an unknown top-level namespace (`foo.bar`) cannot be enumerated from a hook and
+stays accepted — snapd offers no "get everything" call.
 **Why:** the user is watching at `snap set`; a typo that "works" is the worst outcome.
 Unsetting on refresh is the only way a stray key from the past cannot fail every future
 refresh; such keys never had any effect, so nothing that worked stops working.
