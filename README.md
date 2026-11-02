@@ -118,12 +118,14 @@ Settings are snap config, set with `sudo snap set zwave-js-ui <key>=<value>`:
 - `zwave.*` — controller serial port and security keys: `sudo snap set zwave-js-ui zwave.serial-port=/dev/ttyUSB0`
 
 Only `mqtt.name` is snap config; the broker (host, port, user, password) lives in settings.json — edit it with `sudo zwave-js-ui.ui → MQTT broker`.
-Unknown keys are rejected; `sudo snap unset zwave-js-ui <key>` restores a default.
+
+Unknown keys inside these namespaces are rejected; `sudo snap unset zwave-js-ui <key>` restores a default.
+Known settings: `zwave-js-ui.help` (common) or `sudo zwave-js-ui.ui` → Settings (all).
 
 ## Interfaces
 
 The service needs `hardware-observe` **and one of** `raw-usb` or `serial-port`.
-It refuses to start without them: `sudo zwave-js-ui.enable` and `zwave-js-ui.restart` print
+It refuses to start without them: `sudo zwave-js-ui.enable` and `sudo zwave-js-ui.restart` print
 which interface is missing and the command that connects it.
 
 - `raw-usb` (auto-connected from the Snap Store) — USB Z-Wave controller sticks.

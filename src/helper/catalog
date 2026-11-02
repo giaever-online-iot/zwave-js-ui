@@ -79,7 +79,7 @@ validate_cross_config() {   # [key value] -> rc 0 ok; rc 1 + "!! ..." on stderr.
 		session.cookie-secure) cookie="${2:-}" ;;
 	esac
 	if [ "$cookie" = true ] && [ "$ssl" != true ]; then
-		echo "!! session.cookie-secure=true needs server.ssl=true (secure cookies only work over HTTPS)" >&2
+		echo "!! session.cookie-secure=true needs server.ssl=true (secure cookies only work over HTTPS) — or unset it: sudo snap unset ${SNAP_NAME:-zwave-js-ui} session.cookie-secure" >&2
 		return 1
 	fi
 	return 0

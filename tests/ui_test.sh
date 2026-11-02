@@ -257,6 +257,8 @@ po="$(UI_ASSUME_TTY=1 UI_NO_PAUSE=1 ui_pause 2>&1)"; ps=$?
 assert_status "$ps" "0" "pause: UI_NO_PAUSE -> returns 0 (no hang)"
 assert_eq "$po" "" "pause: UI_NO_PAUSE -> emits nothing"
 assert_eq "$(NO_COLOR=1 ui_pause 2>&1)" "" "pause: plain ctx -> no-op"
-assert_contains "$(UI_ASSUME_TTY=1 ui_pause 2>&1 </dev/null || true)" "press Enter to continue" "pause: Enter wording"
+# setsid: no controlling tty, so its read of /dev/tty fails at once instead of waiting for a
+# keypress on a developer's terminal (timeout as a backstop).
+assert_contains "$(UI_ASSUME_TTY=1 timeout 5 setsid -w bash -c 'source "$1/src/helper/ui"; ui_pause' _ "$ROOT" 2>&1 </dev/null || true)" "press Enter to continue" "pause: Enter wording"
 
 finish

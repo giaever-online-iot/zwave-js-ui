@@ -70,7 +70,7 @@ _u9="$(SNAPCTL_D='{"server":{"l":[1,2],"e":{},"ea":[],"host":"x"}}' unknown_conf
 assert_eq "$_u9" "server.e server.ea server.l " "U9: array/empty-map leaves reported by their own key"
 assert_not_contains "$_u9" "server.l.0" "U9: no numeric path segment"
 assert_eq "$(SNAPCTL_server_ssl=false SNAPCTL_session_cookie_secure=true validate_cross_config 2>"$SNAP_COMMON/err"; echo $?)" 1 "X1: cookie true + ssl false rejected"
-assert_contains "$(cat "$SNAP_COMMON/err")" "!! session.cookie-secure=true needs server.ssl=true (secure cookies only work over HTTPS)" "X1: message"
+assert_contains "$(cat "$SNAP_COMMON/err")" "!! session.cookie-secure=true needs server.ssl=true (secure cookies only work over HTTPS) — or unset it: sudo snap unset zwave-js-ui session.cookie-secure" "X1: message"
 assert_eq "$(SNAPCTL_server_ssl=true SNAPCTL_session_cookie_secure=true validate_cross_config; echo $?)" 0 "X1: both true ok"
 assert_eq "$(SNAPCTL_server_ssl=false validate_cross_config session.cookie-secure true 2>/dev/null; echo $?)" 1 "X1: pending pair overrides"
 assert_eq "$(SNAPCTL_server_ssl=true SNAPCTL_session_cookie_secure=true validate_cross_config server.ssl false 2>/dev/null; echo $?)" 1 "X1: pending server.ssl overrides the stored one"

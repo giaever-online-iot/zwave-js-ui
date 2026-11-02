@@ -17,7 +17,7 @@ validate_cross_config || exit 1
 # snap set, with the fix. Only the key is printed, never the value.
 bad="$(unknown_config_keys | head -n1)"
 if [ -n "${bad}" ]; then
-    echo "!! unknown setting \"${bad}\" — remove it with: sudo snap unset ${SNAP_NAME} ${bad}. Known settings: ${SNAP_NAME}.help" >&2
+    echo "!! unknown setting \"${bad}\" — remove it with: sudo snap unset ${SNAP_NAME} ${bad}. Known settings: ${SNAP_NAME}.help (common) or sudo ${SNAP_NAME}.ui → Settings (all)" >&2
     case "${bad}" in mqtt.*) echo "MQTT broker settings live in settings.json — sudo ${SNAP_NAME}.ui → MQTT broker" >&2 ;; esac
     exit 1
 fi

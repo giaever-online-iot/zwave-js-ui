@@ -74,6 +74,8 @@ done
 
 # D6: an unset cookie-secure shows what it follows; an explicit value shows as itself
 assert_contains "$(SNAPCTL_server_ssl=true SNAPCTL_session_cookie_secure='' settings_rows)" "(follows server.ssl: true)" "D6: help shows the effective cookie-secure"
+assert_contains "$(SNAPCTL_server_ssl=true SNAPCTL_server_force_disable_ssl=true SNAPCTL_session_cookie_secure='' settings_rows)" "(follows server.ssl: false)" "D6: force-disable-ssl makes the effective value false"
+assert_contains "$(SNAPCTL_server_ssl='' SNAPCTL_session_cookie_secure='' settings_rows)" "(follows server.ssl: false)" "D6: unset server.ssl -> false, never blank"
 assert_contains "$(SNAPCTL_server_ssl=true SNAPCTL_session_cookie_secure=false settings_rows | grep '^session.cookie-secure')" "session.cookie-secure	false	" "D6: explicit value shown as is"
 assert_contains "$(SNAPCTL_mqtt_name='' settings_rows | grep '^mqtt.name')" "mqtt.name	(unset)	" "D6: other empty keys still (unset)"
 

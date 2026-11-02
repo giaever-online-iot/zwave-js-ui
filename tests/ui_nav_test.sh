@@ -144,7 +144,7 @@ UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings >/dev/null 2>&1
 assert_contains "$(head -n1 "$GUM_LOG")" "--header Setting ← Back " "N13: settings list starts with Back"
 : > "$SET_LOG"; printf '%s\n' "session.cookie-secure" "Edit" "true" "← Back" > "$CQ"
 out="$(SNAPCTL_server_ssl=false UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings 2>&1)"
-assert_contains "$out" "session.cookie-secure=true needs server.ssl=true" "N14: cross-key rejection message"
+assert_contains "$out" "session.cookie-secure=true needs server.ssl=true (secure cookies only work over HTTPS) — or unset it: sudo snap unset zwave-js-ui session.cookie-secure" "N14: cross-key rejection message"
 assert_contains "$out" "Rejected" "N14: rejected banner"
 assert_not_contains "$(cat "$SET_LOG")" "set session.cookie-secure" "N14: nothing written on cross-key rejection"
 # N18: Reset to default also runs the cross-key rule. A stateful stub (the reset re-seeds via a
