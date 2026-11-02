@@ -76,6 +76,18 @@ sanitize_config() {   # unset every stored value validate_config rejects (needs 
 		validate_config "$key" "$(snapctl get "$key" 2>/dev/null)" 2>/dev/null && continue
 		snapctl unset "$key" && lprint "$key: removed invalid value; the default applies"
 	done
+	for key in $(unknown_config_keys); do
+		snapctl unset "$key" && lprint "$key: removed unknown setting"
+	done
+	return 0
+}
+
+unknown_config_keys() {   # stored snap config keys the catalog does not know, one per line (never values)
+	local k
+	while IFS= read -r k; do
+		[ -n "$k" ] || continue
+		catalog_keys | grep -qxF -- "$k" || printf '%s\n' "$k"
+	done < <(snapctl get -d 2>/dev/null | yq -p=json '.. | select(tag != "!!map" and tag != "!!seq") | path | join(".")' 2>/dev/null || true)
 	return 0
 }
 

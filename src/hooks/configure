@@ -12,6 +12,15 @@ for key in $(catalog_keys); do
     validate_config "${key}" "$(snapctl get "${key}")" || exit 1
 done
 
+# A key the catalog does not know is a typo or a settings.json field: refuse it here, at
+# snap set, with the fix. Only the key is printed, never the value.
+bad="$(unknown_config_keys | head -n1)"
+if [ -n "${bad}" ]; then
+    echo "!! unknown setting \"${bad}\" — remove it with: sudo snap unset ${SNAP_NAME} ${bad}. Known settings: ${SNAP_NAME}.help" >&2
+    case "${bad}" in mqtt.*) echo "MQTT broker settings live in settings.json — sudo zwave-js-ui.ui → MQTT broker" >&2 ;; esac
+    exit 1
+fi
+
 # Restart only when the running daemon's inputs changed. env-wrapper writes the digest
 # of what the daemon started with; snapd runs this hook after start-snap-services on
 # every refresh, so an equal digest (or a backup-only change) must not bounce the driver.

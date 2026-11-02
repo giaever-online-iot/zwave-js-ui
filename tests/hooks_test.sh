@@ -66,4 +66,12 @@ run_hook post-refresh; cmp -s "$SNAP_DATA/settings.json" "$T/ref.json"; assert_s
 assert_not_contains "$(cat "$LOGGER_LOG")" "not writable" "A8: no misleading log line"
 mkdir -p "$T/x43/prio"; printf '{"zwave":{"deviceConfigPriorityDir":"%s/x42/prio"}}' "$T" > "$T/x43/settings.json"
 SNAP_DATA="$T/x43" run_hook post-refresh; assert_eq "$(yq -r '.zwave.deviceConfigPriorityDir' "$T/x43/settings.json")" "$T/x43/prio" "A8: stale revision path still rewritten"
+reset_state "${VALID[@]}" server.prot=SEKRIT; run_hook configure; assert_status "$?" 1 "U2: unknown key rejected"
+assert_contains "$(cat "$T/stderr")" '!! unknown setting "server.prot" — remove it with: sudo snap unset zwave-js-ui server.prot. Known settings: zwave-js-ui.help' "U2: message"
+assert_not_contains "$(cat "$T/stderr")$(cat "$LOGGER_LOG")" "SEKRIT" "U2: value never shown"; assert_not_contains "$(cat "$SNAPCTL_LOG")" "restart" "U2: no restart"
+reset_state "${VALID[@]}" mqtt.host=broker; run_hook configure; assert_contains "$(cat "$T/stderr")" "MQTT broker settings live in settings.json — sudo zwave-js-ui.ui → MQTT broker" "U3: mqtt hint"
+reset_state "${VALID[@]}" server.prot=SEKRIT; run_hook post-refresh; assert_status "$?" 0 "U6: post-refresh rc 0"
+assert_contains "$(cat "$SNAPCTL_LOG")" "unset server.prot" "U6: stray key unset at refresh"; assert_contains "$(cat "$LOGGER_LOG")" "server.prot: removed unknown setting" "U6: notice"; assert_not_contains "$(cat "$LOGGER_LOG")" "SEKRIT" "U6: value not logged"
+: > "$SNAPCTL_LOG"; run_hook configure; assert_status "$?" 0 "U6: configure passes after the refresh cleaned up"
+reset_state "${VALID[@]}"; SNAPCTL_GET_D_RAW='garbage' run_hook configure; assert_status "$?" 0 "U4: unreadable get -d does not fail the hook"
 finish

@@ -8,7 +8,7 @@ source "$HERE/lib/assert.sh"
 
 export SNAP="$HERE/fixtures"
 SNAP_COMMON="$(mktemp -d)"; export SNAP_COMMON
-snapctl() { case "$1" in get) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;; *) : ;; esac; }
+snapctl() { case "$1 ${2:-}" in "get -d") printf '%s' "${SNAPCTL_D:-{}}" ;; get*) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;; *) : ;; esac; }
 
 # shellcheck source=/dev/null
 source "$ROOT/src/helper/catalog"
@@ -52,4 +52,8 @@ assert_eq "$(v backup.target S3://bucket/x)" 0 "D7: upper-case scheme ok (duplic
 assert_eq "$(v backup.target sftp:/nas/zui)" 1 "D7: missing slash rejected"; assert_contains "$(cat "$SNAP_COMMON/err")" "!! backup.target must be a duplicity URL like sftp://user@nas/zui, s3://bucket/path or file:///mnt/usb/zui, got sftp:/nas/zui" "D7: message"
 assert_eq "$(v backup.target /mnt/usb/zui)" 1 "D7: bare path rejected"; assert_eq "$(v backup.full-if-older-than 1D12h)" 0 "D7: full-if-older-than unchecked"
 _rc=0; [ "$(catalog_field session.secret 4 | wc -c)" -le 64 ] || _rc=1; assert_status "$_rc" 0 "polish: session.secret description ≤ 63 chars"
+SNAPCTL_D='{"server":{"host":"x","prot":"1"},"mqtt":{"host":"y","name":"a.b=c d"},"timezone":"Europe/Oslo"}'
+assert_eq "$(unknown_config_keys | sort | tr '\n' ' ')" "mqtt.host server.prot " "U1: unknown leaf paths only"
+assert_eq "$(SNAPCTL_D='{}' unknown_config_keys)" "" "U4: empty config -> nothing"; assert_eq "$(SNAPCTL_D='not json' unknown_config_keys 2>/dev/null; echo "rc=$?")" "rc=0" "U4: garbage -> nothing, rc 0"
+assert_eq "$(SNAPCTL_D='{"mqtt":{"name":"a.b=c d"}}' unknown_config_keys)" "" "U5: dotted VALUE is not a key"
 finish
