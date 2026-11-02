@@ -65,12 +65,17 @@ assert_contains "$out" "serial-port" "serial footnote present"
 # The catalog duplicates defaults that test_default_config (helper/functions)
 # seeds; this converts the catalog's "keep in sync" comment into a CI check.
 # Deliberately only the keys with literal defaults — mqtt.name/session.* use
-# placeholder defaults ("(unset)", "(= server.ssl)") that have no literal match.
-for key in server.host server.port server.ssl timezone; do
+# placeholder defaults ("(unset)", "(follows server.ssl)", "(host time)") that have no literal match.
+for key in server.host server.port server.ssl; do
     def="$(settings_catalog | awk -F'\t' -v k="$key" '$1 == k { print $3 }')"
     grep -Eq "testnset_config \"$key\" \"?$def\"?" "$ROOT/src/helper/functions"
     assert_status "$?" "0" "catalog default for $key matches test_default_config"
 done
+
+# D6: an unset cookie-secure shows what it follows; an explicit value shows as itself
+assert_contains "$(SNAPCTL_server_ssl=true SNAPCTL_session_cookie_secure='' settings_rows)" "(follows server.ssl: true)" "D6: help shows the effective cookie-secure"
+assert_contains "$(SNAPCTL_server_ssl=true SNAPCTL_session_cookie_secure=false settings_rows | grep '^session.cookie-secure')" "session.cookie-secure	false	" "D6: explicit value shown as is"
+assert_contains "$(SNAPCTL_mqtt_name='' settings_rows | grep '^mqtt.name')" "mqtt.name	(unset)	" "D6: other empty keys still (unset)"
 
 # --- help renders via the width-fit ui_table (stacking lives in the library now) ---
 unset NO_COLOR; export TERM=xterm-256color   # let UI_ASSUME_TTY reach styled

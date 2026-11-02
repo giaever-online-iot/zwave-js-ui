@@ -52,4 +52,9 @@ _rc=0; [ ! -e "$DF.tmp" ] || _rc=1; assert_status "$_rc" 0 "E5: no temp file lef
 unset DAEMONIZED
 assert_not_contains "$(run_wrapper)" "SESSION_SECRET=" "unset secret -> not exported"
 assert_contains "$(SNAPCTL_session_secret=abc run_wrapper)" "SESSION_SECRET=abc" "set secret -> exported"
+assert_contains "$(SNAPCTL_server_ssl=true run_wrapper)" "USE_SECURE_COOKIE=true" "E6: unset cookie-secure follows HTTPS"
+assert_not_contains "$(SNAPCTL_server_ssl=true SNAPCTL_session_cookie_secure=false run_wrapper)" "USE_SECURE_COOKIE" "E7: explicit false opts out"
+assert_contains "$(SNAPCTL_server_ssl=true SNAPCTL_session_cookie_secure=true run_wrapper)" "USE_SECURE_COOKIE=true" "E7: explicit true kept"
+assert_not_contains "$(SNAPCTL_server_ssl=false run_wrapper)" "USE_SECURE_COOKIE" "E8: no HTTPS -> no secure cookie"
+assert_not_contains "$(SNAPCTL_server_ssl=true SNAPCTL_server_force_disable_ssl=true run_wrapper)" "USE_SECURE_COOKIE" "E9: force-disabled HTTPS -> no secure cookie"
 finish

@@ -10,6 +10,7 @@ test_default_config
 sanitize_config
 test_default_config
 migrate_session_secret
+migrate_cookie_secure
 test_device_priority_dir
 
 # Update references to the external config directory

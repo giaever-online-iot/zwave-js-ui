@@ -113,7 +113,8 @@ out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_setting
 assert_contains "$out" "Used by the next backup run." "N6: backup key -> no restart talk"; assert_not_contains "$(cat "$GUM_LOG")" "confirm" "N6: no confirm for backup keys"
 : > "$SET_LOG"; printf '%s\n' "session.cookie-secure" "Reset to default" "← Back" > "$CQ"
 SNAPCTL_server_ssl=true UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings >/dev/null 2>&1
-assert_contains "$(cat "$SET_LOG")" "set session.cookie-secure=true" "N7: dependent default follows server.ssl"
+assert_contains "$(cat "$SET_LOG")" "unset session.cookie-secure" "N7: reset unsets cookie-secure"
+assert_not_contains "$(cat "$SET_LOG")" "set session.cookie-secure=" "N7: reset leaves it unset, so it follows server.ssl (D6)"
 : > "$SET_LOG"; printf '%s\n' "mqtt.name" "Edit" "← Back" > "$CQ"; printf '\n' > "$INQ"
 UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings >/dev/null 2>&1
 assert_contains "$(cat "$SET_LOG")" "unset mqtt.name" "N8: empty edit = reset"

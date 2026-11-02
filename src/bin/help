@@ -12,6 +12,7 @@ settings_rows() {              # catalog (common only) + live values -> TSV: key
         [ "$scope" = common ] || continue           # advanced keys stay out of the help table
         cur="$(snapctl get "$key" 2>/dev/null)"
         [ "$type" = secret ] && [ -n "$cur" ] && cur="(hidden)"
+        [ "$key" = session.cookie-secure ] && [ -z "$cur" ] && cur="(follows server.ssl: $(snapctl get server.ssl 2>/dev/null))"
         printf '%s\t%s\t%s\t%s\n' "$key" "${cur:-(unset)}" "$def" "$desc"
     done < <(settings_catalog)
 }

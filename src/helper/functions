@@ -139,11 +139,10 @@ function test_default_config {
     testnset_config "server.ssl" false
     testnset_config "server.force-disable-ssl" false
 
-    testnset_config "session.cookie-secure" "$(snapctl get server.ssl)"
+    # session.cookie-secure and timezone are not seeded: unset means "follows server.ssl"
+    # (env-wrapper) and "the host's zone" (D5, D6).
 
     testnset_config "mqtt.name" ""
-
-    testnset_config "timezone" "Europe/Oslo"
 }
 
 # Older revisions seeded session.secret with a v1 UUID, which overrode the
@@ -157,6 +156,22 @@ function migrate_session_secret {
     if [ "${#v}" -eq 36 ] && [[ "$v" =~ ^[0-9a-fA-F-]+$ ]] && [ "${v:14:1}" = "1" ]; then
         if snapctl unset session.secret; then
             lprint "session.secret: removed the generated v1 UUID; the app now keeps its own secret in ${SNAP_DATA}/.session-secret (one re-login)"
+        fi
+    fi
+    : > "$marker" 2>/dev/null || true
+    return 0
+}
+
+# Older revisions copied server.ssl into session.cookie-secure once at install, so turning
+# HTTPS on later left cookies insecure. A stored value equal to server.ssl is that copy:
+# drop it (once, marker) so the cookie follows HTTPS; a differing value was set on purpose.
+function migrate_cookie_secure {
+    local marker="${SNAP_COMMON}/.cookie-secure-migrated" ssl cookie
+    [ -e "$marker" ] && return 0
+    ssl="$(snapctl get server.ssl 2>/dev/null)"; cookie="$(snapctl get session.cookie-secure 2>/dev/null)"
+    if [ -n "$ssl" ] && [ -n "$cookie" ] && [ "$ssl" = "$cookie" ]; then
+        if snapctl unset session.cookie-secure; then
+            lprint "session.cookie-secure: now follows server.ssl (was the install-time copy)"
         fi
     fi
     : > "$marker" 2>/dev/null || true

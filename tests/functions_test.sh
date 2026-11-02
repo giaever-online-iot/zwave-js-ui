@@ -39,6 +39,21 @@ assert_contains "$out" "one re-login" "migrate: notice logged"; assert_not_conta
 : > "$SLOG"; snapctl() { case "$1" in get) printf '' ;; set) printf 'set %s\n' "$2" >> "$SLOG" ;; *) : ;; esac; }
 test_default_config >/dev/null; assert_not_contains "$(cat "$SLOG")" "session.secret" "test_default_config no longer seeds session.secret"
 assert_contains "$(cat "$SLOG")" "set server.port=8091" "test_default_config still seeds server.port"
+assert_not_contains "$(cat "$SLOG")" "set timezone" "D5: test_default_config no longer seeds timezone"
+assert_not_contains "$(cat "$SLOG")" "set session.cookie-secure" "D6: test_default_config no longer seeds session.cookie-secure"
+# --- migrate_cookie_secure: drop the install-time copy of server.ssl once (marker), never a deliberate value
+CMIG="$SNAP_COMMON/.cookie-secure-migrated"
+snapctl() { case "$1 ${2:-}" in "get server.ssl") printf '%s' "${SSL_VALUE:-}" ;; "get session.cookie-secure") printf '%s' "${COOKIE_VALUE:-}" ;; unset*|set*) printf '%s %s\n' "$1" "$2" >> "$SLOG" ;; *) : ;; esac; }
+: > "$SLOG"; rm -f "$CMIG"; out="$(DAEMONIZED=0 SSL_VALUE=false COOKIE_VALUE=false migrate_cookie_secure)"; _rc=$?
+assert_status "$_rc" 0 "M1: equal -> rc 0"; assert_contains "$(cat "$SLOG")" "unset session.cookie-secure" "M1: equal -> unset"
+assert_contains "$out" "session.cookie-secure: now follows server.ssl (was the install-time copy)" "M1: notice"
+_rc=0; [ -e "$CMIG" ] || _rc=1; assert_status "$_rc" 0 "M1: marker written"
+: > "$SLOG"; rm -f "$CMIG"; out="$(DAEMONIZED=0 SSL_VALUE=true COOKIE_VALUE=false migrate_cookie_secure)"
+assert_eq "$(cat "$SLOG")" "" "M2: differing -> kept"; assert_eq "$out" "" "M2: no notice"
+_rc=0; [ -e "$CMIG" ] || _rc=1; assert_status "$_rc" 0 "M2: marker written"
+: > "$SLOG"; rm -f "$CMIG"; DAEMONIZED=0 SSL_VALUE=false COOKIE_VALUE="" migrate_cookie_secure >/dev/null; assert_eq "$(cat "$SLOG")" "" "M3: cookie unset -> nothing to unset"
+: > "$SLOG"; : > "$CMIG"; out="$(DAEMONIZED=0 SSL_VALUE=true COOKIE_VALUE=true migrate_cookie_secure)"
+assert_eq "$(cat "$SLOG")$out" "" "M4: marker present -> nothing"
 rm -f "$SLOG"
 
 PLOG="$(mktemp)"; logger() { printf '%s\n' "$*" >> "$PLOG"; }

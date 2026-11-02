@@ -76,4 +76,22 @@ assert_contains "$(cat "$SNAPCTL_LOG")" "unset server.prot" "U6: stray key unset
 reset_state "${VALID[@]}"; SNAPCTL_GET_D_RAW='garbage' run_hook configure; assert_status "$?" 0 "U4: unreadable get -d does not fail the hook"
 reset_state "${VALID[@]}" foo.bar=1; run_hook configure; assert_status "$?" 0 "U7: key under an unknown namespace is undetectable by design"
 run_hook post-refresh; assert_not_contains "$(cat "$SNAPCTL_LOG")" "unset foo.bar" "U7: sanitizer leaves it alone"
+reset_state server.port=8091 server.ssl=false session.cookie-secure=true; run_hook configure; assert_status "$?" 1 "P5: cookie-secure=true without HTTPS rejected"
+assert_contains "$(cat "$T/stderr")" "!! session.cookie-secure=true needs server.ssl=true (secure cookies only work over HTTPS)" "P5: message"
+assert_not_contains "$(cat "$SNAPCTL_LOG")" "restart" "P5: no restart"
+CMIG="$SNAP_COMMON/.cookie-secure-migrated"
+rm -f "$CMIG"; reset_state server.port=8091 server.ssl=false session.cookie-secure=false; run_hook post-refresh; assert_status "$?" 0 "P6a: rc 0"
+assert_contains "$(cat "$SNAPCTL_LOG")" "unset session.cookie-secure" "P6a: install-time copy unset"
+assert_contains "$(cat "$LOGGER_LOG")" "session.cookie-secure: now follows server.ssl (was the install-time copy)" "P6a: notice"
+_rc=0; [ -e "$CMIG" ] || _rc=1; assert_status "$_rc" 0 "P6a: marker written"
+_rc=0; [ ! -e "$SNAPCTL_STATE/session.cookie-secure" ] || _rc=1; assert_status "$_rc" 0 "P6a: not re-seeded"
+rm -f "$CMIG"; reset_state server.port=8091 server.ssl=false session.cookie-secure=true; run_hook post-refresh; assert_status "$?" 0 "P6b: rc 0"
+assert_contains "$(cat "$SNAPCTL_LOG")" "unset session.cookie-secure" "P6b: sanitizer unsets it"
+assert_contains "$(cat "$LOGGER_LOG")" "session.cookie-secure: removed (needs server.ssl=true)" "P6b: notice"
+run_hook configure; assert_status "$?" 0 "P6b: the configure run that follows passes"
+reset_state server.port=8091 server.ssl=false session.cookie-secure=false; run_hook post-refresh   # marker from P6b present
+assert_not_contains "$(cat "$SNAPCTL_LOG")" "unset session.cookie-secure" "P6c: marker present -> a deliberate false is kept"
+reset_state server.port=8091; run_hook configure; run_hook post-refresh
+assert_not_contains "$(cat "$SNAPCTL_LOG")" "set timezone" "P7: timezone never seeded"
+assert_not_contains "$(cat "$SNAPCTL_LOG")" "set session.cookie-secure" "P7: cookie-secure never seeded"
 finish

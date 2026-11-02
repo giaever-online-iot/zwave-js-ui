@@ -13,9 +13,9 @@ server.port	int	8091	Port for the web UI	common	daemon
 server.ssl	bool	false	Serve the web UI over HTTPS	common	daemon
 server.force-disable-ssl	bool	false	Force-disable SSL even when enabled	common	daemon
 session.secret	secret	(unset)	Session secret; unset = the app keeps its own (recommended)	common	daemon
-session.cookie-secure	bool	(= server.ssl)	Secure session cookie (see expressjs/session#cookiesecure)	common	daemon
+session.cookie-secure	bool	(follows server.ssl)	Secure session cookie; unset = follows server.ssl	common	daemon
 mqtt.name	string	(unset)	Client name when connecting to the MQTT broker	common	daemon
-timezone	string	Europe/Oslo	Timezone exported to the app as TZ	common	daemon
+timezone	string	(host time)	Timezone for the app (TZ), e.g. America/New_York; unset = the host's zone	common	daemon
 backup.target	string	(unset)	Duplicity target URL for off-box backups	common	backup
 backup.dir	string	$SNAP_DATA/backups	Directory shipped by the backup command	common	daemon
 backup.encrypt	bool	(unset)	Set false to opt out of backup encryption	common	backup
@@ -68,6 +68,22 @@ validate_config() {   # <key> <value> -> rc 0 valid; rc 1 + "!! key must be <rul
 	return 0
 }
 
+# shellcheck disable=SC2120  # the navigator passes its pending pair; hooks check the stored config
+validate_cross_config() {   # [key value] -> rc 0 ok; rc 1 + "!! ..." on stderr. Rules between keys, on the
+	# stored config with the optional pending pair (navigator: not yet written) overriding its key.
+	local ssl cookie
+	ssl="$(snapctl get server.ssl 2>/dev/null)"; cookie="$(snapctl get session.cookie-secure 2>/dev/null)"
+	case "${1:-}" in
+		server.ssl) ssl="${2:-}" ;;
+		session.cookie-secure) cookie="${2:-}" ;;
+	esac
+	if [ "$cookie" = true ] && [ "$ssl" != true ]; then
+		echo "!! session.cookie-secure=true needs server.ssl=true (secure cookies only work over HTTPS)" >&2
+		return 1
+	fi
+	return 0
+}
+
 sanitize_config() {   # unset every stored value validate_config rejects (needs lprint from helper/functions)
 	# post-refresh: values an older hook accepted must not fail configure inside the refresh
 	# change (snapd would undo the refresh). Never prints the value: secret keys included.
@@ -76,6 +92,9 @@ sanitize_config() {   # unset every stored value validate_config rejects (needs 
 		validate_config "$key" "$(snapctl get "$key" 2>/dev/null)" 2>/dev/null && continue
 		snapctl unset "$key" && lprint "$key: removed invalid value; the default applies"
 	done
+	if ! validate_cross_config 2>/dev/null; then
+		snapctl unset session.cookie-secure && lprint "session.cookie-secure: removed (needs server.ssl=true)"
+	fi
 	for key in $(unknown_config_keys); do
 		snapctl unset "$key" && lprint "$key: removed unknown setting"
 	done
