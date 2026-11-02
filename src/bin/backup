@@ -83,10 +83,10 @@ parse_collection_status() {
         }'
 }
 
-last_run_file() { printf '%s' "${SNAP_COMMON:-/tmp}/backup.last"; }
+last_run_file() { printf '%s' "$SNAP_COMMON/backup.last"; }
 
 # Hide user[:pass]@ in a URL before it reaches a terminal or log.
-redact_url() { printf '%s' "$1" | sed -E 's#(//)[^/@]+@#\1<redacted>@#'; }
+redact_url() { printf '%s' "$1" | sed -E 's#(//)[^/]*@#\1<redacted>@#'; }
 
 # record_last_run <ok|failed|skipped> <detail> -> $SNAP_COMMON/backup.last, 0600.
 # Never fails the backup: a write problem only prints a notice.
@@ -566,8 +566,8 @@ main() {
                 exit 0
             fi
             require_encryption_config
-            # shellcheck disable=SC2294
             local dup_rc=0
+            # shellcheck disable=SC2294
             eval "$(build_backup_cmd "$(backup_dir)")" || dup_rc=$?
             if [ "$dup_rc" -ne 0 ]; then
                 record_last_run failed "$dup_rc"
