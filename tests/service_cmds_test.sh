@@ -21,6 +21,8 @@ out="$(
 )"
 assert_contains "$out" "OK: Service enabled" "daemonize: success message"
 assert_contains "$out" "sudo zwave-js-ui.logs" "daemonize: next-steps table"
+assert_contains "$out" "Web UI: http://" "D13: daemonize prints the web UI address"
+assert_contains "$out" "sudo zwave-js-ui.ui" "D14: daemonize lists the navigator"
 
 # daemonize failure path: plugs missing.
 (

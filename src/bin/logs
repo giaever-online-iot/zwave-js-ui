@@ -10,16 +10,16 @@ usage() {
     ui_usage <<EOF
 Usage: ${SNAP_NAME}.logs [all|zui|--zui|zwjs|--zwjs]
 
-  (no arg)        follow both streams, merged (interactive terminals get a picker)
+  (no arg)        follow both streams (on a terminal: asks which)
   all  | --all    follow both streams, merged
   zui  | --zui    follow the Z-Wave JS UI application log only
   zwjs | --zwjs   follow the Z-Wave JS driver log only
   -h   | --help   show this help
 
 On an interactive terminal the logs open in a scrollable viewer:
-  Ctrl-C  stop following and scroll back through the whole session
+  Ctrl-C  pause following (then scroll, search…)
   F       resume live following
-  q       quit
+  q       quit (after Ctrl-C)
 EOF
 }
 
@@ -199,7 +199,7 @@ log_viewer_hint() {            # legend line leading the paged buffer, so the sc
                                # keys are discoverable when the user scrolls to the top (the
                                # "read the whole session" gesture). Coloured on a TTY; reads
                                # main's use_color via dynamic scope (like run_followers).
-    local msg='──── live logs · Ctrl-C: scroll back · F: resume follow · q: quit ────'
+    local msg='──── live logs · Ctrl-C: pause · F: resume · q: quit (after Ctrl-C) ────'
     if [ "${use_color:-0}" = 1 ]; then printf '\033[33m%s\033[0m\n' "$msg"; else printf '%s\n' "$msg"; fi
 }
 
@@ -212,13 +212,14 @@ main() {
     local target
     if [ "$#" -eq 0 ] && ui_interactive; then
         local sel
-        sel="$(ui_choose 'Follow which logs?' "pass a stream: ${SNAP_NAME}.logs [zui|zwjs]" all zui zwjs)" || exit 2
+        sel="$(ui_choose 'Follow which logs?' "pass a stream: ${SNAP_NAME}.logs [zui|zwjs]" '← Back' all zui zwjs)" || exit 2
+        [ "$sel" = '← Back' ] && exit 0
         target="$(sel_to_target "$sel")"
     else
         target="$(parse_args "$@")" || { usage >&2; exit 2; }
     fi
 
-    local use_color=0; [ -t 1 ] && use_color=1
+    local use_color=0; [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && use_color=1   # D3: NO_COLOR wins
 
     local streams=()
     case "$target" in

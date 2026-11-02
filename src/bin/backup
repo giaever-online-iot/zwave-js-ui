@@ -13,15 +13,17 @@ DUP_PY="$SNAP/usr/bin/python3"
 
 usage() {
     cat <<EOF
-Usage: ${SNAP_NAME}.backup [restore [<time>] | list | status | list-keys | pick-key [<fpr>] | import-key | create-key | export-key]
+Usage: ${SNAP_NAME}.backup [restore [<time>] [--into <dir>] | list | status | list-keys | pick-key [<fpr>] | import-key | create-key | export-key]
 
   (no arg)    ship ZUI's backups now (incremental; full if older than threshold)
-  restore     fetch+decrypt the latest backup back into the backup dir
+  restore [<time>] [--into <dir>]   fetch+decrypt a backup into a fresh folder (default: \$SNAP_DATA/restored/<stamp>)
+  <time>      e.g. 2026-10-30, 2026-10-30T02:00, 3D (three days ago)
   list        show available backup sets
   status      show current backup config
   list-keys   list YOUR host GPG public keys (no sudo)
   pick-key    export one of YOUR host keys, armored, for the pipe below (no sudo);
               without <fpr> it asks you to pick — bare/unpiped runs are refused
+              (needs: sudo snap connect ${SNAP_NAME}:gpg-public-keys)
   import-key  import a GPG public key (armored, on stdin) into the snap keyring + set encrypt-key (sudo)
   create-key  generate a backup keypair in the snap keyring + set encrypt-key (sudo)
   export-key  export the snap keyring's private key to move it to your host/offline (sudo)
@@ -83,25 +85,66 @@ parse_collection_status() {
         }'
 }
 
+last_run_file() { printf '%s' "$SNAP_COMMON/backup.last"; }
+
+# Hide user[:pass]@ in a URL before it reaches a terminal or log.
+redact_url() { printf '%s' "$1" | sed -E 's#(//)[^/]*@#\1<redacted>@#'; }
+
+# record_last_run <ok|failed|skipped> <detail> -> $SNAP_COMMON/backup.last, 0600.
+# Never fails the backup: a write problem only prints a notice.
+record_last_run() {
+    local f; f="$(last_run_file)"; local tmp
+    tmp="$f.tmp.$$"
+    if ! { ( umask 077; printf '%s %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" > "$tmp" ) 2>/dev/null \
+            && chmod 600 "$tmp" 2>/dev/null && mv -f "$tmp" "$f" 2>/dev/null; }; then
+        rm -f "$tmp" 2>/dev/null
+        ui_print "Could not record the last run in $f." >&2
+    fi
+    return 0
+}
+
+# The "last run" status value for the current config.
+last_run_row() {
+    local ts state detail
+    [ -n "$(cfg target)" ] || { printf 'not configured'; return 0; }
+    [ -r "$(last_run_file)" ] || { printf 'never'; return 0; }
+    read -r ts state detail < "$(last_run_file)" || true
+    ts="${ts%Z}"; ts="${ts/T/ }"; ts="${ts%:*} UTC"
+    case "$state" in
+        ok)      printf '%s  OK' "$ts" ;;
+        failed)  printf '%s  FAILED (rc %s) — see: sudo snap logs %s.backup-timer' "$ts" "$detail" "$SNAP_NAME" ;;
+        skipped) printf "%s  skipped (nothing in %s — enable ZUI's scheduled backups)" "$ts" "$(backup_dir)" ;;
+        *)       printf 'unknown' ;;
+    esac
+}
+
 cmd_status() {                 # render current backup config as a table
-    local target key onbox="no" retention timer
+    local target key onbox="-" retention timer startup
     target="$(cfg target)"
     key="$(cfg encrypt-key)"
-    if [ -n "$key" ] && secret_key_on_disk "$key"; then
-        onbox="yes"
+    if [ -n "$key" ]; then
+        if secret_key_on_disk "$key"; then
+            onbox="yes"
+        else
+            onbox="no (public key only — restore needs the private key)"
+        fi
     fi
     retention="$(cfg retention)"
-    # Startup ("enabled") matters more than Current for a timer that is normally
-    # inactive between firings — show both so "inactive" doesn't read as broken.
-    timer="$(snapctl services "$SNAP_NAME.backup-timer" 2>/dev/null | awk 'NR==2 { print $2 "/" $3 }')"
+    startup="$(snapctl services "$SNAP_NAME.backup-timer" 2>/dev/null | awk 'NR==2 { print $2 }')"
+    case "$startup" in
+        enabled) timer="enabled — runs daily at 03:00 (idle between runs)" ;;
+        '')      timer="unknown" ;;
+        *)       timer="disabled" ;;
+    esac
     ui_kv \
         "target"                     "${target:-(unset)}" \
         "dir"                        "$(backup_dir)" \
+        "last run"                   "$(last_run_row)" \
         "encrypt-key"                "${key:-(unset)}" \
-        "private key on this device" "$onbox" \
+        "private key in snap keyring" "$onbox" \
         "retention (full chains)"    "${retention:-3}" \
         "full backup if older than"  "$(full_if_older)" \
-        "timer"                      "${timer:-unknown} (daily @ 00:00)"
+        "timer"                      "$timer"
 }
 
 # Renders a parse_pubkey_list stream (FPR<tab>uid[<tab>extra]) as a numbered human
@@ -147,6 +190,10 @@ secret_key_on_disk() {
 require_host_keyring() {  # $1 = subcommand name for the message
     if [ "${EUID:-$(id -u)}" -eq 0 ]; then
         ui_err "Run '${1}' WITHOUT sudo — it reads YOUR personal GPG keyring."
+        exit 1
+    fi
+    if ! snapctl is-connected gpg-public-keys 2>/dev/null; then
+        ui_err "The gpg-public-keys interface is not connected, so your ~/.gnupg is not visible to the snap. Run: sudo snap connect ${SNAP_NAME}:gpg-public-keys"
         exit 1
     fi
     local home; home="$(gpg_host_homedir)"
@@ -278,7 +325,7 @@ ensure_agent() {
     # listen() everywhere in the snap (verified: $SNAP_COMMON, /tmp, XDG_RUNTIME_DIR),
     # so the agent can never come up. Callers must fail with actionable guidance.
     if ! gpg-connect-agent --homedir "$GNUPGHOME" --no-autostart 'GETINFO pid' /bye 2>/dev/null | grep -q '^D '; then
-        ui_err "gpg-agent cannot run here: this kernel's snap confinement blocks its socket (AF_UNIX listen mediation, e.g. kernel 6.17 / Ubuntu 25.10)."
+        ui_err "could not start gpg-agent — on kernel 6.17+ this is snap confinement's AF_UNIX mediation; otherwise see: sudo snap logs ${SNAP_NAME}"
         return 1
     fi
 }
@@ -472,6 +519,13 @@ build_restore_cmd() {          # $1 dest dir [$2 time] -> duplicity restore comm
         "$DUP_PY" "$timearg" "$(encryption_args)" "$ARCHIVE_DIR" "$(cfg target)" "$1"
 }
 
+restore_dest() {               # [--into dir] -> prints the fresh destination dir (not created)
+    if [ "${1:-}" = "--into" ]; then printf '%s' "$2"; return; fi
+    local stamp base; stamp="$(date -u +%Y%m%d-%H%M%S)"; base="$SNAP_DATA"
+    [ "$(backup_dir)" = "$SNAP_DATA" ] && base="$SNAP_COMMON"
+    printf '%s/restored/%s' "$base" "$stamp"
+}
+
 build_list_cmd() {             # -> duplicity collection-status command string
     printf '%q -m duplicity collection-status %s --archive-dir %q %q' \
         "$DUP_PY" "$(encryption_args)" "$ARCHIVE_DIR" "$(cfg target)"
@@ -520,21 +574,44 @@ main() {
                 if [ "${DAEMONIZED:-0}" -eq 1 ]; then exit 0; else exit 1; fi
             fi
             if ! has_backups; then
+                record_last_run skipped nothing-to-back-up
                 ui_print "Nothing to back up in $(backup_dir) — enable ZUI's scheduled backups in its settings." >&2
                 exit 0
             fi
             require_encryption_config
+            local dup_rc=0
             # shellcheck disable=SC2294
-            if ! eval "$(build_backup_cmd "$(backup_dir)")"; then
+            eval "$(build_backup_cmd "$(backup_dir)")" || dup_rc=$?
+            if [ "$dup_rc" -ne 0 ]; then
+                record_last_run failed "$dup_rc"
                 ui_err "Backup failed (duplicity exited non-zero)."
                 exit 1
             fi
+            record_last_run ok 0
+            ui_ok "Shipped $(backup_dir) to $(redact_url "$target")"
             "$DUP_PY" -m duplicity remove-all-but-n-full "$(retention)" --force --archive-dir "$ARCHIVE_DIR" "$target" || true
             ;;
         restore)
             require_target
             require_encryption_config
-            local dest; dest="$(backup_dir)"; mkdir -p "$dest"
+            local dest rtime="" into="" default_dest=1 ra
+            shift
+            while [ $# -gt 0 ]; do
+                case "$1" in
+                    --into) [ -n "${2:-}" ] || { ui_err "--into needs a directory"; exit 1; }
+                            into="$2"; shift 2 ;;
+                    *) [ -z "$rtime" ] || { ui_err "restore takes at most one <time>"; exit 1; }
+                       rtime="$1"; shift ;;
+                esac
+            done
+            if [ -n "$into" ]; then dest="$(restore_dest --into "$into")"; default_dest=0
+            else
+                dest="$(restore_dest)"
+                [ "$(backup_dir)" = "$SNAP_DATA" ] && default_dest=0
+            fi
+            mkdir -p "$dest" 2>/dev/null || { ui_err "Cannot create $dest"; exit 1; }
+            ra="$(ls -A "$dest" 2>/dev/null)"
+            [ -z "$ra" ] || { ui_err "$dest is not empty — choose an empty directory"; exit 1; }
             if encryption_args 2>/dev/null | grep -q -- '--no-encryption'; then
                 ui_print "Restoring into ${dest} (no encryption)." >&2
             else
@@ -547,11 +624,15 @@ main() {
                 ui_print "Restoring into ${dest}; you may be prompted for your GPG key passphrase." >&2
             fi
             # shellcheck disable=SC2294
-            if ! eval "$(build_restore_cmd "$dest" "${2:-}")"; then
+            if ! eval "$(build_restore_cmd "$dest" "$rtime")"; then
                 ui_err "Restore failed (duplicity exited non-zero)."
                 exit 1
             fi
-            ui_print "Done. Now use ZUI's in-app restore (NVM / store) to recover." >&2
+            if [ "$default_dest" -eq 1 ]; then
+                ui_ok "Restored into ${dest} — the files are in ZUI's store browser under restored/; download the one you need and use ZUI's restore (NVM or store)."
+            else
+                ui_ok "Restored into ${dest}."
+            fi
             ;;
         list)
             require_target

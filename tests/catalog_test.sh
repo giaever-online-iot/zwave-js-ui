@@ -8,7 +8,7 @@ source "$HERE/lib/assert.sh"
 
 export SNAP="$HERE/fixtures"
 SNAP_COMMON="$(mktemp -d)"; export SNAP_COMMON
-snapctl() { case "$1" in get) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;; *) : ;; esac; }
+snapctl() { case "$1 ${2:-}" in "get -d") [ $# -gt 2 ] || return 1; printf '%s' "${SNAPCTL_D:-{}}" ;; get*) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;; *) : ;; esac; }
 
 # shellcheck source=/dev/null
 source "$ROOT/src/helper/catalog"
@@ -23,7 +23,15 @@ assert_eq "$(catalog_field backup.dir 6)" "daemon"    "catalog_field: backup.dir
 assert_eq "$(catalog_field zwave.serial-port 5)" "advanced" "catalog_field: scope survives (A6)"
 _rc=0; [ -n "$(catalog_field zwave.serial-port 4)" ] || _rc=1; assert_status "$_rc" 0 "zwave.serial-port has a description (A6)"
 assert_eq "$(catalog_field nope 2)" "" "catalog_field: unknown key -> empty"
-assert_eq "$(catalog_keys_for backup)" "$(printf 'backup.target\nbackup.encrypt\nbackup.encrypt-key\nbackup.full-if-older-than\nbackup.retention')" "keys_for backup"
+assert_eq "$(catalog_keys_for backup)" "$(printf 'backup.target\nbackup.encrypt\nbackup.encrypt-key\nbackup.full-if-older-than\nbackup.retention\nbackup.gdrive-credentials')" "keys_for backup"
+assert_eq "$(catalog_keys_for backup | grep -c .)" "6" "keys_for backup: 6 keys"
+# K1: every key the code reads names a catalog row (D1 rejects/sanitizes anything else)
+_used="$( { grep -oE 'cfg [a-z][a-z-]*' "$ROOT/src/bin/backup" | awk '{print "backup."$2}'
+            grep -ohE 'snapctl get [a-z][a-z.-]*' "$ROOT/src/helper/env-wrapper" "$ROOT/src/helper/functions" "$ROOT/src/bin/help" "$ROOT/src/bin/ui" | awk '{print $3}'; } | sort -u)"
+_rc=0; [ "$(grep -c . <<<"$_used")" -ge 10 ] || _rc=1; assert_status "$_rc" 0 "K1: grep found the code's keys"
+for _k in $_used; do
+	_rc=0; catalog_keys | grep -qxF -- "$_k" || _rc=1; assert_status "$_rc" 0 "K1: $_k (read by the code) is in the catalog"
+done
 assert_eq "$(catalog_keys_for daemon | grep -c .)" "16" "keys_for daemon: 8 common + backup.dir + 7 zwave"
 v() { validate_config "$1" "$2" 2>"$SNAP_COMMON/err"; echo "$?"; }   # prints rc; message in err
 assert_eq "$(v server.port 8091)" 0 "port ok";   assert_eq "$(v server.port 65535)" 0 "port max ok"
@@ -47,4 +55,27 @@ _rc=0; [ "$(SNAPCTL_server_host=10.0.0.8 daemon_config_digest)" != "$d1" ] || _r
 assert_eq "$(SNAPCTL_server_host=10.0.0.7 SNAPCTL_backup_target=file:///x daemon_config_digest)" "$d1" "digest ignores backup-only keys"
 assert_eq "$(daemon_digest_file)" "$SNAP_COMMON/.daemon-config.sha256" "digest file path"
 assert_eq "$(catalog_field session.secret 3)" "(unset)" "session.secret default is unset (D4)"
+assert_eq "$(v backup.target sftp://user@nas/zui)" 0 "D7: sftp URL ok"; assert_eq "$(v backup.target file:///mnt/usb/zui)" 0 "D7: file URL ok"
+assert_eq "$(v backup.target S3://bucket/x)" 0 "D7: upper-case scheme ok (duplicity accepts)"
+assert_eq "$(v backup.target sftp:/nas/zui)" 1 "D7: missing slash rejected"; assert_contains "$(cat "$SNAP_COMMON/err")" "!! backup.target must be a duplicity URL like sftp://user@nas/zui, s3://bucket/path or file:///mnt/usb/zui, got sftp:/nas/zui" "D7: message"
+assert_eq "$(v backup.target /mnt/usb/zui)" 1 "D7: bare path rejected"; assert_eq "$(v backup.full-if-older-than 1D12h)" 0 "D7: full-if-older-than unchecked"
+_rc=0; [ "$(catalog_field session.secret 4 | wc -c)" -le 64 ] || _rc=1; assert_status "$_rc" 0 "polish: session.secret description ≤ 63 chars"
+SNAPCTL_D='{"server":{"host":"x","prot":"1"},"mqtt":{"host":"y","name":"a.b=c d"},"timezone":"Europe/Oslo"}'
+assert_eq "$(unknown_config_keys | sort | tr '\n' ' ')" "mqtt.host server.prot " "U1: unknown leaf paths only"
+_rc=0; snapctl get -d >/dev/null 2>&1 || _rc=1; assert_status "$_rc" 1 "U8: stub refuses get -d without keys, like snapd"
+assert_eq "$(SNAPCTL_D='{}' unknown_config_keys)" "" "U4: empty config -> nothing"; assert_eq "$(SNAPCTL_D='not json' unknown_config_keys 2>/dev/null; echo "rc=$?")" "rc=0" "U4: garbage -> nothing, rc 0"
+assert_eq "$(SNAPCTL_D='{"mqtt":{"name":"a.b=c d"}}' unknown_config_keys)" "" "U5: dotted VALUE is not a key"
+# U9: arrays and empty maps are leaves (snapd cannot unset a numeric path segment like server.l.0)
+_u9="$(SNAPCTL_D='{"server":{"l":[1,2],"e":{},"ea":[],"host":"x"}}' unknown_config_keys | sort | tr '\n' ' ')"
+assert_eq "$_u9" "server.e server.ea server.l " "U9: array/empty-map leaves reported by their own key"
+assert_not_contains "$_u9" "server.l.0" "U9: no numeric path segment"
+assert_eq "$(SNAPCTL_server_ssl=false SNAPCTL_session_cookie_secure=true validate_cross_config 2>"$SNAP_COMMON/err"; echo $?)" 1 "X1: cookie true + ssl false rejected"
+assert_contains "$(cat "$SNAP_COMMON/err")" "!! session.cookie-secure=true needs server.ssl=true (secure cookies only work over HTTPS) — or unset it: sudo snap unset zwave-js-ui session.cookie-secure" "X1: message"
+assert_eq "$(SNAPCTL_server_ssl=true SNAPCTL_session_cookie_secure=true validate_cross_config; echo $?)" 0 "X1: both true ok"
+assert_eq "$(SNAPCTL_server_ssl=false validate_cross_config session.cookie-secure true 2>/dev/null; echo $?)" 1 "X1: pending pair overrides"
+assert_eq "$(SNAPCTL_server_ssl=true SNAPCTL_session_cookie_secure=true validate_cross_config server.ssl false 2>/dev/null; echo $?)" 1 "X1: pending server.ssl overrides the stored one"
+assert_eq "$(SNAPCTL_server_ssl=false SNAPCTL_session_cookie_secure=false validate_cross_config; echo $?)" 0 "X1: cookie false + ssl false ok"
+assert_eq "$(SNAPCTL_server_ssl=false validate_cross_config; echo $?)" 0 "X1: cookie unset ok"
+assert_eq "$(catalog_field timezone 3)" "(host time)" "D5 row"
+assert_eq "$(catalog_field session.cookie-secure 3)" "(follows server.ssl)" "D6 row"
 finish

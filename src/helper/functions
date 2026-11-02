@@ -16,12 +16,12 @@ function lprint {
 
 function plug_connected {
     if ! snapctl is-connected "${1}"; then
-        lprint "Missing plug: «${1}»"
-	    lprint "Connect with:"
+        lprint "Missing interface: ${1}"
+        lprint "Connect with:"
         if [ "${1}" == "serial-port" ]; then
-            lprint "$ sudo snap connect ${SNAP_NAME}:${1} <slot name>"
+            lprint "sudo snap connect ${SNAP_NAME}:${1} <slot name>"
         else
-            lprint "$ sudo snap connect ${SNAP_NAME}:${1}"
+            lprint "sudo snap connect ${SNAP_NAME}:${1}"
         fi
         return 1
     fi
@@ -38,10 +38,9 @@ function plugs_connected {
     SERIAL_RES=$?
 
     if [ "$RAW_RES" -ne 0 ] && [ "$SERIAL_RES" -ne 0 ]; then
+        lprint "Connect raw-usb (USB stick) OR serial-port (see ${SNAP_NAME}.help):"
         lprint "$RAW_OUT"
-        lprint "----- OR -----"
         lprint "$SERIAL_OUT"
-        lprint "See ${SNAP_NAME}.help for more info on the serial-port plug"
         MISSING=1
     fi
 
@@ -56,8 +55,7 @@ function plugs_connected {
 
 function require_root {
     if [ "${EUID:-$(id -u)}" -ne 0 ]; then
-        lprint "Running as root is required." >&2
-        lprint "Re-run with sudo."
+        lprint "${SNAP_NAME}: this command must run as root — re-run with sudo." >&2
         exit 1
     fi
 }
@@ -139,11 +137,10 @@ function test_default_config {
     testnset_config "server.ssl" false
     testnset_config "server.force-disable-ssl" false
 
-    testnset_config "session.cookie-secure" "$(snapctl get server.ssl)"
+    # session.cookie-secure and timezone are not seeded: unset means "follows server.ssl"
+    # (env-wrapper) and "the host's zone" (D5, D6).
 
     testnset_config "mqtt.name" ""
-
-    testnset_config "timezone" "Europe/Oslo"
 }
 
 # Older revisions seeded session.secret with a v1 UUID, which overrode the
@@ -163,12 +160,41 @@ function migrate_session_secret {
     return 0
 }
 
+# Older revisions copied server.ssl into session.cookie-secure once at install, so turning
+# HTTPS on later left cookies insecure. A stored value equal to server.ssl is that copy:
+# drop it (once, marker) so the cookie follows HTTPS; a differing value was set on purpose.
+function migrate_cookie_secure {
+    local marker="${SNAP_COMMON}/.cookie-secure-migrated" ssl cookie
+    [ -e "$marker" ] && return 0
+    ssl="$(snapctl get server.ssl 2>/dev/null)"; cookie="$(snapctl get session.cookie-secure 2>/dev/null)"
+    if [ -n "$ssl" ] && [ -n "$cookie" ] && [ "$ssl" = "$cookie" ]; then
+        if snapctl unset session.cookie-secure; then
+            lprint "session.cookie-secure: now follows server.ssl (was the install-time copy)"
+        fi
+    fi
+    : > "$marker" 2>/dev/null || true
+    return 0
+}
+
 function backup_dir {
     local d; d=$(snapctl get backup.dir 2>/dev/null)
     echo "${d:-$SNAP_DATA/backups}"
 }
 
 snap_version() { yq eval '.version' "$SNAP/meta/snap.yaml"; }
+
+web_ui_url() {                 # scheme://host:port the web UI answers on
+    local scheme=http host port
+    [ "$(snapctl get server.ssl 2>/dev/null)" = true ] && [ "$(snapctl get server.force-disable-ssl 2>/dev/null)" != true ] && scheme=https
+    host="$(snapctl get server.host 2>/dev/null)"
+    case "$host" in
+        ''|0.0.0.0|::|'[::]') host="<this-machine>" ;;
+        \[*) ;;
+        *:*) host="[$host]" ;;
+    esac
+    port="$(snapctl get server.port 2>/dev/null)"
+    echo "$scheme://$host:${port:-8091}"
+}
 
 service_state() {              # "enabled active", "disabled inactive", or "unknown"
     local line

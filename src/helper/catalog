@@ -12,16 +12,17 @@ server.host	string	0.0.0.0	IP address the web UI binds to	common	daemon
 server.port	int	8091	Port for the web UI	common	daemon
 server.ssl	bool	false	Serve the web UI over HTTPS	common	daemon
 server.force-disable-ssl	bool	false	Force-disable SSL even when enabled	common	daemon
-session.secret	secret	(unset)	Session secret; leave unset and the app keeps its own 256-bit secret in the store (recommended)	common	daemon
-session.cookie-secure	bool	(= server.ssl)	Secure session cookie (see expressjs/session#cookiesecure)	common	daemon
+session.secret	secret	(unset)	Session secret; unset = the app keeps its own (recommended)	common	daemon
+session.cookie-secure	bool	(follows server.ssl)	Secure session cookie; unset = follows server.ssl	common	daemon
 mqtt.name	string	(unset)	Client name when connecting to the MQTT broker	common	daemon
-timezone	string	Europe/Oslo	Timezone exported to the app as TZ	common	daemon
+timezone	string	(host time)	Timezone for the app (TZ), e.g. America/New_York; unset = the host's zone	common	daemon
 backup.target	string	(unset)	Duplicity target URL for off-box backups	common	backup
 backup.dir	string	$SNAP_DATA/backups	Directory shipped by the backup command	common	daemon
 backup.encrypt	bool	(unset)	Set false to opt out of backup encryption	common	backup
 backup.encrypt-key	string	(unset)	GPG fingerprint backups are encrypted to	common	backup
 backup.full-if-older-than	string	7D	Force a full backup after this age	common	backup
 backup.retention	int	3	Full backup chains kept on the target	common	backup
+backup.gdrive-credentials	string	(unset)	Google service-account JSON for gdrive:// (put it under $SNAP_COMMON)	advanced	backup
 zwave.serial-port	string	(unset)	Serial device of the Z-Wave controller (ZWAVE_PORT)	advanced	daemon
 zwave.s2-unauthenticated	secret	(unset)	S2 Unauthenticated network key (KEY_S2_Unauthenticated)	advanced	daemon
 zwave.s2-authenticated	secret	(unset)	S2 Authenticated network key (KEY_S2_Authenticated)	advanced	daemon
@@ -58,10 +59,29 @@ validate_config() {   # <key> <value> -> rc 0 valid; rc 1 + "!! key must be <rul
 			# length first: an all-digit value too long for [ -ge ] would print a bash error
 			{ [ "${#val}" -le 5 ] && [ "$val" -ge 1 ] && [ "$val" -le 65535 ]; } || { echo "!! $key must be a port number 1-65535, got $val" >&2; return 1; }
 			;;
+		backup.target)
+			[[ "$val" =~ ^[A-Za-z][A-Za-z0-9+.-]*://.+ ]] || { echo "!! $key must be a duplicity URL like sftp://user@nas/zui, s3://bucket/path or file:///mnt/usb/zui, got $val" >&2; return 1; }
+			;;
 		backup.dir)
 			case "$val" in /*) ;; *) echo "!! $key must be an absolute path, got $val" >&2; return 1 ;; esac
 			;;
 	esac
+	return 0
+}
+
+# shellcheck disable=SC2120  # the navigator passes its pending pair; hooks check the stored config
+validate_cross_config() {   # [key value] -> rc 0 ok; rc 1 + "!! ..." on stderr. Rules between keys, on the
+	# stored config with the optional pending pair (navigator: not yet written) overriding its key.
+	local ssl cookie
+	ssl="$(snapctl get server.ssl 2>/dev/null)"; cookie="$(snapctl get session.cookie-secure 2>/dev/null)"
+	case "${1:-}" in
+		server.ssl) ssl="${2:-}" ;;
+		session.cookie-secure) cookie="${2:-}" ;;
+	esac
+	if [ "$cookie" = true ] && [ "$ssl" != true ]; then
+		echo "!! session.cookie-secure=true needs server.ssl=true (secure cookies only work over HTTPS) — or unset it: sudo snap unset ${SNAP_NAME:-zwave-js-ui} session.cookie-secure" >&2
+		return 1
+	fi
 	return 0
 }
 
@@ -73,6 +93,26 @@ sanitize_config() {   # unset every stored value validate_config rejects (needs 
 		validate_config "$key" "$(snapctl get "$key" 2>/dev/null)" 2>/dev/null && continue
 		snapctl unset "$key" && lprint "$key: removed invalid value; the default applies"
 	done
+	if ! validate_cross_config 2>/dev/null; then
+		snapctl unset session.cookie-secure && lprint "session.cookie-secure: removed (needs server.ssl=true)"
+	fi
+	for key in $(unknown_config_keys); do
+		snapctl unset "$key" && lprint "$key: removed unknown setting"
+	done
+	return 0
+}
+
+unknown_config_keys() {   # stored snap config keys the catalog does not know, one per line (never values)
+	# snapd's `snapctl get -d` needs keys, so ask for the known namespaces; a stray key under an
+	# unknown top-level namespace cannot be seen this way (accepted). Only direct children of maps are
+	# reported (an array or empty map is one leaf): snapd cannot unset a numeric segment like server.l.0.
+	local k known
+	known="$(catalog_keys)"
+	# shellcheck disable=SC2046  # one argument per namespace
+	while IFS= read -r k; do
+		[ -n "$k" ] || continue
+		grep -qxF -- "$k" <<<"$known" || printf '%s\n' "$k"
+	done < <(snapctl get -d $(cut -d. -f1 <<<"$known" | sort -u) 2>/dev/null | yq -p=json '.. | select((tag != "!!map" or length == 0) and (parent | tag) == "!!map") | path | join(".")' 2>/dev/null || true)
 	return 0
 }
 
