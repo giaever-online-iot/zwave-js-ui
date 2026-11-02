@@ -8,31 +8,31 @@ source "$SNAP/helper/catalog"
 # --- section stubs (replaced in Tasks 2-5) ---
 nav_settings() {               # browse the catalog; edit via snapctl (nav_set_apply validates + re-seeds + offers restart,
                                # because snapd skips the configure hook for in-app snapctl writes)
-    local choice key type def desc cur act new
+    local choice key type def desc cur raw act new
     while true; do
         ui_clear
-        # build the key list with current values inline (gum choose filters as you type)
+        # build the key list with current values inline (Back first; the choose list filters as you type)
         local items=() k v
         while IFS= read -r k; do
             v="$(snapctl get "$k" 2>/dev/null)"; catalog_is_secret "$k" && [ -n "$v" ] && v="(hidden)"
             items+=("$k = ${v:-(unset)}")
         done < <(catalog_keys)
-        choice="$(ui_choose "Setting (type to filter)" "" "${items[@]}" "← Back")" || return
+        choice="$(ui_choose "Setting" "" "← Back" "${items[@]}")" || return
         [ "$choice" = "← Back" ] && return
         key="${choice%% = *}"
         type="$(catalog_field "$key" 2)"; def="$(catalog_field "$key" 3)"; desc="$(catalog_field "$key" 4)"
-        cur="$(snapctl get "$key" 2>/dev/null)"; catalog_is_secret "$key" && [ -n "$cur" ] && cur="(hidden)"
+        cur="$(snapctl get "$key" 2>/dev/null)"; raw="$cur"; catalog_is_secret "$key" && [ -n "$cur" ] && cur="(hidden)"
         ui_kv "key" "$key" "current" "${cur:-(unset)}" "default" "$def" "type" "$type" "description" "$desc"
-        act="$(ui_choose "Action for $key" "" "Edit" "Reset to default" "← Back")" || continue
+        act="$(ui_choose "Action for $key" "" "← Back" "Edit" "Reset to default")" || continue
         case "$act" in
             Edit)
                 if [ "$type" = bool ]; then
-                    new="$(ui_choose "$key =" "" "true" "false")" || continue
+                    new="$(ui_choose --selected "$raw" "$key =" "" "true" "false")" || continue
                 else
                     if catalog_is_secret "$key"; then
                         new="$(ui_input --password "$key = ")" || continue
                     else
-                        new="$(ui_input "$key = ")" || continue
+                        new="$(ui_input --value "$raw" "$key = ")" || continue
                     fi
                 fi
                 nav_set_apply "$key" "$new" set ;;
@@ -48,6 +48,12 @@ nav_set_apply() {              # $1 key, $2 value, $3 set|unset. snapd commits i
     [ "$mode" = set ] && [ -z "$val" ] && mode="unset"
     if [ "$mode" = set ]; then
         if ! msg="$(validate_config "$key" "$val" 2>&1)"; then
+            ui_err "Rejected — $key unchanged"
+            [ -n "$msg" ] && ui_print "$msg"
+            ui_pause
+            return
+        fi
+        if ! msg="$(validate_cross_config "$key" "$val" 2>&1)"; then
             ui_err "Rejected — $key unchanged"
             [ -n "$msg" ] && ui_print "$msg"
             ui_pause
@@ -82,7 +88,7 @@ nav_service() {                # browse status; act via the existing service bin
     while true; do
         ui_clear
         ui_kv "service" "$SNAP_NAME" "state" "$(service_state)"
-        choice="$(ui_choose "Service action" "" "Enable" "Disable" "Restart" "← Back")" || return
+        choice="$(ui_choose "Service action" "" "← Back" "Enable" "Disable" "Restart")" || return
         case "$choice" in
             Enable)  "$bindir/daemonize" ;;
             Disable) "$bindir/de-daemonize" ;;
@@ -94,7 +100,7 @@ nav_service() {                # browse status; act via the existing service bin
 }
 nav_plugs() {                  # browse interface status; guide the connect commands (never auto-connect)
     # plug -> purpose (the connect-relevant interfaces)
-    local catalog="hardware-observe	the Z-Wave controller (required, with raw-usb or serial-port)
+    local catalog="hardware-observe	required — detects the controller; pair with raw-usb or serial-port
 raw-usb	USB Z-Wave stick access
 serial-port	serial Z-Wave stick (needs experimental hotplug)
 log-observe	read journald logs when 'log to file' is off
@@ -107,7 +113,7 @@ gpg-public-keys	the backup key picker"
             snapctl is-connected "$p" 2>/dev/null && mark="✓" || mark="✗"
             items+=("$mark $p")
         done <<< "$catalog"
-        choice="$(ui_choose "Interface (✓ connected)" "" "${items[@]}" "← Back")" || return
+        choice="$(ui_choose "Interface (✓ connected)" "" "← Back" "${items[@]}")" || return
         [ "$choice" = "← Back" ] && return
         plug="${choice#* }"
         purpose="$(printf '%s\n' "$catalog" | awk -F'\t' -v k="$plug" '$1==k{print $2}')"
@@ -124,7 +130,8 @@ gpg-public-keys	the backup key picker"
 }
 nav_logs() {                   # choose a stream, hand off to the existing logs viewer
     local bindir="${NAV_BIN:-$SNAP/bin}" sel
-    sel="$(ui_choose "Follow which logs?" "" "all" "zui" "zwjs")" || return
+    sel="$(ui_choose "Follow which logs?" "" "← Back" "all" "zui" "zwjs")" || return
+    [ "$sel" = "← Back" ] && return
     "$bindir/logs" "$sel"
 }
 
@@ -159,16 +166,17 @@ mqtt.port	int
 mqtt.auth	bool
 mqtt.username	string
 mqtt.password	secret"
-    local choice path type cur new
+    local choice path type cur new running
     while true; do
         ui_clear
-        ui_warn "Editing settings.json. If the daemon is running it may overwrite changes on its own saves."
+        running=0; case "$(service_state)" in *" active") running=1 ;; esac
+        [ "$running" = 1 ] && ui_warn "Editing settings.json. If the daemon is running it may overwrite changes on its own saves."
         local items=() p t v
         while IFS=$'\t' read -r p t; do
             v="$(mqtt_get "$p")"; [ "$t" = secret ] && [ -n "$v" ] && v="(hidden)"
             items+=("$p = ${v:-(unset)}")
         done <<< "$fields"
-        choice="$(ui_choose "MQTT broker (settings.json)" "" "${items[@]}" "← Back")" || return
+        choice="$(ui_choose "MQTT broker (settings.json)" "" "← Back" "${items[@]}")" || return
         [ "$choice" = "← Back" ] && return
         path="${choice%% = *}"
         type="$(printf '%s\n' "$fields" | awk -F'\t' -v k="$path" '$1==k{print $2}')"
@@ -178,7 +186,11 @@ mqtt.password	secret"
         if mqtt_set "$path" "$new" "$type"; then
             local shown="$new"; [ "$type" = secret ] && [ -n "$new" ] && shown="(hidden)"
             ui_ok "$path set to $shown"
-            if ui_confirm "Restart $SNAP_NAME to apply?"; then "${NAV_BIN:-$SNAP/bin}/restart"; fi
+            if [ "$running" = 1 ]; then
+                if ui_confirm "Restart $SNAP_NAME to apply?"; then "${NAV_BIN:-$SNAP/bin}/restart"; fi
+            else
+                ui_print "Takes effect when the service starts."
+            fi
         else
             ui_err "Could not write $path — settings.json unchanged"
         fi
@@ -188,6 +200,10 @@ mqtt.password	secret"
 
 main() {
     require_root
+    if [ "${TERM:-}" = dumb ]; then
+        ui_print "$SNAP_NAME.ui needs a terminal that can draw menus (TERM=dumb) — use the $SNAP_NAME.* commands, or run with a different TERM" >&2
+        return 2
+    fi
     if ! ui_interactive; then
         ui_print "$SNAP_NAME.ui needs an interactive terminal — see $SNAP_NAME.help" >&2
         return 2
