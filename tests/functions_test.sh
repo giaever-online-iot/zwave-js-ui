@@ -70,5 +70,14 @@ assert_not_contains "$(cat "$PLOG")" "----- OR" "A7: no OR separator"; assert_no
 out="$( (require_root) 2>&1 >/dev/null )"; assert_eq "$out" "zwave-js-ui: this command must run as root — re-run with sudo." "D12: require_root stderr line"
 out="$( (require_root) 2>/dev/null )"; assert_eq "$out" "" "D12: require_root stdout empty"
 (require_root) >/dev/null 2>&1; assert_status "$?" 1 "D12: require_root exits 1"
+# D13: web_ui_url
+snapctl() { case "$1" in get) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\""  ;; *) : ;; esac; }
+assert_eq "$(SNAPCTL_server_host=0.0.0.0 SNAPCTL_server_port=8091 web_ui_url)" "http://<this-machine>:8091" "W1: wildcard host -> <this-machine>"
+assert_eq "$(SNAPCTL_server_host=10.0.0.7 SNAPCTL_server_ssl=true web_ui_url)" "https://10.0.0.7:8091" "W2: ssl -> https, default port"
+assert_eq "$(SNAPCTL_server_host=10.0.0.7 SNAPCTL_server_ssl=true SNAPCTL_server_force_disable_ssl=true web_ui_url)" "http://10.0.0.7:8091" "W3: force-disable-ssl -> http"
+assert_eq "$(SNAPCTL_server_host=:: web_ui_url)" "http://<this-machine>:8091" "W4a: :: -> <this-machine>"
+assert_eq "$(SNAPCTL_server_host=fd00::1 SNAPCTL_server_port=9000 web_ui_url)" "http://[fd00::1]:9000" "W4: ipv6 bracketed"
+assert_eq "$(SNAPCTL_server_host='[fd00::1]' web_ui_url)" "http://[fd00::1]:8091" "W4b: no double bracket"
+assert_eq "$(web_ui_url)" "http://<this-machine>:8091" "W4c: empty host/port -> defaults"
 rm -f "$PLOG"
 finish

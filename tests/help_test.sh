@@ -87,4 +87,16 @@ assert_contains "$mn" "    value: 10.0.0.7"    "main: narrow styled uses the gen
 mw="$(export UI_ASSUME_TTY=1 UI_COLS=999; plugs_connected() { :; }; main)"
 assert_contains "$mw" "[table]"                "main: wide styled uses the gum table"
 
+# D13/D14: state-dependent opening block and sudo-marked rows
+out="$(unset SNAPCTL_server_host; plugs_connected() { :; }; main)"
+assert_contains "$out" "Running — web UI: http://<this-machine>:8091   stop: sudo zwave-js-ui.disable" "D13: running block"
+assert_not_contains "$out" "DISABLED" "D13: running -> no DISABLED"
+out="$(snapctl() { case "$1" in services) printf 'S  Startup  Current  Notes\nx  disabled  inactive  -\n' ;; *) : ;; esac; }; plugs_connected() { :; }; main)"
+assert_contains "$out" "DISABLED" "D13: disabled -> DISABLED text"
+out="$(snapctl() { case "$1" in services) printf 'S  Startup  Current  Notes\nx  enabled  inactive  -\n' ;; *) : ;; esac; }; plugs_connected() { :; }; main)"
+assert_contains "$out" "Enabled but not running — see: sudo zwave-js-ui.logs" "D13: enabled inactive block"
+assert_contains "$(commands_rows)" "sudo zwave-js-ui.enable	start the service now and at every boot" "D14: enable row"
+assert_contains "$(commands_rows)" "zwave-js-ui.help	this overview (no sudo)" "D14: help row"
+assert_not_contains "$(commands_rows)" "…" "D14: no U+2026 in rows"
+
 finish

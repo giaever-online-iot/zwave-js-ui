@@ -183,6 +183,19 @@ function backup_dir {
 
 snap_version() { yq eval '.version' "$SNAP/meta/snap.yaml"; }
 
+web_ui_url() {                 # scheme://host:port the web UI answers on
+    local scheme=http host port
+    [ "$(snapctl get server.ssl 2>/dev/null)" = true ] && [ "$(snapctl get server.force-disable-ssl 2>/dev/null)" != true ] && scheme=https
+    host="$(snapctl get server.host 2>/dev/null)"
+    case "$host" in
+        ''|0.0.0.0|::|'[::]') host="<this-machine>" ;;
+        \[*) ;;
+        *:*) host="[$host]" ;;
+    esac
+    port="$(snapctl get server.port 2>/dev/null)"
+    echo "$scheme://$host:${port:-8091}"
+}
+
 service_state() {              # "enabled active", "disabled inactive", or "unknown"
     local line
     line="$(snapctl services "$SNAP_NAME.$SNAP_NAME" 2>/dev/null | awk 'NR==2 { print $2 " " $3 }')"

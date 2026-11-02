@@ -19,22 +19,27 @@ settings_rows() {              # catalog (common only) + live values -> TSV: key
 
 commands_rows() {
     printf '%s\n' \
-        "$SNAP_NAME.enable	daemonize the service (autostart)" \
-        "$SNAP_NAME.disable	stop + de-daemonize the service" \
-        "$SNAP_NAME.restart	restart the service" \
-        "$SNAP_NAME.exec	run the app in the foreground (debug boot issues)" \
-        "$SNAP_NAME.ui	interactive navigator — browse & change settings, service, plugs, logs" \
-        "$SNAP_NAME.logs [zui|zwjs]	follow live logs (merged by default)" \
-        "$SNAP_NAME.backup …	ship backups off-box; see $SNAP_NAME.backup --help" \
-        "$SNAP_NAME.help	this overview"
+        "sudo $SNAP_NAME.enable	start the service now and at every boot" \
+        "sudo $SNAP_NAME.disable	stop it and do not start at boot" \
+        "sudo $SNAP_NAME.restart	restart the service" \
+        "sudo $SNAP_NAME.exec	run in the foreground (debug start-up)" \
+        "sudo $SNAP_NAME.ui	interactive navigator — settings, service, interfaces, logs" \
+        "sudo $SNAP_NAME.logs [zui|zwjs]	follow live logs (merged by default)" \
+        "$SNAP_NAME.backup ...	ship backups off-box (see --help; most need sudo)" \
+        "$SNAP_NAME.help	this overview (no sudo)"
 }
 
 main() {
     plugs_connected || ui_warn "Required interfaces are not connected — see the connect instructions above."
     ui_header "$SNAP_NAME" "$(snap_version) · $(service_state)"
     echo
-    ui_print "The daemon is DISABLED by default after install. Enable it with:"
-    ui_print "  sudo $SNAP_NAME.enable"
+    case "$(service_state)" in
+        *" active") ui_print "Running — web UI: $(web_ui_url)   stop: sudo $SNAP_NAME.disable" ;;
+        "enabled inactive") ui_print "Enabled but not running — see: sudo $SNAP_NAME.logs" ;;
+        *)
+            ui_print "The daemon is DISABLED by default after install. Enable it with:"
+            ui_print "  sudo $SNAP_NAME.enable" ;;
+    esac
     echo
     settings_rows | ui_table "setting" "value" "default" "description"
     echo
