@@ -47,4 +47,9 @@ _rc=0; [ "$(SNAPCTL_server_host=10.0.0.8 daemon_config_digest)" != "$d1" ] || _r
 assert_eq "$(SNAPCTL_server_host=10.0.0.7 SNAPCTL_backup_target=file:///x daemon_config_digest)" "$d1" "digest ignores backup-only keys"
 assert_eq "$(daemon_digest_file)" "$SNAP_COMMON/.daemon-config.sha256" "digest file path"
 assert_eq "$(catalog_field session.secret 3)" "(unset)" "session.secret default is unset (D4)"
+assert_eq "$(v backup.target sftp://user@nas/zui)" 0 "D7: sftp URL ok"; assert_eq "$(v backup.target file:///mnt/usb/zui)" 0 "D7: file URL ok"
+assert_eq "$(v backup.target S3://bucket/x)" 0 "D7: upper-case scheme ok (duplicity accepts)"
+assert_eq "$(v backup.target sftp:/nas/zui)" 1 "D7: missing slash rejected"; assert_contains "$(cat "$SNAP_COMMON/err")" "!! backup.target must be a duplicity URL like sftp://user@nas/zui, s3://bucket/path or file:///mnt/usb/zui, got sftp:/nas/zui" "D7: message"
+assert_eq "$(v backup.target /mnt/usb/zui)" 1 "D7: bare path rejected"; assert_eq "$(v backup.full-if-older-than 1D12h)" 0 "D7: full-if-older-than unchecked"
+_rc=0; [ "$(catalog_field session.secret 4 | wc -c)" -le 64 ] || _rc=1; assert_status "$_rc" 0 "polish: session.secret description ≤ 63 chars"
 finish
