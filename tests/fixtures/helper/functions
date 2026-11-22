@@ -27,3 +27,6 @@ plug_connected() {
 plugs_connected() { return 0; }   # always-connected stub for process-level tests
 
 backup_dir() { echo "${SNAP_DATA:-/tmp}/backups"; }
+
+# web_ui_url is pure snapctl-get logic: load the REAL definition so the shim cannot drift.
+eval "$(sed -n '/^web_ui_url() {/,/^}/p' "$(dirname "${BASH_SOURCE[0]}")/../../../src/helper/functions")"

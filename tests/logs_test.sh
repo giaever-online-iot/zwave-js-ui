@@ -168,10 +168,27 @@ assert_eq "$(cat "$LESS_LOG2" 2>/dev/null)" "" "viewer: piped run does NOT invok
 h="$(use_color=1 log_viewer_hint)"
 assert_contains "$h" "Ctrl-C" "hint: documents Ctrl-C (scroll back)"
 assert_contains "$h" "F"      "hint: documents F (resume follow)"
-assert_contains "$h" "q"      "hint: documents q (quit)"
+assert_contains "$h" "q: quit (after Ctrl-C)" "hint: documents q (quit, after Ctrl-C)"
+u="$(usage 2>&1)"
+assert_contains "$u" "q       quit (after Ctrl-C)" "usage: legend truthful about q"
+assert_contains "$u" "(on a terminal: asks which)" "usage: no-arg line"
+# picker: Back exits 0 without following
+FOLLOW_SENTINEL="$SNAP_DATA/follow.ran"; rm -f "$FOLLOW_SENTINEL"
+( ui_interactive() { return 0; }; ui_choose() { printf '%s' '← Back'; }; require_root() { :; }
+  run_followers() { : > "$FOLLOW_SENTINEL"; }; main ) >/dev/null 2>&1; _rc=$?
+assert_status "$_rc" 0 "picker: Back -> rc 0"
+_rc=0; [ ! -e "$FOLLOW_SENTINEL" ] || _rc=1; assert_status "$_rc" 0 "picker: Back follows nothing"
 # coloured on a TTY, plain otherwise
 case "$h" in *$'\033'*) PASS=$((PASS+1)) ;; *) FAIL=$((FAIL+1)); echo "FAIL: TTY hint not coloured" >&2 ;; esac
 hp="$(use_color=0 log_viewer_hint)"
 case "$hp" in *$'\033'*) FAIL=$((FAIL+1)); echo "FAIL: plain hint has ANSI" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+# main's hint honours NO_COLOR (D3), on a real pty so main's [ -t 1 ] is true
+if command -v script >/dev/null 2>&1; then
+    _pty() { ROOT="$ROOT" SNAP_COMMON="$SNAP_DATA" TERM=xterm-256color script -qec "bash -c '$1 source \"\$ROOT/src/bin/logs\"; require_root() { :; }; logs_should_page() { return 0; }; resolve_source() { echo /dev/null; }; require_journal_access() { :; }; run_followers() { :; }; less() { cat \"\${@: -1}\"; }; main zui'" /dev/null </dev/null; }
+    _hc="$(_pty 'unset NO_COLOR;')"; _hn="$(_pty 'export NO_COLOR=1;')"
+    assert_contains "$_hn" "live logs" "NO_COLOR: hint still printed by main"
+    case "$_hc" in *$'\033[33m'*) PASS=$((PASS+1)) ;; *) FAIL=$((FAIL+1)); echo "FAIL: pty hint (no NO_COLOR) not coloured" >&2 ;; esac
+    case "$_hn" in *$'\033'*) FAIL=$((FAIL+1)); echo "FAIL: NO_COLOR=1 hint has an ESC byte" >&2 ;; *) PASS=$((PASS+1)) ;; esac
+fi
 
 finish

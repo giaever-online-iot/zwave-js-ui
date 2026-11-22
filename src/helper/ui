@@ -2,8 +2,9 @@
 # ui — gum-backed uniform terminal UI library. The ONLY place gum is invoked.
 # Source AFTER helper/functions (needs lprint). Rendering degrades by context:
 #   syslog: DAEMONIZED=1                           -> lprint only, never styled
-#   plain:  no TTY / NO_COLOR / TERM=dumb / no gum -> plain text, zero ANSI bytes
+#   plain:  no TTY / TERM=dumb / no gum           -> plain text, zero ANSI bytes
 #   styled: TTY + gum                              -> gum rendering, widgets allowed
+# NO_COLOR only drops the colour flags (glyphs and widgets stay); it does not make a context plain.
 # Wording is identical across contexts; only the prefix glyphs differ
 # (styled ✓/!/✗ vs plain OK:/WARN:/ERROR:) so docs can quote one canonical text.
 # Test overrides: UI_GUM (gum path), UI_ASSUME_TTY=1 (treat stdin+stdout as TTY).
@@ -20,8 +21,9 @@ if [ -z "${UI_TTY1:-}" ]; then UI_TTY1=0; [ -t 1 ] && UI_TTY1=1; fi
 if [ -z "${UI_TTY2:-}" ]; then UI_TTY2=0; [ -t 2 ] && UI_TTY2=1; fi
 
 ui_ctx() {                     # [$1 output fd, default 1] -> syslog | plain | styled
+                               # plain = no TTY / TERM=dumb / no gum. NO_COLOR = no colour, widgets stay.
     if [ "${DAEMONIZED:-0}" = 1 ]; then echo syslog; return; fi
-    if [ -n "${NO_COLOR:-}" ] || [ "${TERM:-}" = dumb ]; then echo plain; return; fi
+    if [ "${TERM:-}" = dumb ]; then echo plain; return; fi
     # TTY check, per requested fd, against the source-time flags above. Test
     # overrides: UI_TTY_FDS="1 2" lists fds to treat as TTYs (others NOT);
     # UI_ASSUME_TTY=1 treats every fd as a TTY.
@@ -93,36 +95,40 @@ ui_clear() {                   # wipe the screen between navigator views; no-op 
 ui_pause() {                   # hold transient output until a keypress, so the next ui_clear does not
                                # wipe it unread. No-op when not styled or UI_NO_PAUSE is set (tests).
     { [ "$(ui_ctx)" = styled ] && [ -z "${UI_NO_PAUSE:-}" ]; } || return 0
-    printf '  — press any key to continue —' >&2
+    printf '  — press Enter to continue —' >&2
     read -rsn1 _ </dev/tty 2>/dev/null || true
     printf '\n' >&2
 }
 
 ui_header() {                  # $1 title, $2 optional subtitle
-    local text="$1${2:+ · $2}"
+    local text="$1${2:+ · $2}" c=()
+    [ -n "${NO_COLOR:-}" ] || c=(--border-foreground 6)
     case "$(ui_ctx)" in
-        styled) "$UI_GUM" style --border rounded --padding "0 2" --border-foreground 6 "$text" ;;
+        styled) "$UI_GUM" style --border rounded --padding "0 2" "${c[@]}" "$text" ;;
         *)      ui_print "== $text ==" ;;
     esac
 }
 
 ui_ok() {
+    local c=(); [ -n "${NO_COLOR:-}" ] || c=(--foreground 2)
     case "$(ui_ctx)" in
-        styled) "$UI_GUM" style --foreground 2 "✓ $*" ;;
+        styled) "$UI_GUM" style "${c[@]}" "✓ $*" ;;
         *)      ui_print "OK: $*" ;;
     esac
 }
 
 ui_warn() {
+    local c=(); [ -n "${NO_COLOR:-}" ] || c=(--foreground 3)
     case "$(ui_ctx 2)" in
-        styled) "$UI_GUM" style --foreground 3 "! $*" >&2 ;;
+        styled) "$UI_GUM" style "${c[@]}" "! $*" >&2 ;;
         *)      ui_print "WARN: $*" >&2 ;;
     esac
 }
 
 ui_err() {
+    local c=(); [ -n "${NO_COLOR:-}" ] || c=(--foreground 1)
     case "$(ui_ctx 2)" in
-        styled) "$UI_GUM" style --foreground 1 "✗ $*" >&2 ;;
+        styled) "$UI_GUM" style "${c[@]}" "✗ $*" >&2 ;;
         *)      ui_print "ERROR: $*" >&2 ;;
     esac
 }
@@ -204,7 +210,7 @@ ui_usage() {                   # stdin: usage text (readable raw; light markdown
 }
 
 ui_pager() {                   # stdin: content -> scrollable viewport when it overflows the screen.
-                               # Pages with `less -R`, NOT `gum pager`: gum pager draws a border +
+                               # Pages with `less -RX`, NOT `gum pager`: gum pager draws a border +
                                # line-number gutter that shrink the usable width and re-wrap content
                                # already sized to the terminal (e.g. the help command table). less is
                                # full-width, keeps colours (-R), and is staged in the snap. Gates on
@@ -212,16 +218,19 @@ ui_pager() {                   # stdin: content -> scrollable viewport when it o
     local content; content="$(cat)"
     if [ "$(ui_ctx)" = styled ] && command -v less >/dev/null 2>&1 \
        && [ "$(printf '%s\n' "$content" | wc -l)" -gt "$(ui_lines)" ]; then
-        printf '%s\n' "$content" | less -R
+        printf '%s\n' "$content" | less -RX
     else
         printf '%s\n' "$content"
     fi
 }
 
 ui_choose() {                  # $1 prompt, $2 no-TTY hint, $3.. items -> echoes selection; 2 if not interactive/Ctrl-C/abort
+    local sel=()
+    if [ "${1:-}" = "--selected" ]; then sel=(--selected "$2"); shift 2; fi
     local prompt="$1" hint="$2"; shift 2
     if ui_interactive; then
-        "$UI_GUM" choose --header "$prompt" "$@"
+        local h; h=$(( $(ui_lines) - 6 )); [ "$h" -ge 5 ] || h=5
+        "$UI_GUM" choose "${sel[@]}" --height "$h" --header "$prompt" "$@"
         local rc=$?
         [ "$rc" = 130 ] && return 2
         return "$rc"
@@ -231,13 +240,14 @@ ui_choose() {                  # $1 prompt, $2 no-TTY hint, $3.. items -> echoes
     fi
 }
 
-ui_input() {                   # [--password] $1 prompt -> echoes value; piped stdin honored; 2 if nothing to read/Ctrl-C/abort
+ui_input() {                   # [--password] [--value v] $1 prompt -> echoes value; piped stdin honored; 2 if nothing to read/Ctrl-C/abort
                                # non-interactive path consumes ONE line of stdin — never call it in a
                                # pipeline whose stdin carries data for a later command
-    local pw=()
+    local pw=() val=()
     if [ "${1:-}" = "--password" ]; then pw=(--password); shift; fi
+    if [ "${1:-}" = "--value" ]; then val=(--value "$2"); shift 2; fi
     if ui_interactive; then
-        "$UI_GUM" input "${pw[@]}" --header "$1"
+        "$UI_GUM" input "${pw[@]}" "${val[@]}" --header "$1"
         local rc=$?
         [ "$rc" = 130 ] && return 2
         return "$rc"

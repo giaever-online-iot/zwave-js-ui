@@ -20,15 +20,19 @@ if [ "${FORCE_DISABLE_SSL}" != true ]; then
     unset FORCE_DISABLE_SSL
 fi
 
-USE_SECURE_COOKIE=$(snapctl get session.cookie-secure); export USE_SECURE_COOKIE
+# session.cookie-secure unset = follow the effective HTTPS; only an explicit false opts out.
+COOKIE_CFG=$(snapctl get session.cookie-secure)
 
 if [ "${HTTPS}" != true ] || [ "${FORCE_DISABLE_SSL}" == true ]; then
     unset HTTPS
     unset SERVER_SSL
     unset USE_SECURE_COOKIE
-elif [ "${USE_SECURE_COOKIE}" != true ]; then
+elif [ "${COOKIE_CFG}" = true ] || [ -z "${COOKIE_CFG}" ]; then
+    export USE_SECURE_COOKIE=true
+else
     unset USE_SECURE_COOKIE
 fi
+unset COOKIE_CFG
 
 SESSION_SECRET=$(snapctl get session.secret)
 if [ -n "${SESSION_SECRET}" ]; then

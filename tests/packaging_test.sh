@@ -19,4 +19,13 @@ assert_not_contains "$(cat "$R")" "not strictly required" "C3: README no longer 
 assert_not_contains "$(cat "$C")" "22.20.0" "B2: no stale Node literal"
 assert_not_contains "$(cat "$C")" '`pre-refresh` — runs `test_device_priority_dir`' "B2: hooks attributed correctly"
 assert_contains "$(cat "$C")" "daemon_config_digest" "CLAUDE.md documents the digest gate"
+assert_eq "$(yq '.apps.backup-timer.timer' "$Y")" "03:00" "D8: backup timer at 03:00"
+for _c in enable disable restart exec ui logs backup help; do assert_contains "$(cat "$R")" "zwave-js-ui.$_c" "C23: README lists zwave-js-ui.$_c"; done
+assert_contains "$(cat "$R")" "gpg-public-keys" "D15: README documents gpg-public-keys"
+assert_contains "$(cat "$R")" 'snap unset zwave-js-ui <key>' "C23: README explains unset"
+assert_eq "$(yq '.title' "$Y")" "Z-Wave JS UI" "store title"
+for _t in integation "full-fledge " "MQTT apis" "«" "Z-wave"; do assert_not_contains "$(yq '.description' "$Y")" "$_t" "store text typo gone: $_t"; done
+assert_contains "$(cat "$C")" "03:00" "CLAUDE.md: timer time"
+assert_contains "$(cat "$C")" "restored/" "CLAUDE.md: restore destination"
+assert_contains "$(cat "$C")" "unknown_config_keys" "CLAUDE.md: unknown keys"
 finish

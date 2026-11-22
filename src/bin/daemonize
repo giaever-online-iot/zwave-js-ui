@@ -14,7 +14,9 @@ main() {
     fi
     if ui_spin "Enabling $SNAP_NAME service…" snapctl start --enable "$SNAP_NAME.$SNAP_NAME"; then
         ui_ok "Service enabled"
+        ui_print "Web UI: $(web_ui_url)"
         printf '%s\n' \
+            "interactive navigator	sudo $SNAP_NAME.ui" \
             "follow all logs	sudo $SNAP_NAME.logs" \
             "app log only	sudo $SNAP_NAME.logs zui" \
             "driver log only	sudo $SNAP_NAME.logs zwjs" | ui_table

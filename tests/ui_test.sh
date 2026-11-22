@@ -37,7 +37,11 @@ assert_eq "$(UI_TTY2=1 ui_ctx 2)"                      "styled" "cached fd2 TTY 
 assert_eq "$(DAEMONIZED=1 ui_ctx)"                     "syslog" "daemonized -> syslog"
 assert_eq "$(DAEMONIZED=1 UI_ASSUME_TTY=1 ui_ctx)"     "syslog" "daemonized wins over TTY"
 assert_eq "$(UI_ASSUME_TTY=1 ui_ctx)"                  "styled" "TTY + stub gum -> styled"
-assert_eq "$(UI_ASSUME_TTY=1 NO_COLOR=1 ui_ctx)"       "plain"  "NO_COLOR -> plain"
+assert_eq "$(UI_ASSUME_TTY=1 NO_COLOR=1 ui_ctx)"       "styled" "NO_COLOR -> still styled (widgets stay)"
+UI_ASSUME_TTY=1 NO_COLOR=1 ui_ok x >/dev/null
+assert_not_contains "$(tail -1 "$GUM_LOG")" "--foreground" "NO_COLOR: no colour flag to gum"
+UI_ASSUME_TTY=1 ui_ok x >/dev/null
+assert_contains "$(tail -1 "$GUM_LOG")" "--foreground 2" "colour flag without NO_COLOR"
 assert_eq "$(UI_ASSUME_TTY=1 TERM=dumb ui_ctx)"        "plain"  "TERM=dumb -> plain"
 assert_eq "$(UI_ASSUME_TTY=1 UI_GUM=/nonexistent ui_ctx)" "plain" "gum missing -> plain"
 
@@ -98,9 +102,15 @@ assert_contains "$(printf 'Usage: x\n' | UI_ASSUME_TTY=1 ui_usage)" "[format] Us
 
 # --- ui_choose --------------------------------------------------------------
 export GUM_CHOOSE=zui      # exported: the stub gum runs as a child process
-sel="$(UI_ASSUME_TTY=1 ui_choose 'Follow which logs?' 'pass a stream' all zui zwjs)"
+sel="$(UI_ASSUME_TTY=1 UI_LINES=24 ui_choose 'Follow which logs?' 'pass a stream' all zui zwjs)"
 assert_eq "$sel" "zui" "choose returns gum selection"
-assert_contains "$(tail -1 "$GUM_LOG")" "choose --header Follow which logs? all zui zwjs" "choose argv recorded"
+assert_contains "$(tail -1 "$GUM_LOG")" "choose --height" "choose passes --height"
+assert_contains "$(tail -1 "$GUM_LOG")" "choose --height 18 --header Follow which logs? all zui zwjs" "choose argv recorded (options, header, items)"
+UI_ASSUME_TTY=1 UI_LINES=20 ui_choose --selected b 'P' '' a b >/dev/null
+assert_contains "$(tail -1 "$GUM_LOG")" "--selected b" "choose --selected passed"
+assert_contains "$(tail -1 "$GUM_LOG")" "--height 14" "choose height = lines-6"
+UI_ASSUME_TTY=1 UI_LINES=8 ui_choose 'P' '' a b >/dev/null
+assert_contains "$(tail -1 "$GUM_LOG")" "--height 5" "choose height minimum 5"
 
 ui_choose 'P' 'pass a stream: x.logs zui' a b >/dev/null 2>&1
 assert_status "$?" "2" "choose without TTY -> exit 2"
@@ -108,6 +118,10 @@ assert_contains "$(ui_choose 'P' 'pass a stream: x.logs zui' a b 2>&1 >/dev/null
 
 # --- ui_input ----------------------------------------------------------------
 export GUM_INPUT=Joachim   # exported: the stub gum runs as a child process
+UI_ASSUME_TTY=1 ui_input --value cur 'P' >/dev/null
+assert_contains "$(tail -1 "$GUM_LOG")" "--value cur" "input --value passed"
+UI_ASSUME_TTY=1 ui_input --password 'P' >/dev/null
+assert_not_contains "$(tail -1 "$GUM_LOG")" "--value" "input --password: no --value"
 assert_eq "$(UI_ASSUME_TTY=1 ui_input 'Real name')" "Joachim" "input via gum"
 assert_eq "$(printf 'piped-val\n' | ui_input 'Real name')" "piped-val" "input reads piped stdin without TTY"
 assert_eq "$(printf 'sec\n' | ui_input --password 'Passphrase')" "sec" "password input reads piped stdin"
@@ -221,6 +235,7 @@ big="$(seq 1 50)"
 LESS_LOG="$SNAP_DATA/less_pager.log"; export LESS_LOG; : > "$LESS_LOG"
 printf '%s\n' "$big" | UI_ASSUME_TTY=1 UI_LINES=10 ui_pager >/dev/null
 assert_contains "$(cat "$LESS_LOG")" "-R" "pager: styled + overflow -> less -R"
+assert_contains "$(cat "$LESS_LOG")" "-RX" "pager: -X keeps output on screen"
 # fits -> passthrough: content intact, less NOT invoked
 : > "$LESS_LOG"
 fits="$(printf 'a\nb\n' | UI_ASSUME_TTY=1 UI_LINES=10 ui_pager)"
@@ -242,5 +257,8 @@ po="$(UI_ASSUME_TTY=1 UI_NO_PAUSE=1 ui_pause 2>&1)"; ps=$?
 assert_status "$ps" "0" "pause: UI_NO_PAUSE -> returns 0 (no hang)"
 assert_eq "$po" "" "pause: UI_NO_PAUSE -> emits nothing"
 assert_eq "$(NO_COLOR=1 ui_pause 2>&1)" "" "pause: plain ctx -> no-op"
+# setsid: no controlling tty, so its read of /dev/tty fails at once instead of waiting for a
+# keypress on a developer's terminal (timeout as a backstop).
+assert_contains "$(UI_ASSUME_TTY=1 timeout 5 setsid -w bash -c 'source "$1/src/helper/ui"; ui_pause' _ "$ROOT" 2>&1 </dev/null || true)" "press Enter to continue" "pause: Enter wording"
 
 finish

@@ -65,12 +65,19 @@ assert_contains "$out" "serial-port" "serial footnote present"
 # The catalog duplicates defaults that test_default_config (helper/functions)
 # seeds; this converts the catalog's "keep in sync" comment into a CI check.
 # Deliberately only the keys with literal defaults — mqtt.name/session.* use
-# placeholder defaults ("(unset)", "(= server.ssl)") that have no literal match.
-for key in server.host server.port server.ssl timezone; do
+# placeholder defaults ("(unset)", "(follows server.ssl)", "(host time)") that have no literal match.
+for key in server.host server.port server.ssl; do
     def="$(settings_catalog | awk -F'\t' -v k="$key" '$1 == k { print $3 }')"
     grep -Eq "testnset_config \"$key\" \"?$def\"?" "$ROOT/src/helper/functions"
     assert_status "$?" "0" "catalog default for $key matches test_default_config"
 done
+
+# D6: an unset cookie-secure shows what it follows; an explicit value shows as itself
+assert_contains "$(SNAPCTL_server_ssl=true SNAPCTL_session_cookie_secure='' settings_rows)" "(follows server.ssl: true)" "D6: help shows the effective cookie-secure"
+assert_contains "$(SNAPCTL_server_ssl=true SNAPCTL_server_force_disable_ssl=true SNAPCTL_session_cookie_secure='' settings_rows)" "(follows server.ssl: false)" "D6: force-disable-ssl makes the effective value false"
+assert_contains "$(SNAPCTL_server_ssl='' SNAPCTL_session_cookie_secure='' settings_rows)" "(follows server.ssl: false)" "D6: unset server.ssl -> false, never blank"
+assert_contains "$(SNAPCTL_server_ssl=true SNAPCTL_session_cookie_secure=false settings_rows | grep '^session.cookie-secure')" "session.cookie-secure	false	" "D6: explicit value shown as is"
+assert_contains "$(SNAPCTL_mqtt_name='' settings_rows | grep '^mqtt.name')" "mqtt.name	(unset)	" "D6: other empty keys still (unset)"
 
 # --- help renders via the width-fit ui_table (stacking lives in the library now) ---
 unset NO_COLOR; export TERM=xterm-256color   # let UI_ASSUME_TTY reach styled
@@ -81,5 +88,17 @@ assert_contains "$mn" "server.host"            "main: narrow styled shows the se
 assert_contains "$mn" "    value: 10.0.0.7"    "main: narrow styled uses the generic stacked form"
 mw="$(export UI_ASSUME_TTY=1 UI_COLS=999; plugs_connected() { :; }; main)"
 assert_contains "$mw" "[table]"                "main: wide styled uses the gum table"
+
+# D13/D14: state-dependent opening block and sudo-marked rows
+out="$(unset SNAPCTL_server_host; plugs_connected() { :; }; main)"
+assert_contains "$out" "Running — web UI: http://<this-machine>:8091   stop: sudo zwave-js-ui.disable" "D13: running block"
+assert_not_contains "$out" "DISABLED" "D13: running -> no DISABLED"
+out="$(snapctl() { case "$1" in services) printf 'S  Startup  Current  Notes\nx  disabled  inactive  -\n' ;; *) : ;; esac; }; plugs_connected() { :; }; main)"
+assert_contains "$out" "DISABLED" "D13: disabled -> DISABLED text"
+out="$(snapctl() { case "$1" in services) printf 'S  Startup  Current  Notes\nx  enabled  inactive  -\n' ;; *) : ;; esac; }; plugs_connected() { :; }; main)"
+assert_contains "$out" "Enabled but not running — see: sudo zwave-js-ui.logs" "D13: enabled inactive block"
+assert_contains "$(commands_rows)" "sudo zwave-js-ui.enable	start the service now and at every boot" "D14: enable row"
+assert_contains "$(commands_rows)" "zwave-js-ui.help	this overview (no sudo)" "D14: help row"
+assert_not_contains "$(commands_rows)" "…" "D14: no U+2026 in rows"
 
 finish

@@ -258,9 +258,9 @@ assert_contains "$(cat "$SNAP_COMMON/xerr")" "nothing to export" "X5: explains";
 export GNUPGHOME="$SNAP_COMMON/.gnupg"; mkdir -p "$GNUPGHOME/private-keys-v1.d"
 gpg() { case "$*" in *--with-keygrip*) printf 'grp:::::::::1234GRIP:\n' ;; esac; }
 : > "$GNUPGHOME/private-keys-v1.d/1234GRIP.key"; secret_key_on_disk F0F0; assert_status "$?" 0 "S1: keygrip file present -> secret key on disk"
-printf '%s\n' "$(SNAPCTL_backup_encrypt_key=F0F0 cmd_status)" | grep -Eq 'private key on this device[[:space:]]+yes'; assert_status "$?" 0 "S1: status says yes without an agent (A5)"
+printf '%s\n' "$(SNAPCTL_backup_encrypt_key=F0F0 cmd_status)" | grep -Eq 'private key in snap keyring[[:space:]]+yes'; assert_status "$?" 0 "S1: status says yes without an agent (A5)"
 rm "$GNUPGHOME/private-keys-v1.d/1234GRIP.key"; secret_key_on_disk F0F0; assert_status "$?" 1 "S2: no keygrip file -> no"
-printf '%s\n' "$(SNAPCTL_backup_encrypt_key=F0F0 cmd_status)" | grep -Eq 'private key on this device[[:space:]]+no'; assert_status "$?" 0 "S2: status says no"
+printf '%s\n' "$(SNAPCTL_backup_encrypt_key=F0F0 cmd_status)" | grep -Eq 'private key in snap keyring[[:space:]]+no'; assert_status "$?" 0 "S2: status says no"
 gpg() { :; }; secret_key_on_disk F0F0; assert_status "$?" 1 "S3: key not in the keyring -> no"
 ih="$( (gpg() { return 1; }; printf 'junk' | cmd_import_key) 2>&1 )"; assert_not_contains "$ih" "Paste the ARMORED" "I1: piped stdin -> no paste hint"
 if command -v script >/dev/null 2>&1; then
@@ -273,5 +273,100 @@ EOT
   assert_contains "$ip" "Paste the ARMORED PUBLIC key" "I2: terminal stdin -> paste hint before reading (C7)"
 fi
 unset GNUPGHOME
+
+# --- Task 8: last-run record, status rows, Shipped line (D8, C22) ---
+t8c="$SNAP_COMMON"; t8b="$(mktemp -d)"; echo x > "$t8b/f"
+printf '#!/bin/sh\necho "Errors 0"\nexit "${DUP_RC:-0}"\n' > "$t8c/dup.sh"; chmod +x "$t8c/dup.sh"
+t8run() { ( DUP_PY="$t8c/dup.sh" SNAPCTL_backup_target='sftp://u:p@nas/zui' SNAPCTL_backup_encrypt=false SNAPCTL_backup_dir="$1" main backup ) 2>&1; }
+rm -f "$t8c/backup.last"
+o="$(DUP_RC=0 t8run "$t8b")"; rc=$?
+_rc=0; grep -Eq '^[0-9T:-]+Z ok 0$' "$t8c/backup.last" || _rc=1; assert_status "$_rc" 0 "B1: ok recorded"
+assert_eq "$(stat -c %a "$t8c/backup.last")" "600" "B1: mode 600"
+assert_contains "$o" "Shipped $t8b to sftp://<redacted>@nas/zui" "B1: Shipped line"
+assert_not_contains "$o" "u:p@" "B1: credentials redacted"
+assert_eq "$(redact_url 'sftp://u:p@ss@nas/zui')" "sftp://<redacted>@nas/zui" "B1: last @ splits userinfo"
+assert_eq "$(redact_url 'file:///srv/zui')" "file:///srv/zui" "B1: file url unchanged"
+assert_eq "$(redact_url 'sftp://nas/zui')" "sftp://nas/zui" "B1: no userinfo unchanged"
+assert_eq "$(redact_url 's3://KEY:SECRET@bucket/x')" "s3://<redacted>@bucket/x" "B1: s3 keys redacted"
+DUP_RC=23 t8run "$t8b" >/dev/null; assert_status "$?" 1 "B2: failed run rc 1"
+_rc=0; grep -Eq '^[0-9T:-]+Z failed 23$' "$t8c/backup.last" || _rc=1; assert_status "$_rc" 0 "B2: failed recorded"
+t8e="$(mktemp -d)"; t8run "$t8e" >/dev/null; assert_status "$?" 0 "B3: nothing to back up rc 0"
+_rc=0; grep -Eq '^[0-9T:-]+Z skipped nothing-to-back-up$' "$t8c/backup.last" || _rc=1; assert_status "$_rc" 0 "B3: skipped recorded"
+t8st() { SNAPCTL_backup_dir="$t8b" SNAPCTL_backup_target="${T8T-sftp://x/y}" cmd_status; }
+printf '2026-11-02T03:00:04Z ok 0\n' > "$t8c/backup.last"
+assert_contains "$(t8st)" "2026-11-02 03:00 UTC  OK" "B4: ok row"
+printf '2026-11-02T03:00:04Z failed 23\n' > "$t8c/backup.last"
+assert_contains "$(t8st)" "FAILED (rc 23) — see: sudo snap logs" "B4: failed row"
+printf '2026-11-02T03:00:04Z skipped nothing-to-back-up\n' > "$t8c/backup.last"
+assert_contains "$(t8st)" "skipped (nothing in $t8b — enable ZUI's scheduled backups)" "B4: skipped row"
+rm -f "$t8c/backup.last"
+_rc=0; t8st | grep -Eq 'last run[[:space:]]+never' || _rc=1; assert_status "$_rc" 0 "B4: never"
+_rc=0; T8T='' t8st | grep -Eq 'last run[[:space:]]+not configured' || _rc=1; assert_status "$_rc" 0 "B4: not configured"
+snapctl() { case "$1" in get) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;; services) printf 'Service Startup Current Notes\nzwave-js-ui.backup-timer enabled inactive -\n' ;; *) : ;; esac; }
+assert_contains "$(t8st)" "enabled — runs daily at 03:00 (idle between runs)" "B5: timer row"
+snapctl() { case "$1" in get) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;; services) printf 'Service Startup Current Notes\nzwave-js-ui.backup-timer disabled inactive -\n' ;; *) : ;; esac; }
+_rc=0; t8st | grep -Eq 'timer[[:space:]]+disabled' || _rc=1; assert_status "$_rc" 0 "B5: timer disabled"
+snapctl() { case "$1" in get) local k="${2//[.-]/_}"; eval "printf '%s' \"\${SNAPCTL_${k}:-}\"" ;; *) : ;; esac; }
+_rc=0; ( export GNUPGHOME="$t8c/.gnupg"; gpg() { :; }; SNAPCTL_backup_encrypt_key=F0F0 t8st ) | grep -Fq 'no (public key only — restore needs the private key)' || _rc=1; assert_status "$_rc" 0 "B5: key row public only"
+_rc=0; t8st | grep -Eq 'private key in snap keyring[[:space:]]+-' || _rc=1; assert_status "$_rc" 0 "B5: key row none"
+( SNAP_COMMON=/nonexistent DUP_PY="$t8c/dup.sh" SNAPCTL_backup_target='sftp://u:p@nas/zui' SNAPCTL_backup_encrypt=false SNAPCTL_backup_dir="$t8b" main backup ) >/dev/null 2>&1
+assert_status "$?" 0 "B6: unwritable SNAP_COMMON never fails the backup"
+rm -rf "$t8b" "$t8e"
+
+# ---- Task 9: restore into a fresh folder ----
+t9c="$(mktemp -d)"; t9d="$(mktemp -d)"
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" > "$SNAP_COMMON/dup.argv"\nexit "${DUP_RC:-0}"\n' > "$t9c/dup.sh"; chmod +x "$t9c/dup.sh"
+t9run() { ( SNAP_COMMON="$t9c" SNAP_DATA="${T9D:-$t9d}" DUP_PY="$t9c/dup.sh" SNAPCTL_backup_target='sftp://nas/zui' SNAPCTL_backup_encrypt=false SNAPCTL_backup_dir="${T9BD-}" main restore "$@" ) 2>&1; }
+rm -f "$t9c/dup.argv"; o="$(t9run)"; rc=$?
+assert_status "$rc" 0 "R1: restore rc 0"
+last="$(awk '{print $NF}' "$t9c/dup.argv")"
+_rc=0; [[ "$last" =~ ^$t9d/restored/[0-9]{8}-[0-9]{6}$ ]] || _rc=1; assert_status "$_rc" 0 "R1: dest under SNAP_DATA/restored/<stamp>"
+_rc=0; [ -d "$last" ] || _rc=1; assert_status "$_rc" 0 "R1: dest exists"
+assert_contains "$o" "Restored into $last — the files are in ZUI's store browser under restored/" "R1: success text"
+t9run 3D >/dev/null; assert_contains "$(cat "$t9c/dup.argv")" "--time 3D" "R2: time passed"
+mkdir "$t9c/empty"; o="$(t9run --into "$t9c/empty")"
+assert_eq "$(awk '{print $NF}' "$t9c/dup.argv")" "$t9c/empty" "R3: --into dest"
+assert_contains "$o" "Restored into $t9c/empty." "R3: into message"
+t9run 2026-10-30 --into "$t9c/empty" >/dev/null; assert_contains "$(cat "$t9c/dup.argv")" "--time 2026-10-30" "R3: time with --into after"
+mkdir "$t9c/full"; : > "$t9c/full/x"; rm -f "$t9c/dup.argv"
+o="$(t9run --into "$t9c/full")"; rc=$?
+assert_status "$rc" 1 "R4: non-empty rc 1"
+assert_contains "$o" "$t9c/full is not empty — choose an empty directory" "R4: message"
+_rc=0; [ ! -e "$t9c/dup.argv" ] || _rc=1; assert_status "$_rc" 0 "R4: duplicity not invoked"
+o="$(T9D=/proc/none t9run)"; rc=$?
+assert_status "$rc" 1 "R5: cannot create rc 1"
+assert_contains "$o" "Cannot create /proc/none/restored/" "R5: message"
+_rc=0; [ ! -e "$t9c/dup.argv" ] || _rc=1; assert_status "$_rc" 0 "R5: duplicity not invoked"
+o="$(T9BD="$t9d" t9run)"; rc=$?
+assert_status "$rc" 0 "R6: fallback rc 0"
+_rc=0; [[ "$(awk '{print $NF}' "$t9c/dup.argv")" == "$t9c/restored/"* ]] || _rc=1; assert_status "$_rc" 0 "R6: under SNAP_COMMON/restored"
+assert_contains "$o" "Restored into $t9c/restored/" "R6: message"
+_rc=0; [[ "$o" != *"store browser"* ]] || _rc=1; assert_status "$_rc" 0 "R6: no store-browser claim"
+assert_contains "$(usage)" "3D (three days ago)" "R7: usage documents <time>"
+rm -rf "$t9c" "$t9d"
+
+# ---- Task 10: name the missing gpg-public-keys interface; honest agent error (D10, D15) ----
+t10c="$(mktemp -d)"
+# Opt-in stub variant (local to each subshell): is-connected follows SNAPCTL_CONNECTED
+# (space-separated plug names) when that variable is set, else succeeds.
+t10_stub='snapctl() { case "$1" in is-connected) [ -z "${SNAPCTL_CONNECTED+x}" ] || case " $SNAPCTL_CONNECTED " in *" $2 "*) return 0;; *) return 1;; esac ;; *) : ;; esac; }'
+# G1: interface not connected -> named error, rc 1, no "No host GPG keyring" claim
+( eval "$t10_stub"; export SNAPCTL_CONNECTED='' SNAP_REAL_HOME="$t10c/nohome"; require_host_keyring list-keys ) >"$t10c/g1.out" 2>&1
+_rc=$?; assert_status "$_rc" 1 "G1: not connected -> rc 1"
+assert_contains "$(cat "$t10c/g1.out")" "The gpg-public-keys interface is not connected, so your ~/.gnupg is not visible to the snap. Run: sudo snap connect zwave-js-ui:gpg-public-keys" "G1: names the interface and the connect command"
+assert_not_contains "$(cat "$t10c/g1.out")" "No host GPG keyring" "G1: no misleading keyring message"
+# G2: interface connected but no ~/.gnupg -> the existing keyring message
+mkdir -p "$t10c/home"
+( eval "$t10_stub"; export SNAPCTL_CONNECTED='gpg-public-keys' SNAP_REAL_HOME="$t10c/home"; require_host_keyring list-keys ) >"$t10c/g2.out" 2>&1
+_rc=$?; assert_status "$_rc" 1 "G2: connected, no keyring -> rc 1"
+assert_contains "$(cat "$t10c/g2.out")" "No host GPG keyring at $t10c/home/.gnupg." "G2: existing keyring message"
+# G3: gpg-agent cannot start -> honest message naming the likely causes
+( GNUPGHOME="$t10c/gnupg"; export GNUPGHOME SNAP_COMMON="$t10c"
+  gpg-agent() { return 1; }; gpg-connect-agent() { :; }; ensure_agent ) >"$t10c/g3.out" 2>&1
+_rc=$?; assert_status "$_rc" 1 "G3: agent failure -> rc 1"
+assert_contains "$(cat "$t10c/g3.out")" "could not start gpg-agent — on kernel 6.17+ this is snap confinement's AF_UNIX mediation; otherwise see: sudo snap logs zwave-js-ui" "G3: honest agent error"
+# G4: usage names the interface needed by list-keys/pick-key
+assert_contains "$(usage)" "(needs: sudo snap connect zwave-js-ui:gpg-public-keys)" "G4: usage names gpg-public-keys"
+rm -rf "$t10c"
 
 finish

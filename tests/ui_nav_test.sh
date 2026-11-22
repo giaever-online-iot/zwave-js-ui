@@ -113,7 +113,8 @@ out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_setting
 assert_contains "$out" "Used by the next backup run." "N6: backup key -> no restart talk"; assert_not_contains "$(cat "$GUM_LOG")" "confirm" "N6: no confirm for backup keys"
 : > "$SET_LOG"; printf '%s\n' "session.cookie-secure" "Reset to default" "← Back" > "$CQ"
 SNAPCTL_server_ssl=true UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings >/dev/null 2>&1
-assert_contains "$(cat "$SET_LOG")" "set session.cookie-secure=true" "N7: dependent default follows server.ssl"
+assert_contains "$(cat "$SET_LOG")" "unset session.cookie-secure" "N7: reset unsets cookie-secure"
+assert_not_contains "$(cat "$SET_LOG")" "set session.cookie-secure=" "N7: reset leaves it unset, so it follows server.ssl (D6)"
 : > "$SET_LOG"; printf '%s\n' "mqtt.name" "Edit" "← Back" > "$CQ"; printf '\n' > "$INQ"
 UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings >/dev/null 2>&1
 assert_contains "$(cat "$SET_LOG")" "unset mqtt.name" "N8: empty edit = reset"
@@ -126,6 +127,47 @@ assert_contains "$out" "mqtt.name reset to default: (unset)" "N9: a key without 
 printf '%s\n' "zwave.serial-port" "← Back" > "$CQ"
 out="$(UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings 2>&1)"
 assert_contains "$out" "Serial device of the Z-Wave controller" "A6: real description shown"; assert_not_contains "$out" "advanced" "A6: scope no longer leaks into the description"
+
+# N10-N14: edits start from the current value; Back is first; cross-key rule
+: > "$GUM_LOG"; printf '%s\n' "server.host" "Edit" "← Back" > "$CQ"; printf '10.0.0.8\n' > "$INQ"
+SNAPCTL_server_host=10.0.0.7 UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings >/dev/null 2>&1
+assert_contains "$(cat "$GUM_LOG")" "input --value 10.0.0.7 --header server.host = " "N10: string edit starts from the current value"
+: > "$GUM_LOG"; printf '%s\n' "session.secret" "Edit" "← Back" > "$CQ"; printf 'x\n' > "$INQ"
+SNAPCTL_session_secret=oldsecret UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" GUM_INPUT_QUEUE="$INQ" nav_settings >/dev/null 2>&1
+assert_not_contains "$(grep '^input' "$GUM_LOG")" "--value" "N11: secret edit never pre-fills"
+assert_not_contains "$(cat "$GUM_LOG")" "oldsecret" "N11: secret value never reaches gum"
+: > "$GUM_LOG"; printf '%s\n' "server.ssl" "Edit" "true" "← Back" > "$CQ"
+SNAPCTL_server_ssl=false UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings >/dev/null 2>&1
+assert_contains "$(cat "$GUM_LOG")" "choose --selected false" "N12: bool edit preselects the current value"
+: > "$GUM_LOG"; printf '%s\n' "← Back" > "$CQ"
+UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings >/dev/null 2>&1
+assert_contains "$(head -n1 "$GUM_LOG")" "--header Setting ← Back " "N13: settings list starts with Back"
+: > "$SET_LOG"; printf '%s\n' "session.cookie-secure" "Edit" "true" "← Back" > "$CQ"
+out="$(SNAPCTL_server_ssl=false UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$CQ" nav_settings 2>&1)"
+assert_contains "$out" "session.cookie-secure=true needs server.ssl=true (secure cookies only work over HTTPS) — or unset it: sudo snap unset zwave-js-ui session.cookie-secure" "N14: cross-key rejection message"
+assert_contains "$out" "Rejected" "N14: rejected banner"
+assert_not_contains "$(cat "$SET_LOG")" "set session.cookie-secure" "N14: nothing written on cross-key rejection"
+# N18: Reset to default also runs the cross-key rule. A stateful stub (the reset re-seeds via a
+# subshell, so state lives in files): server.ssl=true + cookie-secure=true, reset server.ssl.
+_prev_snapctl="$(declare -f snapctl)"
+ST="$SNAP_DATA/n18"; rm -rf "$ST"; mkdir -p "$ST"; printf true > "$ST/server.ssl"; printf true > "$ST/session.cookie-secure"
+snapctl() {
+    case "$1" in
+        services) printf 'Service  Startup  Current  Notes\nzwave-js-ui.zwave-js-ui  enabled  active  -\n' ;;
+        get) [ -e "$ST/$2" ] && cat "$ST/$2"; return 0 ;;
+        set)   printf 'set %s\n' "$2" >> "$SET_LOG"; printf '%s' "${2#*=}" > "$ST/${2%%=*}" ;;
+        unset) printf 'unset %s\n' "$2" >> "$SET_LOG"; rm -f "$ST/$2" ;;
+        *) : ;;
+    esac
+}
+: > "$SET_LOG"; : > "$GUM_LOG"; printf '%s\n' "server.ssl" "Reset to default" "← Back" > "$CQ"
+out="$(UI_ASSUME_TTY=1 GUM_CONFIRM=0 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$CQ" nav_settings 2>&1)"
+assert_contains "$out" "session.cookie-secure=true needs server.ssl=true" "N18: reset hits the cross-key message"
+assert_contains "$out" "Rejected" "N18: rejected banner"
+assert_eq "$(sed -n '$p' "$SET_LOG")" "set server.ssl=true" "N18: previous value restored"
+assert_eq "$(cat "$ST/server.ssl")" "true" "N18: stored server.ssl is true again"
+assert_not_contains "$(cat "$GUM_LOG")" "confirm" "N18: no restart offer"; assert_not_contains "$out" "RAN_restart" "N18: no restart"
+eval "$_prev_snapctl"
 
 # session.secret value is masked in the success banner (not leaked)
 # Re-source src/bin/ui to clear any spy overrides left by prior tests
@@ -154,6 +196,9 @@ assert_contains "$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$LQ" nav_log
 printf '%s\n' "all" > "$LQ"
 assert_contains "$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$LQ" nav_logs 2>&1)" "RAN_logs all" "Live logs > all runs logs all"
 assert_contains "$(NAV_BIN="$SVC" nav_help 2>&1)" "RAN_help" "Help runs help"
+printf '%s\n' "← Back" > "$LQ"
+out="$(UI_ASSUME_TTY=1 NAV_BIN="$SVC" GUM_CHOOSE_QUEUE="$LQ" nav_logs 2>&1)"
+assert_not_contains "$out" "RAN_logs" "N17: logs Back returns without running logs"
 
 # navigator wipes the screen on each styled view (ui_clear wired into the loops)
 cqx="$SNAP_DATA/clear.q"; printf '%s\n' "Enable" > "$cqx"
@@ -180,5 +225,22 @@ MI="$SNAP_DATA/mqtt.in"; printf 'broker.local\n' > "$MI"
 # decline the restart prompt
 GUM_CONFIRM=1 UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$MQ" GUM_INPUT_QUEUE="$MI" SNAP_DATA="$SNAP_DATA" nav_mqtt >/dev/null 2>&1
 assert_contains "$(cat "$YQ_LOG")" ".mqtt.host" "nav_mqtt writes mqtt.host via yq"
+
+# N15: MQTT section is honest about the daemon state
+snapctl() { case "$1" in services) printf 'Service  Startup  Current  Notes\nzwave-js-ui.zwave-js-ui  enabled  %s  -\n' "${SNAPCTL_MAIN_STATE:-active}" ;; *) : ;; esac; }
+: > "$GUM_LOG"; printf '%s\n' "mqtt.host" "← Back" > "$MQ"; printf 'broker.local\n' > "$MI"
+out="$(SNAPCTL_MAIN_STATE=inactive UI_ASSUME_TTY=1 GUM_CHOOSE_QUEUE="$MQ" GUM_INPUT_QUEUE="$MI" nav_mqtt 2>&1)"
+assert_not_contains "$out" "Editing settings.json" "N15: no overwrite warning when stopped"
+assert_not_contains "$(cat "$GUM_LOG")" "confirm" "N15: no restart offer when stopped"
+assert_contains "$out" "Takes effect when the service starts." "N15: stopped -> start hint"
+: > "$GUM_LOG"; printf '%s\n' "mqtt.host" "← Back" > "$MQ"; printf 'broker.local\n' > "$MI"
+out="$(UI_ASSUME_TTY=1 GUM_CONFIRM=1 GUM_CHOOSE_QUEUE="$MQ" GUM_INPUT_QUEUE="$MI" nav_mqtt 2>&1)"
+assert_contains "$out" "Editing settings.json" "N15: warning shown when running"
+assert_contains "$(cat "$GUM_LOG")" "confirm" "N15: restart offered when running"
+
+# N16: TERM=dumb -> explanation, rc 2
+out="$(TERM=dumb UI_ASSUME_TTY=1 main </dev/null 2>&1)"; st=$?
+assert_status "$st" "2" "N16: TERM=dumb -> returns 2"
+assert_contains "$out" "needs a terminal that can draw menus (TERM=dumb)" "N16: dumb-terminal message"
 
 finish
